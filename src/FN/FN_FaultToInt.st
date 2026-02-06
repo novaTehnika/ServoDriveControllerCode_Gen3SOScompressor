@@ -15,15 +15,22 @@
        Fault           : E_FaultCode      (* Fault code to convert
 *)
 
-CASE Fault OF
-    FAULT_NONE:         FaultToInt := 0;
-    FAULT_HANDSHAKE:    FaultToInt := 1;
-    FAULT_DRIVE:        FaultToInt := 2;
-    FAULT_POSITION:     FaultToInt := 3;
-    FAULT_HOMING_REQ:   FaultToInt := 4;
-    FAULT_PISTON_EXIT:  FaultToInt := 5;
-    FAULT_LIMIT_SWITCH: FaultToInt := 6;
-    FAULT_ENCODER:      FaultToInt := 7;
+IF Fault = FAULT_NONE THEN
+    FaultToInt := 0;
+ELSIF Fault = FAULT_HANDSHAKE THEN
+    FaultToInt := 1;
+ELSIF Fault = FAULT_DRIVE THEN
+    FaultToInt := 2;
+ELSIF Fault = FAULT_POSITION THEN
+    FaultToInt := 3;
+ELSIF Fault = FAULT_HOMING_REQ THEN
+    FaultToInt := 4;
+ELSIF Fault = FAULT_PISTON_EXIT THEN
+    FaultToInt := 5;
+ELSIF Fault = FAULT_LIMIT_SWITCH THEN
+    FaultToInt := 6;
+ELSIF Fault = FAULT_ENCODER THEN
+    FaultToInt := 7;
 ELSE
     FaultToInt := 0;
-END_CASE;
+END_IF;

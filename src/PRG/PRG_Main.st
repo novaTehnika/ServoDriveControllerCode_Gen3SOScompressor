@@ -231,13 +231,13 @@ IF bEnterState THEN
     tStateTimer(IN := FALSE);   (* Reset state timer on entry *)
 END_IF;
 
-CASE sysCurrentState OF
+IF sysCurrentState = ST_INIT THEN
 
     (* ======================================================================
        INITIALIZATION STATES
        ====================================================================== *)
 
-    ST_INIT:
+    (* ST_INIT *)
         (* Power-on initialization *)
         IF bEnterState THEN
             (* Ensure safe output state *)
@@ -250,7 +250,7 @@ CASE sysCurrentState OF
         sysCurrentState := ST_ENCODER_CHECK;
 
 
-    ST_ENCODER_CHECK:
+ELSIF sysCurrentState = ST_ENCODER_CHECK THEN
         (* Validate absolute encoder status using AbsolutePositionManager *)
         IF bEnterState THEN
             fbEncoderManager(Enable := FALSE);  (* Reset *)
@@ -284,7 +284,7 @@ CASE sysCurrentState OF
         END_IF;
 
 
-    ST_REQUIRE_ABS_HOME:
+ELSIF sysCurrentState = ST_REQUIRE_ABS_HOME THEN
         (* Set absolute home requirement flag *)
         IF bEnterState THEN
             flagAbsHomeRequired := TRUE;
@@ -298,7 +298,7 @@ CASE sysCurrentState OF
        IDLE STATE
        ====================================================================== *)
 
-    ST_IDLE:
+ELSIF sysCurrentState = ST_IDLE THEN
         IF bEnterState THEN
             (* Ensure safe state *)
             doBrakeDisengage := FALSE;  (* Brake engaged *)
@@ -360,7 +360,7 @@ CASE sysCurrentState OF
        TRANSITION STATES - ACTIVATION
        ====================================================================== *)
 
-    ST_DRIVE_ENABLE:
+ELSIF sysCurrentState = ST_DRIVE_ENABLE THEN
         IF bEnterState THEN
             tDriveReadyTimer(IN := FALSE);
         END_IF;
@@ -385,7 +385,7 @@ CASE sysCurrentState OF
         END_IF;
 
 
-    ST_BRAKE_RELEASE:
+ELSIF sysCurrentState = ST_BRAKE_RELEASE THEN
         IF bEnterState THEN
             doBrakeDisengage := TRUE;   (* Release brake *)
             tBrakeTimer(IN := FALSE);
@@ -398,18 +398,24 @@ CASE sysCurrentState OF
             sysBrakeEngaged := FALSE;
 
             (* Transition to target operational state *)
-            CASE eTargetMode OF
-                MODE_BRAKE_HOLD:    sysCurrentState := ST_BRAKE_HOLD;
-                MODE_POSITION:      sysCurrentState := ST_POSITION_CTRL;
-                MODE_VELOCITY:      sysCurrentState := ST_VELOCITY_CTRL;
-                MODE_TORQUE:        sysCurrentState := ST_TORQUE_CTRL;
-                MODE_GO_HOME:       sysCurrentState := ST_GO_HOME;
-                MODE_HOME_LIMIT:    sysCurrentState := ST_HOME_LIMIT;
-                MODE_HOME_EOT:      sysCurrentState := ST_HOME_EOT;
+            IF eTargetMode = MODE_BRAKE_HOLD THEN
+                sysCurrentState := ST_BRAKE_HOLD;
+            ELSIF eTargetMode = MODE_POSITION THEN
+                sysCurrentState := ST_POSITION_CTRL;
+            ELSIF eTargetMode = MODE_VELOCITY THEN
+                sysCurrentState := ST_VELOCITY_CTRL;
+            ELSIF eTargetMode = MODE_TORQUE THEN
+                sysCurrentState := ST_TORQUE_CTRL;
+            ELSIF eTargetMode = MODE_GO_HOME THEN
+                sysCurrentState := ST_GO_HOME;
+            ELSIF eTargetMode = MODE_HOME_LIMIT THEN
+                sysCurrentState := ST_HOME_LIMIT;
+            ELSIF eTargetMode = MODE_HOME_EOT THEN
+                sysCurrentState := ST_HOME_EOT;
             ELSE
                 (* Unknown mode - brake is released, hold position until handshake *)
                 sysCurrentState := ST_HOLD_POSITION;
-            END_CASE;
+            END_IF;
         END_IF;
 
 
@@ -417,7 +423,7 @@ CASE sysCurrentState OF
        OPERATIONAL STATES
        ====================================================================== *)
 
-    ST_BRAKE_HOLD:
+ELSIF sysCurrentState = ST_BRAKE_HOLD THEN
         IF bEnterState THEN
             doBrakeDisengage := FALSE;  (* Engage brake *)
             sysConfirmedMode := MODE_BRAKE_HOLD;
@@ -447,20 +453,19 @@ CASE sysCurrentState OF
                 sysActiveFault := FAULT_HOMING_REQ;
                 sysCurrentState := ST_FAULT;
             ELSE
-                CASE eTargetMode OF
-                    MODE_IDLE:
-                        (* Return to idle - disable drive *)
-                        sysCurrentState := ST_DRIVE_DISABLE;
+                IF eTargetMode = MODE_IDLE THEN
+                    (* Return to idle - disable drive *)
+                    sysCurrentState := ST_DRIVE_DISABLE;
 
-                    MODE_BRAKE_HOLD:
-                        (* Stay in brake hold - do nothing *)
-                        ;
+                ELSIF eTargetMode = MODE_BRAKE_HOLD THEN
+                    (* Stay in brake hold - do nothing *)
+                    ;
 
-                    MODE_POSITION, MODE_VELOCITY, MODE_TORQUE,
-                    MODE_GO_HOME, MODE_HOME_LIMIT, MODE_HOME_EOT:
-                        (* Other operational modes - need to release brake first *)
-                        sysCurrentState := ST_BRAKE_RELEASE;
-                END_CASE;
+                ELSIF eTargetMode = MODE_POSITION OR eTargetMode = MODE_VELOCITY OR eTargetMode = MODE_TORQUE OR
+                      eTargetMode = MODE_GO_HOME OR eTargetMode = MODE_HOME_LIMIT OR eTargetMode = MODE_HOME_EOT THEN
+                    (* Other operational modes - need to release brake first *)
+                    sysCurrentState := ST_BRAKE_RELEASE;
+                END_IF;
             END_IF;
         END_IF;
 
@@ -468,7 +473,7 @@ CASE sysCurrentState OF
            It is safer to keep the brake engaged. Mode changes are handled via handshake above. *)
 
 
-    ST_POSITION_CTRL:
+ELSIF sysCurrentState = ST_POSITION_CTRL THEN
         IF bEnterState THEN
             sysConfirmedMode := MODE_POSITION;
             (* Configure position mode limits *)
@@ -504,7 +509,7 @@ CASE sysCurrentState OF
         END_IF;
 
 
-    ST_VELOCITY_CTRL:
+ELSIF sysCurrentState = ST_VELOCITY_CTRL THEN
         IF bEnterState THEN
             sysConfirmedMode := MODE_VELOCITY;
             stCurrentLimits.VelMax := cfgVelLimitMax;
@@ -533,7 +538,7 @@ CASE sysCurrentState OF
         END_IF;
 
 
-    ST_TORQUE_CTRL:
+ELSIF sysCurrentState = ST_TORQUE_CTRL THEN
         IF bEnterState THEN
             sysConfirmedMode := MODE_TORQUE;
             stCurrentLimits.TorqueMax := cfgTorqueLimitMax;
@@ -562,7 +567,7 @@ CASE sysCurrentState OF
         END_IF;
 
 
-    ST_GO_HOME:
+ELSIF sysCurrentState = ST_GO_HOME THEN
         IF bEnterState THEN
             sysConfirmedMode := MODE_GO_HOME;
             fbGoHome(Enable := FALSE);  (* Reset FB *)
@@ -606,7 +611,7 @@ CASE sysCurrentState OF
         END_IF;
 
 
-    ST_HOME_LIMIT:
+ELSIF sysCurrentState = ST_HOME_LIMIT THEN
         (* Mode 110 - Home to Limit Switch
            Uses FB_HomeLimit to encapsulate the complete homing sequence:
            approach, over-travel handling, detect, backoff, and set reference *)
@@ -654,16 +659,14 @@ CASE sysCurrentState OF
 
 
     (* Deprecated sub-states - kept for E_SystemState compatibility *)
-    ST_HOME_LIM_APPROACH,
-    ST_HOME_LIM_DETECT,
-    ST_HOME_LIM_BACKOFF,
-    ST_HOME_LIM_SETREF:
+ELSIF sysCurrentState = ST_HOME_LIM_APPROACH OR sysCurrentState = ST_HOME_LIM_DETECT OR
+      sysCurrentState = ST_HOME_LIM_BACKOFF OR sysCurrentState = ST_HOME_LIM_SETREF THEN
         (* These sub-states are now handled internally by FB_HomeLimit.
            If we get here, redirect back to ST_HOME_LIMIT *)
         sysCurrentState := ST_HOME_LIMIT;
 
 
-    ST_HOME_EOT:
+ELSIF sysCurrentState = ST_HOME_EOT THEN
         (* Mode 111 - Home to End-of-Travel
            Uses FB_HomeEOT to encapsulate the complete homing sequence:
            check requirements, fast approach, slow approach, stall detect, offset calc *)
@@ -724,16 +727,14 @@ CASE sysCurrentState OF
 
 
     (* Deprecated sub-states - kept for E_SystemState compatibility *)
-    ST_HOME_EOT_FAST,
-    ST_HOME_EOT_SLOW,
-    ST_HOME_EOT_DETECT,
-    ST_HOME_EOT_SETREF:
+ELSIF sysCurrentState = ST_HOME_EOT_FAST OR sysCurrentState = ST_HOME_EOT_SLOW OR
+      sysCurrentState = ST_HOME_EOT_DETECT OR sysCurrentState = ST_HOME_EOT_SETREF THEN
         (* These sub-states are now handled internally by FB_HomeEOT.
            If we get here, redirect back to ST_HOME_EOT *)
         sysCurrentState := ST_HOME_EOT;
 
 
-    ST_HOME_COMPLETE:
+ELSIF sysCurrentState = ST_HOME_COMPLETE THEN
         IF bEnterState THEN
             flagHomingInProgress := FALSE;
             doHomingComplete := TRUE;
@@ -751,7 +752,7 @@ CASE sysCurrentState OF
        TRANSITION STATE - INTER-MODE
        ====================================================================== *)
 
-    ST_HOLD_POSITION:
+ELSIF sysCurrentState = ST_HOLD_POSITION THEN
         IF bEnterState THEN
             (* IMPORTANT: Order matters here!
                1. fbHalt FIRST - initiates controlled deceleration and transitions axis
@@ -804,16 +805,23 @@ CASE sysCurrentState OF
                 sysCurrentState := ST_FAULT;
             ELSE
                 (* Transition directly to new mode (drive already enabled) *)
-                CASE eTargetMode OF
-                    MODE_BRAKE_HOLD:    sysCurrentState := ST_BRAKE_HOLD;
-                    MODE_POSITION:      sysCurrentState := ST_POSITION_CTRL;
-                    MODE_VELOCITY:      sysCurrentState := ST_VELOCITY_CTRL;
-                    MODE_TORQUE:        sysCurrentState := ST_TORQUE_CTRL;
-                    MODE_GO_HOME:       sysCurrentState := ST_GO_HOME;
-                    MODE_HOME_LIMIT:    sysCurrentState := ST_HOME_LIMIT;
-                    MODE_HOME_EOT:      sysCurrentState := ST_HOME_EOT;
-                    MODE_IDLE:          sysCurrentState := ST_BRAKE_ENGAGE;
-                END_CASE;
+                IF eTargetMode = MODE_BRAKE_HOLD THEN
+                    sysCurrentState := ST_BRAKE_HOLD;
+                ELSIF eTargetMode = MODE_POSITION THEN
+                    sysCurrentState := ST_POSITION_CTRL;
+                ELSIF eTargetMode = MODE_VELOCITY THEN
+                    sysCurrentState := ST_VELOCITY_CTRL;
+                ELSIF eTargetMode = MODE_TORQUE THEN
+                    sysCurrentState := ST_TORQUE_CTRL;
+                ELSIF eTargetMode = MODE_GO_HOME THEN
+                    sysCurrentState := ST_GO_HOME;
+                ELSIF eTargetMode = MODE_HOME_LIMIT THEN
+                    sysCurrentState := ST_HOME_LIMIT;
+                ELSIF eTargetMode = MODE_HOME_EOT THEN
+                    sysCurrentState := ST_HOME_EOT;
+                ELSIF eTargetMode = MODE_IDLE THEN
+                    sysCurrentState := ST_BRAKE_ENGAGE;
+                END_IF;
             END_IF;
 
         ELSIF tHandshakeTimer.Q THEN
@@ -827,7 +835,7 @@ CASE sysCurrentState OF
        TRANSITION STATES - DEACTIVATION
        ====================================================================== *)
 
-    ST_BRAKE_ENGAGE:
+ELSIF sysCurrentState = ST_BRAKE_ENGAGE THEN
         IF bEnterState THEN
             doBrakeDisengage := FALSE;  (* Engage brake *)
             tBrakeTimer(IN := FALSE);
@@ -843,7 +851,7 @@ CASE sysCurrentState OF
         END_IF;
 
 
-    ST_DRIVE_DISABLE:
+ELSIF sysCurrentState = ST_DRIVE_DISABLE THEN
         IF bEnterState THEN
             fbPower(Axis := sysAxis, Enable := FALSE);
         END_IF;
@@ -861,7 +869,7 @@ CASE sysCurrentState OF
        FAULT STATES
        ====================================================================== *)
 
-    ST_FAULT:
+ELSIF sysCurrentState = ST_FAULT THEN
         (* ----------------------------------------------------------------
            FAULT STATE - Active fault handling
 
@@ -928,7 +936,7 @@ CASE sysCurrentState OF
         END_IF;
 
 
-    ST_FAULT_RECOVERY:
+ELSIF sysCurrentState = ST_FAULT_RECOVERY THEN
         (* ----------------------------------------------------------------
            LEGACY STATE - Kept for MC_Reset if needed
            Currently bypassed by fast recovery path in ST_FAULT
@@ -954,7 +962,7 @@ CASE sysCurrentState OF
         END_IF;
 
 
-    ST_FAULT_IDLE:
+ELSIF sysCurrentState = ST_FAULT_IDLE THEN
         (* ----------------------------------------------------------------
            FAULT IDLE STATE - Drive disabled, brake engaged
 
@@ -1007,7 +1015,7 @@ CASE sysCurrentState OF
             sysCurrentState := ST_IDLE;
         END_IF;
 
-END_CASE;
+END_IF;
 
 
 (* --------------------------------------------------------------------------

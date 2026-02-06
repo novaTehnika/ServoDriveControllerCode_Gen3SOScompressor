@@ -15,16 +15,23 @@
        Mode            : E_OperatingMode  (* Operating mode to convert
 *)
 
-CASE Mode OF
-    MODE_IDLE:       ModeToInt := 0;
-    MODE_BRAKE_HOLD: ModeToInt := 1;
-    MODE_POSITION:   ModeToInt := 2;
-    MODE_VELOCITY:   ModeToInt := 3;
-    MODE_TORQUE:     ModeToInt := 4;
-    MODE_GO_HOME:    ModeToInt := 5;
-    MODE_HOME_LIMIT: ModeToInt := 6;
-    MODE_HOME_EOT:   ModeToInt := 7;
+IF Mode = MODE_IDLE THEN
+    ModeToInt := 0;
+ELSIF Mode = MODE_BRAKE_HOLD THEN
+    ModeToInt := 1;
+ELSIF Mode = MODE_POSITION THEN
+    ModeToInt := 2;
+ELSIF Mode = MODE_VELOCITY THEN
+    ModeToInt := 3;
+ELSIF Mode = MODE_TORQUE THEN
+    ModeToInt := 4;
+ELSIF Mode = MODE_GO_HOME THEN
+    ModeToInt := 5;
+ELSIF Mode = MODE_HOME_LIMIT THEN
+    ModeToInt := 6;
+ELSIF Mode = MODE_HOME_EOT THEN
+    ModeToInt := 7;
 ELSE
     ModeToInt := 0;
-END_CASE;
+END_IF;
  

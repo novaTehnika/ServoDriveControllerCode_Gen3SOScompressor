@@ -15,11 +15,6 @@
        Mode            : E_OperatingMode  (* Mode to check
 *)
 
-CASE Mode OF
-    MODE_GO_HOME,
-    MODE_HOME_LIMIT,
-    MODE_HOME_EOT:
-        IsHomingMode := TRUE;
-ELSE
-    IsHomingMode := FALSE;
-END_CASE;
+IsHomingMode := (Mode = MODE_GO_HOME) OR
+                (Mode = MODE_HOME_LIMIT) OR
+                (Mode = MODE_HOME_EOT);

@@ -15,15 +15,22 @@
        Value           : INT              (* Integer value 0-7
 *)
 
-CASE Value OF
-    0: IntToMode := MODE_IDLE;
-    1: IntToMode := MODE_BRAKE_HOLD;
-    2: IntToMode := MODE_POSITION;
-    3: IntToMode := MODE_VELOCITY;
-    4: IntToMode := MODE_TORQUE;
-    5: IntToMode := MODE_GO_HOME;
-    6: IntToMode := MODE_HOME_LIMIT;
-    7: IntToMode := MODE_HOME_EOT;
+IF Value = 0 THEN
+    IntToMode := MODE_IDLE;
+ELSIF Value = 1 THEN
+    IntToMode := MODE_BRAKE_HOLD;
+ELSIF Value = 2 THEN
+    IntToMode := MODE_POSITION;
+ELSIF Value = 3 THEN
+    IntToMode := MODE_VELOCITY;
+ELSIF Value = 4 THEN
+    IntToMode := MODE_TORQUE;
+ELSIF Value = 5 THEN
+    IntToMode := MODE_GO_HOME;
+ELSIF Value = 6 THEN
+    IntToMode := MODE_HOME_LIMIT;
+ELSIF Value = 7 THEN
+    IntToMode := MODE_HOME_EOT;
 ELSE
     IntToMode := MODE_IDLE;
-END_CASE;
+END_IF;

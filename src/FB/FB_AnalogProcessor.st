@@ -127,16 +127,15 @@ ELSE
 END_IF;
 
 (* Select active reference based on mode *)
-CASE CurrentMode OF
-    MODE_POSITION:
-        ActiveReference := ScaledPosition;
+IF CurrentMode = MODE_POSITION THEN
+    ActiveReference := ScaledPosition;
 
-    MODE_VELOCITY:
-        ActiveReference := ScaledVelocity;
+ELSIF CurrentMode = MODE_VELOCITY THEN
+    ActiveReference := ScaledVelocity;
 
-    MODE_TORQUE:
-        ActiveReference := ScaledTorque;
+ELSIF CurrentMode = MODE_TORQUE THEN
+    ActiveReference := ScaledTorque;
 
 ELSE
     ActiveReference := 0.0;
-END_CASE;
+END_IF;

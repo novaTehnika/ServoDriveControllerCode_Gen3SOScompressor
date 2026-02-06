@@ -16,12 +16,7 @@
        Mode            : E_OperatingMode  (* Mode to check
 *)
 
-CASE Mode OF
-    MODE_BRAKE_HOLD,
-    MODE_POSITION,
-    MODE_VELOCITY,
-    MODE_TORQUE:
-        IsOperationalMode := TRUE;
-ELSE
-    IsOperationalMode := FALSE;
-END_CASE;
+IsOperationalMode := (Mode = MODE_BRAKE_HOLD) OR
+                     (Mode = MODE_POSITION) OR
+                     (Mode = MODE_VELOCITY) OR
+                     (Mode = MODE_TORQUE);

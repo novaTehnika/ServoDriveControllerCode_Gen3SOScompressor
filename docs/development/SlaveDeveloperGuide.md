@@ -67,6 +67,37 @@ Global variables defined in a `GVL` use a prefix to indicate their scope.
 | `MODE_` | `E_OperatingMode` ENUM | `MODE_POSITION` | An operating mode commanded by the master. |
 | `FAULT_` | `E_FaultCode` ENUM | `FAULT_DRIVE` | A system fault code. |
 
+### MotionWorks IEC Express Compatibility
+
+This project uses **MotionWorks IEC Express**, which has more restrictions than MotionWorks IEC Pro.
+
+**CASE Statement Restriction:**
+
+MotionWorks IEC Express does not support enum types as CASE selectors. Always use IF-ELSIF-ELSE chains instead:
+
+```structuredtext
+(* ✓ CORRECT - Use IF-ELSIF with enums *)
+IF sysCurrentState = ST_IDLE THEN
+    (* logic *)
+ELSIF sysCurrentState = ST_RUNNING THEN
+    (* logic *)
+END_IF;
+
+(* ✗ WRONG - CASE with enum will not compile in MWiec Express *)
+CASE sysCurrentState OF
+    ST_IDLE:
+        (* logic *)
+    ST_RUNNING:
+        (* logic *)
+END_CASE;
+```
+
+**Note:** CASE statements with INT types (used in some internal FB state machines) are allowed and compile correctly.
+
+**Function Output Limitation:**
+
+Functions can only have one output. For multiple outputs, use a function block instead.
+
 ---
 
 ## 4. State Machine Deep Dive
@@ -105,15 +136,15 @@ Let's say you want to add `MODE_NEW_FEATURE` with a value of `101` (currently un
 
 4.  **Create a State:** In `src/DUT/DataTypes.st`, add a corresponding state in `E_SystemState`, e.g., `ST_NEW_FEATURE`.
 
-5.  **Add State Logic:** In `PRG_Main.st`, add a new `CASE` statement for `ST_NEW_FEATURE`. Implement the logic for this state.
+5.  **Add State Logic:** In `PRG_Main.st`, add a new `ELSIF` branch in the main state machine for `ST_NEW_FEATURE`. Implement the logic for this state.
     ```structuredtext
-    ST_NEW_FEATURE:
+    ELSIF sysCurrentState = ST_NEW_FEATURE THEN
         IF bEnterState THEN
             sysConfirmedMode := MODE_NEW_FEATURE;
-            // ... initialization logic ...
+            (* ... initialization logic ... *)
         END_IF;
 
-        // ... continuous logic for the new mode ...
+        (* ... continuous logic for the new mode ... *)
 
         IF fTrigMotionEnable.Q THEN
             sysCurrentState := ST_HOLD_POSITION;
@@ -121,8 +152,8 @@ Let's say you want to add `MODE_NEW_FEATURE` with a value of `101` (currently un
     ```
 
 6.  **Handle Transitions:** In `PRG_Main.st`, update the state transitions to allow entry into your new state.
-    *   In `ST_BRAKE_RELEASE`, add: `MODE_NEW_FEATURE: sysCurrentState := ST_NEW_FEATURE;`
-    *   In `ST_HOLD_POSITION`, add: `MODE_NEW_FEATURE: sysCurrentState := ST_NEW_FEATURE;`
+    *   In `ST_BRAKE_RELEASE`, add: `ELSIF eTargetMode = MODE_NEW_FEATURE THEN sysCurrentState := ST_NEW_FEATURE;`
+    *   In `ST_HOLD_POSITION`, add: `ELSIF eTargetMode = MODE_NEW_FEATURE THEN sysCurrentState := ST_NEW_FEATURE;`
 
 ### How to Add a New Fault Condition
 
@@ -130,7 +161,7 @@ Let's say you want to add `FAULT_NEW_CONDITION` with a value of `5` (currently `
 
 1.  **Define Enum:** In `src/DUT/DataTypes.st`, add the new fault to `E_FaultCode`. Note that ordinal position matters for bit encoding.
 
-2.  **Update Conversions:** In the individual function files under `src/FN/`, add the new fault to `FN_FaultToInt.st`, `FN_IntToFault.st`, and `FN_FaultToBits.st`.
+2.  **Update Conversions:** In the individual function files under `src/FN/`, add the new fault to `FN_FaultToInt.st` and `FN_FaultToBits.st`.
 
 3.  **Update Master Docs:** Add the new fault to the tables in `docs/master/FaultCodeReference.md` and other relevant guides.
 
