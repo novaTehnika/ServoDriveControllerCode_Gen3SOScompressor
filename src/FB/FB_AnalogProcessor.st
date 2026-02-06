@@ -23,33 +23,33 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable the processor *)
-       RawAnalogInput      : INT              (* Raw analog input value *)
-       CurrentMode         : E_OperatingMode  (* Current operating mode *)
-       Stage1PosMin        : LREAL            (* Stage 1 position start (mm) *)
-       Stage1PosMax        : LREAL            (* Stage 1 position end (mm) = transition pos *)
-       Stage1VoltMin       : LREAL            (* Stage 1 voltage start (V) *)
-       Stage1VoltMax       : LREAL            (* Stage 1 voltage end (V) = transition volt *)
-       Stage2PosMin        : LREAL            (* Stage 2 position start (mm) = transition pos *)
-       Stage2PosMax        : LREAL            (* Stage 2 position end (mm) *)
-       Stage2VoltMin       : LREAL            (* Stage 2 voltage start (V) = transition volt *)
-       Stage2VoltMax       : LREAL            (* Stage 2 voltage end (V) *)
-       VelMin              : LREAL            (* Velocity at -10V (mm/s) *)
-       VelMax              : LREAL            (* Velocity at +10V (mm/s) *)
-       TorqueMin           : LREAL            (* Torque at -10V (%) *)
-       TorqueMax           : LREAL            (* Torque at +10V (%) *)
+       Enable              : BOOL             (* Enable the processor
+       RawAnalogInput      : INT              (* Raw analog input value
+       CurrentMode         : E_OperatingMode  (* Current operating mode
+       Stage1PosMin        : LREAL            (* Stage 1 position start (mm)
+       Stage1PosMax        : LREAL            (* Stage 1 position end (mm) = transition pos
+       Stage1VoltMin       : LREAL            (* Stage 1 voltage start (V)
+       Stage1VoltMax       : LREAL            (* Stage 1 voltage end (V) = transition volt
+       Stage2PosMin        : LREAL            (* Stage 2 position start (mm) = transition pos
+       Stage2PosMax        : LREAL            (* Stage 2 position end (mm)
+       Stage2VoltMin       : LREAL            (* Stage 2 voltage start (V) = transition volt
+       Stage2VoltMax       : LREAL            (* Stage 2 voltage end (V)
+       VelMin              : LREAL            (* Velocity at -10V (mm/s)
+       VelMax              : LREAL            (* Velocity at +10V (mm/s)
+       TorqueMin           : LREAL            (* Torque at -10V (%)
+       TorqueMax           : LREAL            (* Torque at +10V (%)
      VAR_OUTPUT:
-       ScaledPosition      : LREAL            (* Scaled position reference (mm) *)
-       ScaledVelocity      : LREAL            (* Scaled velocity reference (mm/s) *)
-       ScaledTorque        : LREAL            (* Scaled torque reference (%) *)
-       ActiveReference     : LREAL            (* Currently active reference value *)
-       NormalizedInput     : LREAL            (* Input normalized to 0.0-1.0 range *)
-       InputVoltage        : LREAL            (* Calculated input voltage (-10 to +10) *)
-       InStage1            : BOOL             (* Position input is in stage 1 region *)
-       InStage2            : BOOL             (* Position input is in stage 2 region *)
+       ScaledPosition      : LREAL            (* Scaled position reference (mm)
+       ScaledVelocity      : LREAL            (* Scaled velocity reference (mm/s)
+       ScaledTorque        : LREAL            (* Scaled torque reference (%)
+       ActiveReference     : LREAL            (* Currently active reference value
+       NormalizedInput     : LREAL            (* Input normalized to 0.0-1.0 range
+       InputVoltage        : LREAL            (* Calculated input voltage (-10 to +10)
+       InStage1            : BOOL             (* Position input is in stage 1 region
+       InStage2            : BOOL             (* Position input is in stage 2 region
      VAR:
-       rNormalized         : LREAL            (* Normalized value 0.0 to 1.0 *)
-       rStageNormalized    : LREAL            (* Normalized value within stage *)
+       rNormalized         : LREAL            (* Normalized value 0.0 to 1.0
+       rStageNormalized    : LREAL            (* Normalized value within stage
      VAR CONSTANT:
        RAW_MIN             : LREAL := -32768.0
        RAW_MAX             : LREAL := 32767.0

@@ -16,8 +16,8 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Fault           : E_FaultCode      (* Fault code to compare *)
-       Mode            : E_OperatingMode   (* Mode bits to compare against *)
+       Fault           : E_FaultCode      (* Fault code to compare
+       Mode            : E_OperatingMode   (* Mode bits to compare against
 *)
 
 (* Both use 3-bit encoding 0-7, so we just compare integer values *)

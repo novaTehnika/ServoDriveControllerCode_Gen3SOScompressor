@@ -10,13 +10,13 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Fault           : E_FaultCode      (* Fault code to convert *)
+       Fault           : E_FaultCode      (* Fault code to convert
      VAR_OUTPUT:
-       Bit0            : BOOL             (* LSB *)
+       Bit0            : BOOL             (* LSB
        Bit1            : BOOL
-       Bit2            : BOOL             (* MSB *)
+       Bit2            : BOOL             (* MSB
      VAR:
-       nValue          : INT              (* Integer fault value *)
+       nValue          : INT              (* Integer fault value
 *)
 
 nValue := FaultToInt(Fault);

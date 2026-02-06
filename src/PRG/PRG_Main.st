@@ -21,7 +21,7 @@
 
    Variables (define in MWiec GUI):
      VAR:
-       (* Function block instances *)
+       (* Function block instances
        fbFilterModeBit0    : FB_DigitalInputFilter
        fbFilterModeBit1    : FB_DigitalInputFilter
        fbFilterModeBit2    : FB_DigitalInputFilter
@@ -52,16 +52,16 @@
        fbMoveAbsolute      : MC_MoveAbsolute
        fbMoveVelocity      : MC_MoveVelocity
        fbDirectControl     : Y_DirectControl
-       (* Timers *)
+       (* Timers
        tStateTimer         : TON
        tBrakeTimer         : TON
        tDriveReadyTimer    : TON
        tHandshakeTimer     : TON
-       (* Edge triggers *)
+       (* Edge triggers
        rTrigFaultReset     : R_TRIG
        rTrigMotionEnable   : R_TRIG
        fTrigMotionEnable   : F_TRIG
-       (* Local variables *)
+       (* Local variables
        bFirstScan          : BOOL := TRUE
        bEnterState         : BOOL
        eTargetState        : E_SystemState

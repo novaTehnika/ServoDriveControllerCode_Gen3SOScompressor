@@ -12,7 +12,7 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Fault           : E_FaultCode      (* Fault code to convert *)
+       Fault           : E_FaultCode      (* Fault code to convert
 *)
 
 CASE Fault OF

@@ -29,29 +29,29 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable safety monitoring *)
-       LimitRetractActive  : BOOL             (* TRUE = retract limit triggered *)
-       LimitHomeActive     : BOOL             (* TRUE = home limit triggered *)
-       ActualPosition      : LREAL            (* Current axis position (mm) *)
-       SoftLimitMin        : LREAL            (* Minimum allowed position (mm) *)
-       SoftLimitMax        : LREAL            (* Maximum allowed position (mm) *)
-       DriveReady          : BOOL             (* Drive is ready for motion *)
-       DriveFault          : BOOL             (* Drive has reported a fault *)
-       DriveErrorID        : DWORD            (* Drive error code if fault *)
-       EncoderValid        : BOOL             (* Absolute encoder position valid *)
-       EncoderBatteryOK    : BOOL             (* Encoder battery status OK *)
-       CurrentState        : E_SystemState    (* Current state machine state *)
-       CurrentMode         : E_OperatingMode  (* Current operating mode *)
-       ExitGuardTriggered  : BOOL             (* Piston exit guard triggered fault *)
-       AbsHomeRequired     : BOOL             (* Homing required - suppresses encoder fault *)
+       Enable              : BOOL             (* Enable safety monitoring
+       LimitRetractActive  : BOOL             (* TRUE = retract limit triggered
+       LimitHomeActive     : BOOL             (* TRUE = home limit triggered
+       ActualPosition      : LREAL            (* Current axis position (mm)
+       SoftLimitMin        : LREAL            (* Minimum allowed position (mm)
+       SoftLimitMax        : LREAL            (* Maximum allowed position (mm)
+       DriveReady          : BOOL             (* Drive is ready for motion
+       DriveFault          : BOOL             (* Drive has reported a fault
+       DriveErrorID        : DWORD            (* Drive error code if fault
+       EncoderValid        : BOOL             (* Absolute encoder position valid
+       EncoderBatteryOK    : BOOL             (* Encoder battery status OK
+       CurrentState        : E_SystemState    (* Current state machine state
+       CurrentMode         : E_OperatingMode  (* Current operating mode
+       ExitGuardTriggered  : BOOL             (* Piston exit guard triggered fault
+       AbsHomeRequired     : BOOL             (* Homing required - suppresses encoder fault
      VAR_OUTPUT:
-       FaultDetected       : BOOL             (* A fault condition exists *)
-       FaultCode           : E_FaultCode      (* Fault code to report *)
-       FaultLimitSwitch    : BOOL             (* Limit switch fault detected *)
-       FaultPosition       : BOOL             (* Position limit exceeded *)
-       FaultDrive          : BOOL             (* Drive fault detected *)
-       FaultEncoder        : BOOL             (* Encoder fault detected *)
-       FaultPistonExit     : BOOL             (* Piston exit guard fault *)
+       FaultDetected       : BOOL             (* A fault condition exists
+       FaultCode           : E_FaultCode      (* Fault code to report
+       FaultLimitSwitch    : BOOL             (* Limit switch fault detected
+       FaultPosition       : BOOL             (* Position limit exceeded
+       FaultDrive          : BOOL             (* Drive fault detected
+       FaultEncoder        : BOOL             (* Encoder fault detected
+       FaultPistonExit     : BOOL             (* Piston exit guard fault
      VAR:
        bLatchedFault       : BOOL
        eLatchedFaultCode   : E_FaultCode

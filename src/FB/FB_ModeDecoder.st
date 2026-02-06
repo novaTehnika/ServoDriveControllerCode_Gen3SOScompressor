@@ -13,18 +13,18 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable          : BOOL             (* Enable the decoder *)
-       ModeBit0        : BOOL             (* Mode bit 0 - LSB (DI0) - pre-filtered *)
-       ModeBit1        : BOOL             (* Mode bit 1 (DI1) - pre-filtered *)
-       ModeBit2        : BOOL             (* Mode bit 2 - MSB (DI2) - pre-filtered *)
+       Enable          : BOOL             (* Enable the decoder
+       ModeBit0        : BOOL             (* Mode bit 0 - LSB (DI0) - pre-filtered
+       ModeBit1        : BOOL             (* Mode bit 1 (DI1) - pre-filtered
+       ModeBit2        : BOOL             (* Mode bit 2 - MSB (DI2) - pre-filtered
      VAR_OUTPUT:
-       DecodedMode     : E_OperatingMode  (* Decoded operating mode *)
-       ModeValue       : INT              (* Numeric mode value 0-7 *)
-       ModeStable      : BOOL             (* Mode has been stable (no change from last scan) *)
-       ModeChanged     : BOOL             (* Rising edge - mode just changed *)
+       DecodedMode     : E_OperatingMode  (* Decoded operating mode
+       ModeValue       : INT              (* Numeric mode value 0-7
+       ModeStable      : BOOL             (* Mode has been stable (no change from last scan)
+       ModeChanged     : BOOL             (* Rising edge - mode just changed
      VAR:
-       nCurrentValue   : INT              (* Current mode value *)
-       nPreviousValue  : INT              (* Previous scan mode value *)
+       nCurrentValue   : INT              (* Current mode value
+       nPreviousValue  : INT              (* Previous scan mode value
    ============================================================================ *)
 
 (* ============================================================================

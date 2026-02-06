@@ -13,7 +13,7 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Mode            : E_OperatingMode  (* Mode to check *)
+       Mode            : E_OperatingMode  (* Mode to check
 *)
 
 CASE Mode OF

@@ -12,7 +12,7 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Value           : INT              (* Integer value 0-7 *)
+       Value           : INT              (* Integer value 0-7
 *)
 
 CASE Value OF

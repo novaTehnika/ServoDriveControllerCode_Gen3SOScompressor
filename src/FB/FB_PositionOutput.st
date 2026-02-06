@@ -23,25 +23,25 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable the mapper *)
-       ActualPosition      : LREAL            (* Current position in mm *)
-       Stage1PosMin        : LREAL            (* Stage 1 position start (mm) *)
-       Stage1PosMax        : LREAL            (* Stage 1 position end (mm) *)
-       Stage1VoltMin       : LREAL            (* Stage 1 voltage start (V) *)
-       Stage1VoltMax       : LREAL            (* Stage 1 voltage end (V) *)
-       Stage2PosMin        : LREAL            (* Stage 2 position start (mm) *)
-       Stage2PosMax        : LREAL            (* Stage 2 position end (mm) *)
-       Stage2VoltMin       : LREAL            (* Stage 2 voltage start (V) *)
-       Stage2VoltMax       : LREAL            (* Stage 2 voltage end (V) *)
+       Enable              : BOOL             (* Enable the mapper
+       ActualPosition      : LREAL            (* Current position in mm
+       Stage1PosMin        : LREAL            (* Stage 1 position start (mm)
+       Stage1PosMax        : LREAL            (* Stage 1 position end (mm)
+       Stage1VoltMin       : LREAL            (* Stage 1 voltage start (V)
+       Stage1VoltMax       : LREAL            (* Stage 1 voltage end (V)
+       Stage2PosMin        : LREAL            (* Stage 2 position start (mm)
+       Stage2PosMax        : LREAL            (* Stage 2 position end (mm)
+       Stage2VoltMin       : LREAL            (* Stage 2 voltage start (V)
+       Stage2VoltMax       : LREAL            (* Stage 2 voltage end (V)
      VAR_OUTPUT:
-       RawAnalogOutput     : INT              (* Raw analog output value *)
-       OutputVoltage       : LREAL            (* Calculated output voltage *)
-       InStage1            : BOOL             (* Position is in stage 1 region *)
-       InStage2            : BOOL             (* Position is in stage 2 region *)
+       RawAnalogOutput     : INT              (* Raw analog output value
+       OutputVoltage       : LREAL            (* Calculated output voltage
+       InStage1            : BOOL             (* Position is in stage 1 region
+       InStage2            : BOOL             (* Position is in stage 2 region
      VAR:
-       rVoltage            : LREAL            (* Calculated voltage *)
-       rNormalized         : LREAL            (* Normalized position within stage *)
-       rRawValue           : LREAL            (* Raw value before conversion *)
+       rVoltage            : LREAL            (* Calculated voltage
+       rNormalized         : LREAL            (* Normalized position within stage
+       rRawValue           : LREAL            (* Raw value before conversion
      VAR CONSTANT:
        RAW_MIN             : LREAL := -32768.0
        RAW_MAX             : LREAL := 32767.0

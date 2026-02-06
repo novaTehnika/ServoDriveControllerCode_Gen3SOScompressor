@@ -25,29 +25,29 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable the function block *)
-       Execute             : BOOL             (* Start go home sequence *)
-       Axis                : AXIS_REF         (* PLCopen axis reference *)
-       AbsHomeRequired     : BOOL             (* Encoder homing required (blocks Go Home) *)
-       EOTHomeRequired     : BOOL             (* EOT homing required (does NOT block) *)
-       HomePosition        : LREAL            (* Target home position (mm) *)
-       HomeVelocity        : LREAL            (* Movement velocity (mm/s) *)
-       Abort               : BOOL             (* Abort the move *)
+       Enable              : BOOL             (* Enable the function block
+       Execute             : BOOL             (* Start go home sequence
+       Axis                : AXIS_REF         (* PLCopen axis reference
+       AbsHomeRequired     : BOOL             (* Encoder homing required (blocks Go Home)
+       EOTHomeRequired     : BOOL             (* EOT homing required (does NOT block)
+       HomePosition        : LREAL            (* Target home position (mm)
+       HomeVelocity        : LREAL            (* Movement velocity (mm/s)
+       Abort               : BOOL             (* Abort the move
      VAR_OUTPUT:
-       Active              : BOOL             (* Sequence is running *)
-       Done                : BOOL             (* At home position *)
-       AtPosition          : BOOL             (* Currently at home position *)
-       HomingRequired      : BOOL             (* Homing must be done first *)
-       RedirectToHoming    : BOOL             (* Caller should switch to homing mode *)
-       InMotion            : BOOL             (* Currently moving *)
-       Error               : BOOL             (* Error occurred *)
-       ErrorID             : DWORD            (* Error code if Error=TRUE *)
+       Active              : BOOL             (* Sequence is running
+       Done                : BOOL             (* At home position
+       AtPosition          : BOOL             (* Currently at home position
+       HomingRequired      : BOOL             (* Homing must be done first
+       RedirectToHoming    : BOOL             (* Caller should switch to homing mode
+       InMotion            : BOOL             (* Currently moving
+       Error               : BOOL             (* Error occurred
+       ErrorID             : DWORD            (* Error code if Error=TRUE
      VAR:
        fbMoveAbsolute      : MC_MoveAbsolute
        fbHalt              : MC_Halt
-       eState              : INT := 0         (* State machine *)
+       eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
-       rPosTolerance       : LREAL := 0.1     (* mm *)
+       rPosTolerance       : LREAL := 0.1     (* mm
      VAR CONSTANT:
        GOH_IDLE            : INT := 0
        GOH_CHECK_REQ       : INT := 1

@@ -12,7 +12,7 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Mode            : E_OperatingMode  (* Operating mode to convert *)
+       Mode            : E_OperatingMode  (* Operating mode to convert
 *)
 
 CASE Mode OF
@@ -27,3 +27,4 @@ CASE Mode OF
 ELSE
     ModeToInt := 0;
 END_CASE;
+ 

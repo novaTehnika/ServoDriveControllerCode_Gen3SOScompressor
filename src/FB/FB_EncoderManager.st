@@ -27,21 +27,21 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable the function block *)
-       Axis                : AXIS_REF         (* PLCopen axis reference *)
-       CheckOnStartup      : BOOL             (* Trigger startup check *)
+       Enable              : BOOL             (* Enable the function block
+       Axis                : AXIS_REF         (* PLCopen axis reference
+       CheckOnStartup      : BOOL             (* Trigger startup check
      VAR_OUTPUT:
-       EncoderValid        : BOOL             (* Absolute position is valid *)
-       BatteryOK           : BOOL             (* Encoder battery status OK *)
-       MultiTurnValid      : BOOL             (* Multi-turn counter data valid *)
-       AbsHomeRequired     : BOOL             (* Homing required due to encoder issue *)
-       CheckComplete       : BOOL             (* Startup check finished *)
-       Busy                : BOOL             (* Check in progress *)
-       Error               : BOOL             (* Error occurred during check *)
-       ErrorID             : DWORD            (* Error code if Error=TRUE *)
+       EncoderValid        : BOOL             (* Absolute position is valid
+       BatteryOK           : BOOL             (* Encoder battery status OK
+       MultiTurnValid      : BOOL             (* Multi-turn counter data valid
+       AbsHomeRequired     : BOOL             (* Homing required due to encoder issue
+       CheckComplete       : BOOL             (* Startup check finished
+       Busy                : BOOL             (* Check in progress
+       Error               : BOOL             (* Error occurred during check
+       ErrorID             : DWORD            (* Error code if Error=TRUE
      VAR:
        fbAbsPosManager     : AbsolutePositionManager
-       eState              : INT := 0         (* State machine *)
+       eState              : INT := 0         (* State machine
        rTrigCheck          : R_TRIG
        tCheckTimeout       : TON
        bCheckTriggered     : BOOL

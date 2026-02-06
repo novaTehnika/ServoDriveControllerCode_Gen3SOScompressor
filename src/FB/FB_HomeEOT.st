@@ -34,35 +34,35 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable the function block *)
-       Execute             : BOOL             (* Start homing sequence *)
-       Axis                : AXIS_REF         (* PLCopen axis reference *)
-       AbsHomeRequired     : BOOL             (* Limit switch homing required *)
-       FastVelocity        : LREAL            (* Fast approach velocity (mm/s) *)
-       SlowVelocity        : LREAL            (* Slow approach velocity (mm/s) *)
-       TorqueLimit         : LREAL            (* Torque limit during approach (%) *)
-       TorqueThreshold     : LREAL            (* Torque threshold for stall detection (%) *)
-       ApproachDistance    : LREAL            (* Distance before EOT to switch to slow (mm) *)
-       ExpectedEOTPosition : LREAL            (* Expected position at EOT (mm) *)
-       StallDetectTime     : TIME             (* Time to confirm stall condition *)
-       Timeout             : TIME             (* Overall sequence timeout *)
-       ActualPosition      : LREAL            (* Current position (mm) *)
-       ActualVelocity      : LREAL            (* Current velocity (mm/s) *)
-       ActualTorque        : LREAL            (* Current torque (% of rated) *)
-       Abort               : BOOL             (* Abort the sequence *)
+       Enable              : BOOL             (* Enable the function block
+       Execute             : BOOL             (* Start homing sequence
+       Axis                : AXIS_REF         (* PLCopen axis reference
+       AbsHomeRequired     : BOOL             (* Limit switch homing required
+       FastVelocity        : LREAL            (* Fast approach velocity (mm/s)
+       SlowVelocity        : LREAL            (* Slow approach velocity (mm/s)
+       TorqueLimit         : LREAL            (* Torque limit during approach (%)
+       TorqueThreshold     : LREAL            (* Torque threshold for stall detection (%)
+       ApproachDistance    : LREAL            (* Distance before EOT to switch to slow (mm)
+       ExpectedEOTPosition : LREAL            (* Expected position at EOT (mm)
+       StallDetectTime     : TIME             (* Time to confirm stall condition
+       Timeout             : TIME             (* Overall sequence timeout
+       ActualPosition      : LREAL            (* Current position (mm)
+       ActualVelocity      : LREAL            (* Current velocity (mm/s)
+       ActualTorque        : LREAL            (* Current torque (% of rated)
+       Abort               : BOOL             (* Abort the sequence
      VAR_OUTPUT:
-       Active              : BOOL             (* Sequence is running *)
-       Done                : BOOL             (* Homing complete *)
-       InMotion            : BOOL             (* Currently moving *)
-       Error               : BOOL             (* Error occurred *)
-       ErrorID             : DWORD            (* Error code if Error=TRUE *)
-       RequiresLimitHome   : BOOL             (* Must do limit switch homing first *)
-       EOTPosition         : LREAL            (* Recorded encoder position at EOT stall *)
-       EOTOffset           : LREAL            (* Calculated coordinate offset *)
+       Active              : BOOL             (* Sequence is running
+       Done                : BOOL             (* Homing complete
+       InMotion            : BOOL             (* Currently moving
+       Error               : BOOL             (* Error occurred
+       ErrorID             : DWORD            (* Error code if Error=TRUE
+       RequiresLimitHome   : BOOL             (* Must do limit switch homing first
+       EOTPosition         : LREAL            (* Recorded encoder position at EOT stall
+       EOTOffset           : LREAL            (* Calculated coordinate offset
      VAR:
        fbDirectControl     : Y_DirectControl
        fbHalt              : MC_Halt
-       eState              : INT := 0         (* State machine *)
+       eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
        tTimeout            : TON
        tStallConfirm       : TON

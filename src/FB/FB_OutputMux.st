@@ -23,21 +23,21 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable the function block *)
-       FaultActive         : BOOL             (* Fault state is active *)
-       FaultCode           : E_FaultCode      (* Current fault code *)
-       ModeConfirmBit0     : BOOL             (* Mode confirmation bit 0 *)
-       ModeConfirmBit1     : BOOL             (* Mode confirmation bit 1 *)
-       ModeConfirmBit2     : BOOL             (* Mode confirmation bit 2 *)
+       Enable              : BOOL             (* Enable the function block
+       FaultActive         : BOOL             (* Fault state is active
+       FaultCode           : E_FaultCode      (* Current fault code
+       ModeConfirmBit0     : BOOL             (* Mode confirmation bit 0
+       ModeConfirmBit1     : BOOL             (* Mode confirmation bit 1
+       ModeConfirmBit2     : BOOL             (* Mode confirmation bit 2
      VAR_OUTPUT:
-       DO0_Output          : BOOL             (* Output for DO0 *)
-       DO1_Output          : BOOL             (* Output for DO1 *)
-       DO2_Output          : BOOL             (* Output for DO2 *)
-       FaultActiveOutput   : BOOL             (* Output for doFaultActive (DO5) *)
+       DO0_Output          : BOOL             (* Output for DO0
+       DO1_Output          : BOOL             (* Output for DO1
+       DO2_Output          : BOOL             (* Output for DO2
+       FaultActiveOutput   : BOOL             (* Output for doFaultActive (DO5)
      VAR:
-       bFaultBit0          : BOOL             (* Fault code bit 0 *)
-       bFaultBit1          : BOOL             (* Fault code bit 1 *)
-       bFaultBit2          : BOOL             (* Fault code bit 2 *)
+       bFaultBit0          : BOOL             (* Fault code bit 0
+       bFaultBit1          : BOOL             (* Fault code bit 1
+       bFaultBit2          : BOOL             (* Fault code bit 2
    ============================================================================ *)
 
 (* ============================================================================

@@ -32,21 +32,21 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable the guard *)
-       ActualPosition      : LREAL            (* Current position (mm) *)
-       ActualVelocity      : LREAL            (* Current velocity (mm/s) *)
-       ActualTorque        : LREAL            (* Current torque (%) *)
-       SoftLimitMin        : LREAL            (* Minimum allowed position (mm) *)
-       GuardMargin         : LREAL            (* Safety margin before limit (mm) *)
-       VelocityThreshold   : LREAL            (* Motion detection threshold (mm/s) *)
-       TorqueThreshold     : LREAL            (* Torque threshold for detection (%) *)
+       Enable              : BOOL             (* Enable the guard
+       ActualPosition      : LREAL            (* Current position (mm)
+       ActualVelocity      : LREAL            (* Current velocity (mm/s)
+       ActualTorque        : LREAL            (* Current torque (%)
+       SoftLimitMin        : LREAL            (* Minimum allowed position (mm)
+       GuardMargin         : LREAL            (* Safety margin before limit (mm)
+       VelocityThreshold   : LREAL            (* Motion detection threshold (mm/s)
+       TorqueThreshold     : LREAL            (* Torque threshold for detection (%)
      VAR_OUTPUT:
-       FaultTriggered      : BOOL             (* Dangerous condition detected - transition to fault *)
-       GuardActive         : BOOL             (* Guard is actively monitoring *)
-       InDangerZone        : BOOL             (* Position is near exit limit *)
-       ApproachingLimit    : BOOL             (* Moving toward exit limit *)
+       FaultTriggered      : BOOL             (* Dangerous condition detected - transition to fault
+       GuardActive         : BOOL             (* Guard is actively monitoring
+       InDangerZone        : BOOL             (* Position is near exit limit
+       ApproachingLimit    : BOOL             (* Moving toward exit limit
      VAR:
-       rGuardBoundary      : LREAL            (* Boundary = SoftLimitMin + GuardMargin *)
+       rGuardBoundary      : LREAL            (* Boundary = SoftLimitMin + GuardMargin
    ============================================================================ *)
 
 (* ============================================================================

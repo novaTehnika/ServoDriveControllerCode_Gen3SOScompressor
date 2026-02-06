@@ -26,19 +26,19 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL := TRUE     (* Enable filtering *)
-       RawInput            : INT              (* Raw analog input (-32768 to +32767) *)
-       Alpha               : LREAL            (* Low-pass filter coefficient (0.0-1.0) *)
-       MedianFilterSize    : INT := 3         (* Median filter size: 3 or 5 *)
+       Enable              : BOOL := TRUE     (* Enable filtering
+       RawInput            : INT              (* Raw analog input (-32768 to +32767)
+       Alpha               : LREAL            (* Low-pass filter coefficient (0.0-1.0)
+       MedianFilterSize    : INT := 3         (* Median filter size: 3 or 5
      VAR_OUTPUT:
-       FilteredOutput      : INT              (* Filtered output value *)
-       FilteredReal        : LREAL            (* Filtered output as LREAL *)
-       RawReal             : LREAL            (* Raw input as LREAL *)
+       FilteredOutput      : INT              (* Filtered output value
+       FilteredReal        : LREAL            (* Filtered output as LREAL
+       RawReal             : LREAL            (* Raw input as LREAL
      VAR:
-       aMedianBuffer       : ARRAY[0..4] OF LREAL  (* Median filter buffer *)
+       aMedianBuffer       : ARRAY[0..4] OF LREAL  (* Median filter buffer
        nMedianIndex        : INT := 0
        aSortBuffer         : ARRAY[0..4] OF LREAL
-       rFilteredValue      : LREAL := 0.0     (* Low-pass filter state *)
+       rFilteredValue      : LREAL := 0.0     (* Low-pass filter state
        rAlpha              : LREAL
        bInitialized        : BOOL := FALSE
        i, j                : INT

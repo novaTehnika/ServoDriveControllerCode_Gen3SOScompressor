@@ -15,20 +15,20 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       RawInput            : BOOL             (* Raw digital input *)
-       DebounceTime        : TIME := T#10MS   (* Debounce time *)
+       RawInput            : BOOL             (* Raw digital input
+       DebounceTime        : TIME := T#10MS   (* Debounce time
      VAR_OUTPUT:
-       FilteredOutput      : BOOL             (* Debounced output *)
-       RisingEdge          : BOOL             (* Rising edge detected on filtered output *)
-       FallingEdge         : BOOL             (* Falling edge detected on filtered output *)
-       Stable              : BOOL             (* Output has been stable (not changing) *)
-       RawPassthrough      : BOOL             (* Raw input passthrough for debugging *)
+       FilteredOutput      : BOOL             (* Debounced output
+       RisingEdge          : BOOL             (* Rising edge detected on filtered output
+       FallingEdge         : BOOL             (* Falling edge detected on filtered output
+       Stable              : BOOL             (* Output has been stable (not changing)
+       RawPassthrough      : BOOL             (* Raw input passthrough for debugging
      VAR:
-       tDebounce           : TON              (* Debounce timer *)
-       bLastRaw            : BOOL             (* Previous raw input state *)
-       bLastFiltered       : BOOL             (* Previous filtered output state *)
-       bPendingState       : BOOL             (* State we're debouncing toward *)
-       bFirstScan          : BOOL := TRUE     (* First scan flag for initialization *)
+       tDebounce           : TON              (* Debounce timer
+       bLastRaw            : BOOL             (* Previous raw input state
+       bLastFiltered       : BOOL             (* Previous filtered output state
+       bPendingState       : BOOL             (* State we're debouncing toward
+       bFirstScan          : BOOL := TRUE     (* First scan flag for initialization
    ============================================================================ *)
 
 (* ============================================================================

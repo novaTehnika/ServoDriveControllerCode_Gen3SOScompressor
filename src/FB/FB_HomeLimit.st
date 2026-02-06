@@ -27,28 +27,28 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable the function block *)
-       Execute             : BOOL             (* Start homing sequence *)
-       Axis                : AXIS_REF         (* PLCopen axis reference *)
-       ApproachVelocity    : LREAL            (* Approach velocity (mm/s) *)
-       BackoffVelocity     : LREAL            (* Backoff velocity (mm/s) *)
-       SetPosition         : LREAL            (* Position to set at home switch (mm) *)
-       Timeout             : TIME             (* Overall sequence timeout *)
-       LimitHomeActive     : BOOL             (* Home limit switch is triggered *)
-       LimitRetractActive  : BOOL             (* Retract limit switch is triggered *)
-       Abort               : BOOL             (* Abort the sequence *)
+       Enable              : BOOL             (* Enable the function block
+       Execute             : BOOL             (* Start homing sequence
+       Axis                : AXIS_REF         (* PLCopen axis reference
+       ApproachVelocity    : LREAL            (* Approach velocity (mm/s)
+       BackoffVelocity     : LREAL            (* Backoff velocity (mm/s)
+       SetPosition         : LREAL            (* Position to set at home switch (mm)
+       Timeout             : TIME             (* Overall sequence timeout
+       LimitHomeActive     : BOOL             (* Home limit switch is triggered
+       LimitRetractActive  : BOOL             (* Retract limit switch is triggered
+       Abort               : BOOL             (* Abort the sequence
      VAR_OUTPUT:
-       Active              : BOOL             (* Sequence is running *)
-       Done                : BOOL             (* Homing complete *)
-       InMotion            : BOOL             (* Currently moving *)
-       Error               : BOOL             (* Error occurred *)
-       ErrorID             : DWORD            (* Error code if Error=TRUE *)
-       ApproachingPositive : BOOL             (* Currently approaching from positive direction *)
+       Active              : BOOL             (* Sequence is running
+       Done                : BOOL             (* Homing complete
+       InMotion            : BOOL             (* Currently moving
+       Error               : BOOL             (* Error occurred
+       ErrorID             : DWORD            (* Error code if Error=TRUE
+       ApproachingPositive : BOOL             (* Currently approaching from positive direction
      VAR:
        fbMoveVelocity      : MC_MoveVelocity
        fbHalt              : MC_Halt
        fbSetPosition       : MC_SetPosition
-       eState              : INT := 0         (* State machine *)
+       eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
        tTimeout            : TON
        bApproachFromPositive : BOOL := FALSE

@@ -30,36 +30,36 @@
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable handshake manager *)
-       RequestedMode       : E_OperatingMode  (* Mode requested by master *)
-       ModeStable          : BOOL             (* Mode inputs are stable *)
-       MotionEnable        : BOOL             (* Motion enable from master - should be filtered *)
-       FaultReset          : BOOL             (* Fault reset signal from master - should be filtered *)
-       InFaultState        : BOOL             (* Currently in fault state *)
-       ActiveFaultCode     : E_FaultCode      (* Active fault code for mirroring check *)
-       HandshakeTimeout    : TIME := T#500MS  (* Timeout for handshake *)
+       Enable              : BOOL             (* Enable handshake manager
+       RequestedMode       : E_OperatingMode  (* Mode requested by master
+       ModeStable          : BOOL             (* Mode inputs are stable
+       MotionEnable        : BOOL             (* Motion enable from master - should be filtered
+       FaultReset          : BOOL             (* Fault reset signal from master - should be filtered
+       InFaultState        : BOOL             (* Currently in fault state
+       ActiveFaultCode     : E_FaultCode      (* Active fault code for mirroring check
+       HandshakeTimeout    : TIME := T#500MS  (* Timeout for handshake
      VAR_OUTPUT:
-       ConfirmedMode       : E_OperatingMode  (* Current confirmed mode (valid when HandshakeComplete) *)
-       HandshakeActive     : BOOL             (* TRUE from handshake start until complete/timeout *)
-       HandshakeComplete   : BOOL             (* TRUE when handshake succeeded *)
-       HandshakeTimeout_Q  : BOOL             (* TRUE when timeout occurred *)
-       ConfirmBit0         : BOOL             (* DO0 value *)
-       ConfirmBit1         : BOOL             (* DO1 value *)
-       ConfirmBit2         : BOOL             (* DO2 value *)
-       FaultResetEdge      : BOOL             (* Fault reset rising edge detected (single scan pulse) *)
-       FaultResetValid     : BOOL             (* Fault reset conditions met (level-based) *)
+       ConfirmedMode       : E_OperatingMode  (* Current confirmed mode (valid when HandshakeComplete)
+       HandshakeActive     : BOOL             (* TRUE from handshake start until complete/timeout
+       HandshakeComplete   : BOOL             (* TRUE when handshake succeeded
+       HandshakeTimeout_Q  : BOOL             (* TRUE when timeout occurred
+       ConfirmBit0         : BOOL             (* DO0 value
+       ConfirmBit1         : BOOL             (* DO1 value
+       ConfirmBit2         : BOOL             (* DO2 value
+       FaultResetEdge      : BOOL             (* Fault reset rising edge detected (single scan pulse)
+       FaultResetValid     : BOOL             (* Fault reset conditions met (level-based)
      VAR:
-       eState              : INT := 0         (* Handshake state - initialized to HS_IDLE *)
-       tTimeout            : TON              (* Handshake timeout timer *)
-       rTrigFaultReset     : R_TRIG           (* Rising edge on fault reset *)
-       eModeAtStart        : E_OperatingMode  (* Mode when handshake started *)
-       bModeStableAtStart  : BOOL             (* Capture mode stability at handshake start *)
+       eState              : INT := 0         (* Handshake state - initialized to HS_IDLE
+       tTimeout            : TON              (* Handshake timeout timer
+       rTrigFaultReset     : R_TRIG           (* Rising edge on fault reset
+       eModeAtStart        : E_OperatingMode  (* Mode when handshake started
+       bModeStableAtStart  : BOOL             (* Capture mode stability at handshake start
      VAR CONSTANT:
-       HS_IDLE             : INT := 0         (* Idle, no handshake active *)
-       HS_WAIT_MOTION_EN   : INT := 1         (* Waiting for motion enable *)
-       HS_VERIFY_MODE      : INT := 2         (* Verifying mode match *)
-       HS_COMPLETE         : INT := 3         (* Handshake complete *)
-       HS_TIMEOUT          : INT := 4         (* Handshake timed out *)
+       HS_IDLE             : INT := 0         (* Idle, no handshake active
+       HS_WAIT_MOTION_EN   : INT := 1         (* Waiting for motion enable
+       HS_VERIFY_MODE      : INT := 2         (* Verifying mode match
+       HS_COMPLETE         : INT := 3         (* Handshake complete
+       HS_TIMEOUT          : INT := 4         (* Handshake timed out
    ============================================================================ *)
 
 (* ============================================================================
