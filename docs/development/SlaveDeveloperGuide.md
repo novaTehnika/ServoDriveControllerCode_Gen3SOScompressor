@@ -21,8 +21,9 @@ The MotionWorks IEC project is organized into several key folders, following sta
 |--------|------|---------|
 | `src/PRG/` | Programs | Contains the main program entry point, `PRG_Main.st`, which houses the core state machine. |
 | `src/FB/` | Function Blocks | Contains reusable modules of encapsulated logic (e.g., `FB_HandshakeManager`, `FB_HomeEOT`). This is where most of the application logic resides. |
-| `src/GVL/` | Global Variable Lists | Defines global variables accessible across the entire project. This is used for configuration, I/O, system status, and position data. |
-| `src/DUT/` | Data Unit Types | Contains definitions for custom data structures (`STRUCT`) and enumerations (`ENUM`), such as `E_SystemState`, `E_OperatingMode`, and `ST_AxisLimits`. |
+| `src/FN/` | Functions | Contains standalone conversion and utility functions (e.g., `FN_BitsToMode`, `FN_IsOperationalMode`). |
+| `src/GVL/` | Global Variable Lists | Contains a single comment-only reference file (`GlobalVariables_Reference.st`). Variables are defined in the MWiec GUI; this file documents their names, types, and defaults. |
+| `src/DUT/` | Data Unit Types | Contains all custom data structures (`STRUCT`) and enumerations (`ENUM`) in a single `DataTypes.st` file. |
 
 ---
 
@@ -48,13 +49,15 @@ The codebase follows a set of naming conventions to improve readability and main
 
 Global variables defined in a `GVL` use a prefix to indicate their scope.
 
-| Prefix | GVL File | Example | Description |
-|--------|----------|---------|-------------|
-| `cfg` | `GVL_Config.st` | `cfgDebounceTimeMode` | A static configuration parameter used for tuning. |
-| `sys` | `GVL_System.st` | `sysCurrentState` | A dynamic system status variable. |
-| `pos` | `GVL_Position.st`| `posEOTOffset` | A position-related value, often calculated during homing. |
-| `di` / `do` | `GVL_IO.st` | `diModeBit0` | A digital input (`di`) or output (`do`). |
-| `ai` / `ao` | `GVL_IO.st` | `aiReference` | An analog input (`ai`) or output (`ao`). |
+| Prefix | Scope | Example | Description |
+|--------|-------|---------|-------------|
+| `cfg` | Configuration | `cfgDebounceTimeMode` | A static configuration parameter used for tuning. |
+| `sys` | System | `sysCurrentState` | A dynamic system status variable. |
+| `pos` | Position | `posEOTOffset` | A position-related value, often calculated during homing. |
+| `di` / `do` | I/O | `diModeBit0` | A digital input (`di`) or output (`do`). |
+| `ai` / `ao` | I/O | `aiReference` | An analog input (`ai`) or output (`ao`). |
+
+> All global variables are documented in `src/GVL/GlobalVariables_Reference.st` and defined in the MWiec GUI.
 
 ### Constant Prefixes
 
@@ -91,17 +94,16 @@ The core logic resides in a state machine within `PRG_Main.st`. Understanding th
 
 Let's say you want to add `MODE_NEW_FEATURE` with a value of `101` (currently unused).
 
-1.  **Define Enum:** In `src/DUT/E_OperatingMode.st`, add the new mode:
+1.  **Define Enum:** In `src/DUT/DataTypes.st`, add the new mode member in the correct ordinal position (the enum uses dense sequential numbering):
     ```structuredtext
-    MODE_NEW_FEATURE := 5,
+    MODE_NEW_FEATURE, (* Binary 101 - new feature mode *)
     ```
-    *(Adjust subsequent values if necessary)*.
 
-2.  **Update Conversions:** In `src/DUT/EnumConversions.st`, add the new mode to `ModeToInt` and `IntToMode` functions.
+2.  **Update Conversions:** In the individual function files under `src/FN/`, add the new mode to `FN_ModeToInt.st`, `FN_IntToMode.st`, `FN_BitsToMode.st`, and `FN_ModeToBits.st`.
 
 3.  **Update Master Docs:** In `docs/master/MasterProtocolGuide.md` and `docs/master/IOReference.md`, add the new mode to the mode tables so the master developer knows about it.
 
-4.  **Create a State:** In `src/DUT/E_SystemState.st`, add a corresponding state, e.g., `ST_NEW_FEATURE`.
+4.  **Create a State:** In `src/DUT/DataTypes.st`, add a corresponding state in `E_SystemState`, e.g., `ST_NEW_FEATURE`.
 
 5.  **Add State Logic:** In `PRG_Main.st`, add a new `CASE` statement for `ST_NEW_FEATURE`. Implement the logic for this state.
     ```structuredtext
@@ -109,13 +111,13 @@ Let's say you want to add `MODE_NEW_FEATURE` with a value of `101` (currently un
         IF bEnterState THEN
             sysConfirmedMode := MODE_NEW_FEATURE;
             // ... initialization logic ...
-        END_IF
+        END_IF;
 
         // ... continuous logic for the new mode ...
 
         IF fTrigMotionEnable.Q THEN
             sysCurrentState := ST_HOLD_POSITION;
-        END_IF
+        END_IF;
     ```
 
 6.  **Handle Transitions:** In `PRG_Main.st`, update the state transitions to allow entry into your new state.
@@ -126,9 +128,9 @@ Let's say you want to add `MODE_NEW_FEATURE` with a value of `101` (currently un
 
 Let's say you want to add `FAULT_NEW_CONDITION` with a value of `5` (currently `FAULT_PISTON_EXIT`).
 
-1.  **Define Enum:** In `src/DUT/E_FaultCode.st`, add the new fault, potentially renumbering others.
+1.  **Define Enum:** In `src/DUT/DataTypes.st`, add the new fault to `E_FaultCode`. Note that ordinal position matters for bit encoding.
 
-2.  **Update Conversions:** In `src/DUT/EnumConversions.st`, add the new fault to `FaultToInt` and `IntToFault`.
+2.  **Update Conversions:** In the individual function files under `src/FN/`, add the new fault to `FN_FaultToInt.st`, `FN_IntToFault.st`, and `FN_FaultToBits.st`.
 
 3.  **Update Master Docs:** Add the new fault to the tables in `docs/master/FaultCodeReference.md` and other relevant guides.
 
@@ -141,7 +143,7 @@ Let's say you want to add `FAULT_NEW_CONDITION` with a value of `5` (currently `
         FaultNewCondition := TRUE;
     ELSE
         FaultNewCondition := FALSE;
-    END_IF
+    END_IF;
     ```
 
 5.  **Prioritize the Fault:** In the "FAULT PRIORITY AND OUTPUT" section of `FB_SafetyMonitor.st`, add your new fault into the `IF/ELSIF` chain according to its desired priority.

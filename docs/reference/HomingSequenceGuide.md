@@ -31,16 +31,16 @@ Establish the coordinate system zero reference using the physical home limit swi
 
 > **Note on Implementation**
 >
-> The sequence of steps described below is now encapsulated within the `FB_HomeLimit` function block. The state names (e.g., `ST_HOME_LIM_APPROACH`) are deprecated in `PRG_Main` but are preserved here to accurately describe the internal logic of the function block.
+> The sequence of steps described below is encapsulated within the `FB_HomeLimit` function block. The sub-state names (e.g., `ST_HOME_LIM_APPROACH`) were previously states in `E_SystemState` but have been removed; the logic now lives entirely within `FB_HomeLimit`, which is called from the single `ST_HOME_LIMIT` state in `PRG_Main`. The step labels below (e.g., `HL_APPROACH`) are the FB's internal constants.
 
 ### Sequence Steps
 
 ```
 Step 1: APPROACH
 +------------------------------------------+
-| State: ST_HOME_LIM_APPROACH              |
+| Step: HL_APPROACH                        |
 | Action: MC_MoveVelocity (negative dir)   |
-| Velocity: cfgHomeLimApproachVelocity     |
+| Velocity: ApproachVelocity (FB input)    |
 |           (default: -20 mm/s)            |
 | Exit: LimitHomeActive = TRUE             |
 +------------------------------------------+
@@ -48,7 +48,7 @@ Step 1: APPROACH
         v
 Step 2: DETECT
 +------------------------------------------+
-| State: ST_HOME_LIM_DETECT                |
+| Step: HL_DETECT                          |
 | Action: MC_Halt (controlled stop)        |
 | Verify: LimitHomeActive still TRUE       |
 | Exit: Motion stopped                     |
@@ -57,9 +57,9 @@ Step 2: DETECT
         v
 Step 3: BACKOFF
 +------------------------------------------+
-| State: ST_HOME_LIM_BACKOFF               |
+| Step: HL_BACKOFF                         |
 | Action: MC_MoveVelocity (positive dir)   |
-| Velocity: cfgHomeLimBackoffVelocity      |
+| Velocity: BackoffVelocity (FB input)     |
 |           (default: +5 mm/s)             |
 | Exit: LimitHomeActive = FALSE            |
 +------------------------------------------+
@@ -67,7 +67,7 @@ Step 3: BACKOFF
         v
 Step 4: SET REFERENCE
 +------------------------------------------+
-| State: ST_HOME_LIM_SETREF                |
+| Step: HL_SETREF                          |
 | Action: MC_SetPosition                   |
 | Position: cfgHomeLimSetPosition          |
 |           (default: 0.0 mm)              |
@@ -126,14 +126,14 @@ Calibrate the cylinder end-of-travel position by detecting mechanical stall. Thi
 
 > **Note on Implementation**
 >
-> The sequence of steps described below is now encapsulated within the `FB_HomeEOT` function block. The state names (e.g., `ST_HOME_EOT_FAST`) are deprecated in `PRG_Main` but are preserved here to accurately describe the internal logic of the function block.
+> The sequence of steps described below is encapsulated within the `FB_HomeEOT` function block. The sub-state names (e.g., `ST_HOME_EOT_FAST`) were previously states in `E_SystemState` but have been removed; the logic now lives entirely within `FB_HomeEOT`, which is called from the single `ST_HOME_EOT` state in `PRG_Main`. The step labels below (e.g., `HE_FAST_APPROACH`) are the FB's internal constants.
 
 ### Sequence Steps
 
 ```
 Step 1: FAST APPROACH
 +------------------------------------------+
-| State: ST_HOME_EOT_FAST                  |
+| Step: HE_FAST_APPROACH                   |
 | Action: MC_MoveVelocity (positive dir)   |
 | Velocity: cfgHomeEOTFastVelocity         |
 |           (default: +50 mm/s)            |
@@ -144,7 +144,7 @@ Step 1: FAST APPROACH
         v
 Step 2: SLOW APPROACH
 +------------------------------------------+
-| State: ST_HOME_EOT_SLOW                  |
+| Step: HE_SLOW_APPROACH                   |
 | Action: Y_DirectControl (velocity mode)  |
 | Velocity: cfgHomeEOTSlowVelocity         |
 |           (default: +10 mm/s)            |
@@ -156,7 +156,7 @@ Step 2: SLOW APPROACH
         v
 Step 3: STALL DETECT
 +------------------------------------------+
-| State: ST_HOME_EOT_DETECT                |
+| Step: HE_STALL_DETECT                    |
 | Condition 1: |velocity| < 0.5 mm/s       |
 | Condition 2: |torque| >= 90% of limit    |
 | Duration: 200 ms continuous              |
@@ -167,12 +167,13 @@ Step 3: STALL DETECT
         v
 Step 4: SET REFERENCE
 +------------------------------------------+
-| State: ST_HOME_EOT_SETREF                |
-| Action: MC_SetPosition                   |
+| Step: HE_SETREF                          |
+| Action: Calculate EOTOffset              |
+|   EOTOffset := ExpectedEOTPos - ActualPos|
 | Position: cfgHomeEOTSetPosition          |
 |           (default: 305.0 mm)            |
-| Clear: flagEOTHomeRequired = FALSE       |
-| Exit: MC_SetPosition.Done                |
+| Note: PRG_Main clears flagEOTHomeRequired|
+|       after FB reports Done              |
 +------------------------------------------+
         |
         v
@@ -314,6 +315,8 @@ MASTER:
 ---
 
 ## 5. Homing Configuration Parameters
+
+> These parameters are global variables documented in `src/GVL/GlobalVariables_Reference.st` and configured in the MWiec GUI.
 
 ### Mode 110 Parameters
 

@@ -58,38 +58,33 @@ This document summarizes the agent reviews of all function blocks in src/FB/.
 ---
 
 ## FB_HandshakeManager.st
-**Status**: Critical fix needed
+**Status**: Fixed
 
 ### Findings:
-1. **CRITICAL**: Timer not called in HS_WAIT_MOTION_EN state
+1. **CRITICAL** *(FIXED)*: Timer not called in HS_WAIT_MOTION_EN state
    - Timer started on transition INTO state but never called while IN state
    - `tTimeout.Q` will never go TRUE because timer isn't being evaluated
-   - Location: Lines 162-179
-
-   Fix: Add `tTimeout();` or `tTimeout(IN := TRUE, PT := HandshakeTimeout);` at start of HS_WAIT_MOTION_EN case
+   - **Fix applied**: Timer is now called each scan in HS_WAIT_MOTION_EN state
 
 2. **LOW**: `eModeAtStart` persists across handshake cycles (cosmetic, no functional impact)
 
 ### Recommendations:
-- **MUST FIX**: Add timer call in HS_WAIT_MOTION_EN state
+- None remaining
 
 ---
 
 ## FB_ModeDecoder.st
-**Status**: Critical fix needed
+**Status**: Fixed
 
 ### Findings:
-1. **CRITICAL**: Edge detection logic error at line 69
-   - Current: `ModeChanged := NOT ModeStable AND bPrevStable;`
-   - This only fires when transitioning FROM stable TO unstable
-   - Should detect when mode VALUE changes, not stability state
-
-   Fix: `ModeChanged := (nCurrentValue <> nPreviousValue);`
+1. **CRITICAL** *(FIXED)*: Edge detection logic error
+   - Previous: `ModeChanged := NOT ModeStable AND bPrevStable;` (detected stability transitions, not value changes)
+   - **Fix applied**: Removed `bPrevStable`, simplified to direct comparison of mode values
 
 2. **LOW**: `nPreviousValue` initialized to 0 implicitly (correct, matches MODE_IDLE)
 
 ### Recommendations:
-- **MUST FIX**: Change ModeChanged detection logic
+- None remaining
 
 ---
 
@@ -107,7 +102,7 @@ This document summarizes the agent reviews of all function blocks in src/FB/.
 
 ---
 
-## FB_PositionMapping.st
+## FB_PositionOutput.st
 **Status**: Minor issue
 
 ### Findings:
@@ -126,8 +121,8 @@ This document summarizes the agent reviews of all function blocks in src/FB/.
 ## Priority Fixes (Ordered by Severity)
 
 ### CRITICAL:
-1. **FB_HandshakeManager**: Add timer call in HS_WAIT_MOTION_EN state
-2. **FB_ModeDecoder**: Fix ModeChanged edge detection logic
+1. ~~**FB_HandshakeManager**: Add timer call in HS_WAIT_MOTION_EN state~~ *(FIXED)*
+2. ~~**FB_ModeDecoder**: Fix ModeChanged edge detection logic~~ *(FIXED)*
 
 ### HIGH:
 3. **FB_AnalogProcessor**: Fix stage boundary comparison (`<=` to `<`)
@@ -135,7 +130,7 @@ This document summarizes the agent reviews of all function blocks in src/FB/.
 
 ### MEDIUM:
 5. **FB_DigitalInputFilter**: Consider initialization handling
-6. **FB_PositionMapping**: Add out-of-range handling
+6. **FB_PositionOutput**: Add out-of-range handling
 
 ### LOW:
 7. Various initialization and cosmetic issues (acceptable as-is)
@@ -175,6 +170,10 @@ This document summarizes the agent reviews of all function blocks in src/FB/.
 2. **Updated fault state detection**:
    - Added ST_FAULT_IDLE to bInFaultState check
    - Updated fault latch reset to trigger on ST_FAULT_IDLE instead of ST_FAULT_RECOVERY
+
+3. **Additional changes from restructuring**:
+   - Added `AbsHomeRequired` input for encoder fault suppression when homing is required
+   - Deprecated homing sub-states removed from `bInHomingState` check (now only checks `ST_HOME_LIMIT`, `ST_HOME_EOT`, `ST_HOME_COMPLETE`)
 
 ### Recommendations:
 - Production ready after simplification

@@ -1,13 +1,13 @@
 # Configuration and Tuning Guide
 
 ## Gen3 SOS Compressor ServoController
-### GVL_Config Parameter Reference
+### Configuration Parameter Reference
 
 ---
 
 ## 1. Introduction
 
-This document provides a detailed reference for all configurable parameters found in `src/GVL/GVL_Config.st`. These variables allow the system's behavior to be tuned and adapted without changing the core application logic.
+This document provides a detailed reference for all configurable parameters documented in `src/GVL/GlobalVariables_Reference.st` and defined in the MWiec GUI. These variables allow the system's behavior to be tuned and adapted without changing the core application logic.
 
 **Warning:** Modifying these parameters can have a significant impact on machine performance and safety. Changes should be made carefully and tested thoroughly.
 

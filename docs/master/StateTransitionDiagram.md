@@ -110,32 +110,34 @@
 ```
 +---------------+
 | ST_HOME_LIMIT |  Entry point from mode command
-+-------+-------+
++-------+-------+  (FB_HomeLimit executes internally)
         |
         v
+  [FB_HomeLimit internal steps]
+        |
 +-------------------+
-| ST_HOME_LIM       |  MC_MoveVelocity (negative direction)
-| _APPROACH         |  Moving toward home limit switch
+| HL_APPROACH       |  MC_MoveVelocity (negative direction)
+|                   |  Moving toward home limit switch
 +-------+-----------+
         |
         | (LimitHomeActive = TRUE)
         v
 +-------------------+
-| ST_HOME_LIM       |  MC_Halt
-| _DETECT           |  Confirm switch triggered
+| HL_DETECT         |  MC_Halt
+|                   |  Confirm switch triggered
 +-------+-----------+
         |
         v
 +-------------------+
-| ST_HOME_LIM       |  MC_MoveVelocity (positive, slow)
-| _BACKOFF          |  Back away from switch
+| HL_BACKOFF        |  MC_MoveVelocity (positive, slow)
+|                   |  Back away from switch
 +-------+-----------+
         |
         | (LimitHomeActive = FALSE)
         v
 +-------------------+
-| ST_HOME_LIM       |  MC_SetPosition
-| _SETREF           |  Set position reference
+| HL_SETREF         |  MC_SetPosition
+|                   |  Set position reference
 +-------+-----------+  Clear flagAbsHomeRequired
         |
         v
@@ -150,33 +152,35 @@
 ```
 +---------------+
 | ST_HOME_EOT   |  Entry point from mode command
-+-------+-------+
++-------+-------+  (FB_HomeEOT executes internally)
         |
         v
+  [FB_HomeEOT internal steps]
+        |
 +-------------------+
-| ST_HOME_EOT       |  MC_MoveVelocity (positive, fast)
-| _FAST             |  Fast jog toward EOT region
+| HE_FAST_APPROACH  |  MC_MoveVelocity (positive, fast)
+|                   |  Fast jog toward EOT region
 +-------+-----------+
         |
         | (Near expected EOT region)
         v
 +-------------------+
-| ST_HOME_EOT       |  Y_DirectControl (velocity + torque limit)
-| _SLOW             |  Slow approach with torque limiting
+| HE_SLOW_APPROACH  |  Y_DirectControl (velocity + torque limit)
+|                   |  Slow approach with torque limiting
 +-------+-----------+
         |
         | (Stall detected: vel < 0.5mm/s AND torque >= 90%)
         v
 +-------------------+
-| ST_HOME_EOT       |  Confirm stall for 200ms
-| _DETECT           |  Validate mechanical stop reached
+| HE_STALL_DETECT   |  Confirm stall for 200ms
+|                   |  Validate mechanical stop reached
 +-------+-----------+
         |
         v
 +-------------------+
-| ST_HOME_EOT       |  MC_SetPosition
-| _SETREF           |  Set position reference
-+-------+-----------+  Clear flagEOTHomeRequired
+| HE_SETREF         |  Calculate EOTOffset
+|                   |  EOTOffset := Expected - Actual
++-------+-----------+  (PRG_Main clears flagEOTHomeRequired)
         |
         v
 +---------------+
@@ -227,38 +231,32 @@
     |               |
     | - doFaultActive = HIGH
     | - Output fault code on DO0-DO2
-    | - Motion stopped
-    | - Brake engaged
+    | - MC_Halt (motion stopped)
     +-------+-------+
             |
-            | (diFaultReset rising edge
-            |  with valid mirrored code
-            |  and diMotionEnable = LOW)
-            v
-    +---------------+
-    | ST_FAULT      |
-    | _RECOVERY     |
-    |               |
-    | - Validate mirrored code
-    | - Clear fault latch
-    +-------+-------+
-            |
-            v
-    +---------------+
-    | ST_BRAKE      |
-    | _ENGAGE       |
-    +-------+-------+
-            |
-            v
-    +---------------+
-    | ST_DRIVE      |
-    | _DISABLE      |
-    +-------+-------+
-            |
-            v
-    +---------------+
-    | ST_IDLE       |
-    +---------------+
+            +---------------------------+
+            |                           |
+    (Fast recovery:                (Slow recovery:
+     diFaultReset rising edge       cfgFaultIdleTimeout
+     + valid mirrored code          expires)
+     + diMotionEnable HIGH)              |
+            |                           v
+            v                   +---------------+
+    +---------------+           | ST_FAULT_IDLE |
+    | ST_BRAKE_HOLD |           |               |
+    | (drive stays  |           | - Brake engaged
+    |  enabled)     |           | - Drive disabled
+    +---------------+           | - doFaultActive = HIGH
+                                +-------+-------+
+                                        |
+                                (diFaultReset rising edge
+                                 + valid mirrored code
+                                 + diMotionEnable LOW)
+                                        |
+                                        v
+                                +---------------+
+                                | ST_IDLE       |
+                                +---------------+
 ```
 
 ---
@@ -296,36 +294,30 @@
 
 ## 6. State Enumeration Reference
 
+The enum uses dense sequential numbering (0, 1, 2, ...). Code never references numeric values directly.
+
 ```
-STATE                      VALUE    DESCRIPTION
----------------------------------------------------------
-ST_INIT                    0        Power-on initialization
-ST_ENCODER_CHECK           1        Validate absolute encoder
-ST_REQUIRE_ABS_HOME        2        Set homing required flag
-ST_IDLE                    10       Drive OFF, awaiting commands
-ST_DRIVE_ENABLE            20       Powering on drive
-ST_BRAKE_RELEASE           21       Releasing brake
-ST_BRAKE_HOLD              30       Mode 001: Drive ON, brake ON
-ST_POSITION_CTRL           31       Mode 010: Position control
-ST_VELOCITY_CTRL           32       Mode 011: Velocity control
-ST_TORQUE_CTRL             33       Mode 100: Torque control
-ST_GO_HOME                 34       Mode 101: Go home sequence
-ST_HOME_LIMIT              40       Mode 110: Entry
-ST_HOME_LIM_APPROACH       41       Moving to limit
-ST_HOME_LIM_DETECT         42       Detecting limit
-ST_HOME_LIM_BACKOFF        43       Backing off
-ST_HOME_LIM_SETREF         44       Setting reference
-ST_HOME_EOT                50       Mode 111: Entry
-ST_HOME_EOT_FAST           51       Fast approach
-ST_HOME_EOT_SLOW           52       Slow approach
-ST_HOME_EOT_DETECT         53       Stall detection
-ST_HOME_EOT_SETREF         54       Setting reference
-ST_HOME_COMPLETE           60       Homing done
-ST_HOLD_POSITION           70       Controlled stop, await mode
-ST_BRAKE_ENGAGE            80       Engaging brake
-ST_DRIVE_DISABLE           81       Powering off drive
-ST_FAULT                   90       Fault active
-ST_FAULT_RECOVERY          91       Processing reset
+STATE                      DESCRIPTION
+-----------------------------------------------------
+ST_INIT                    Power-on initialization
+ST_ENCODER_CHECK           Validate absolute encoder
+ST_REQUIRE_ABS_HOME        Set homing required flag
+ST_IDLE                    Drive OFF, awaiting commands
+ST_DRIVE_ENABLE            Powering on drive
+ST_BRAKE_RELEASE           Releasing brake
+ST_BRAKE_HOLD              Mode 001: Drive ON, brake ON
+ST_POSITION_CTRL           Mode 010: Position control
+ST_VELOCITY_CTRL           Mode 011: Velocity control
+ST_TORQUE_CTRL             Mode 100: Torque control
+ST_GO_HOME                 Mode 101: Go home sequence
+ST_HOME_LIMIT              Mode 110: Homing (FB_HomeLimit)
+ST_HOME_EOT                Mode 111: Homing (FB_HomeEOT)
+ST_HOME_COMPLETE           Homing done
+ST_HOLD_POSITION           Controlled stop, await mode
+ST_BRAKE_ENGAGE            Engaging brake
+ST_DRIVE_DISABLE           Powering off drive
+ST_FAULT                   Fault active
+ST_FAULT_IDLE              Safe powered-down fault state
 ```
 
 ---
