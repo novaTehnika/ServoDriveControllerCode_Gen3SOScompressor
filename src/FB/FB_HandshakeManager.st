@@ -14,8 +14,8 @@
    2. Slave decodes and validates mode
    3. Slave sets confirmation bits (DO0-2) to match
    4. Master sets diMotionEnable HIGH
-   5. Slave verifies mode bits still match → handshake complete
-   6. If timeout or mismatch → handshake failed
+   5. Slave verifies mode bits still match -> handshake complete
+   6. If timeout or mismatch -> handshake failed
 
    Fault Reset Handshake (with fault code mirroring):
    1. Slave is in fault state with doFaultActive = HIGH
@@ -27,68 +27,40 @@
    7. Master sees fault cleared, releases diFaultReset
 
    NOTE: All inputs should be pre-filtered/debounced by the caller.
+
+   Variables (define in MWiec GUI):
+     VAR_INPUT:
+       Enable              : BOOL             (* Enable handshake manager *)
+       RequestedMode       : E_OperatingMode  (* Mode requested by master *)
+       ModeStable          : BOOL             (* Mode inputs are stable *)
+       MotionEnable        : BOOL             (* Motion enable from master - should be filtered *)
+       FaultReset          : BOOL             (* Fault reset signal from master - should be filtered *)
+       InFaultState        : BOOL             (* Currently in fault state *)
+       ActiveFaultCode     : E_FaultCode      (* Active fault code for mirroring check *)
+       HandshakeTimeout    : TIME := T#500MS  (* Timeout for handshake *)
+     VAR_OUTPUT:
+       ConfirmedMode       : E_OperatingMode  (* Current confirmed mode (valid when HandshakeComplete) *)
+       HandshakeActive     : BOOL             (* TRUE from handshake start until complete/timeout *)
+       HandshakeComplete   : BOOL             (* TRUE when handshake succeeded *)
+       HandshakeTimeout_Q  : BOOL             (* TRUE when timeout occurred *)
+       ConfirmBit0         : BOOL             (* DO0 value *)
+       ConfirmBit1         : BOOL             (* DO1 value *)
+       ConfirmBit2         : BOOL             (* DO2 value *)
+       FaultResetEdge      : BOOL             (* Fault reset rising edge detected (single scan pulse) *)
+       FaultResetValid     : BOOL             (* Fault reset conditions met (level-based) *)
+     VAR:
+       eState              : INT := 0         (* Handshake state - initialized to HS_IDLE *)
+       tTimeout            : TON              (* Handshake timeout timer *)
+       rTrigFaultReset     : R_TRIG           (* Rising edge on fault reset *)
+       eModeAtStart        : E_OperatingMode  (* Mode when handshake started *)
+       bModeStableAtStart  : BOOL             (* Capture mode stability at handshake start *)
+     VAR CONSTANT:
+       HS_IDLE             : INT := 0         (* Idle, no handshake active *)
+       HS_WAIT_MOTION_EN   : INT := 1         (* Waiting for motion enable *)
+       HS_VERIFY_MODE      : INT := 2         (* Verifying mode match *)
+       HS_COMPLETE         : INT := 3         (* Handshake complete *)
+       HS_TIMEOUT          : INT := 4         (* Handshake timed out *)
    ============================================================================ *)
-
-FUNCTION_BLOCK FB_HandshakeManager
-VAR_INPUT
-    Enable              : BOOL;             (* Enable handshake manager *)
-
-    (* Mode handshake inputs *)
-    RequestedMode       : E_OperatingMode;  (* Mode requested by master *)
-    ModeStable          : BOOL;             (* Mode inputs are stable *)
-    MotionEnable        : BOOL;             (* Motion enable from master - should be filtered *)
-
-    (* Fault reset inputs *)
-    FaultReset          : BOOL;             (* Fault reset signal from master - should be filtered *)
-    InFaultState        : BOOL;             (* Currently in fault state *)
-    ActiveFaultCode     : E_FaultCode;      (* Active fault code for mirroring check *)
-
-    (* Configuration *)
-    HandshakeTimeout    : TIME := T#500MS;  (* Timeout for handshake *)
-END_VAR
-
-VAR_OUTPUT
-    (* Mode handshake outputs *)
-    ConfirmedMode       : E_OperatingMode;  (* Current confirmed mode (valid when HandshakeComplete) *)
-    HandshakeActive     : BOOL;             (* TRUE from handshake start until complete/timeout *)
-    HandshakeComplete   : BOOL;             (* TRUE when handshake succeeded (persists until MotionEnable drops) *)
-    HandshakeTimeout_Q  : BOOL;             (* TRUE when timeout occurred (persists until MotionEnable drops) *)
-
-    (* Confirmation bits for digital outputs *)
-    ConfirmBit0         : BOOL;             (* DO0 value *)
-    ConfirmBit1         : BOOL;             (* DO1 value *)
-    ConfirmBit2         : BOOL;             (* DO2 value *)
-
-    (* Fault reset outputs *)
-    FaultResetEdge      : BOOL;             (* Fault reset rising edge detected (single scan pulse) *)
-    FaultResetValid     : BOOL;             (* Fault reset conditions met (level-based, stays TRUE while valid) *)
-END_VAR
-
-VAR
-    (* State machine *)
-    eState              : INT := HS_IDLE;   (* Handshake state - initialized to HS_IDLE *)
-
-    (* Timers *)
-    tTimeout            : TON;              (* Handshake timeout timer *)
-
-    (* Edge detection *)
-    rTrigFaultReset     : R_TRIG;           (* Rising edge on fault reset *)
-
-    (* Internal tracking *)
-    eModeAtStart        : E_OperatingMode;  (* Mode when handshake started *)
-    bModeStableAtStart  : BOOL;             (* Capture mode stability at handshake start *)
-END_VAR
-
-(* ============================================================================
-   Constants for state machine
-   ============================================================================ *)
-VAR CONSTANT
-    HS_IDLE             : INT := 0;         (* Idle, no handshake active *)
-    HS_WAIT_MOTION_EN   : INT := 1;         (* Waiting for motion enable *)
-    HS_VERIFY_MODE      : INT := 2;         (* Verifying mode match *)
-    HS_COMPLETE         : INT := 3;         (* Handshake complete *)
-    HS_TIMEOUT          : INT := 4;         (* Handshake timed out *)
-END_VAR
 
 (* ============================================================================
    Main Logic
@@ -108,7 +80,7 @@ IF NOT Enable THEN
     eState := HS_IDLE;
     tTimeout(IN := FALSE);
     RETURN;
-END_IF
+END_IF;
 
 (* --------------------------------------------------------------------------
    Fault Reset Handshake Detection (with fault code mirroring)
@@ -147,7 +119,7 @@ CASE eState OF
         IF ModeStable AND (RequestedMode <> MODE_IDLE) AND NOT MotionEnable THEN
             (* Set confirmation to match requested mode *)
             ConfirmedMode := RequestedMode;
-            SetConfirmBits(RequestedMode);
+            ModeToBits(RequestedMode, ConfirmBit0, ConfirmBit1, ConfirmBit2);
             eModeAtStart := RequestedMode;
             bModeStableAtStart := TRUE;
             HandshakeActive := TRUE;
@@ -156,8 +128,8 @@ CASE eState OF
         ELSIF ModeStable AND (RequestedMode = MODE_IDLE) THEN
             (* Idle mode - just confirm it *)
             ConfirmedMode := MODE_IDLE;
-            SetConfirmBits(MODE_IDLE);
-        END_IF
+            ModeToBits(MODE_IDLE, ConfirmBit0, ConfirmBit1, ConfirmBit2);
+        END_IF;
 
     HS_WAIT_MOTION_EN:
         (* Waiting for master to assert motion enable *)
@@ -177,7 +149,7 @@ CASE eState OF
         ELSIF MotionEnable THEN
             (* Motion enable received, verify mode still matches *)
             eState := HS_VERIFY_MODE;
-        END_IF
+        END_IF;
 
     HS_VERIFY_MODE:
         (* Verify requested mode hasn't changed since handshake start *)
@@ -191,7 +163,7 @@ CASE eState OF
             (* Mismatch - treat as timeout/failure *)
             tTimeout(IN := FALSE);
             eState := HS_TIMEOUT;
-        END_IF
+        END_IF;
 
     HS_COMPLETE:
         (* Handshake complete - stay here until motion enable drops *)
@@ -199,36 +171,20 @@ CASE eState OF
             (* Motion disabled - return to idle *)
             HandshakeComplete := FALSE;
             eState := HS_IDLE;
-        END_IF
+        END_IF;
 
     HS_TIMEOUT:
         (* Handshake timed out or failed *)
         HandshakeTimeout_Q := TRUE;
         HandshakeActive := FALSE;
         ConfirmedMode := MODE_IDLE;  (* Reset confirmed mode on failure *)
-        SetConfirmBits(MODE_IDLE);
+        ModeToBits(MODE_IDLE, ConfirmBit0, ConfirmBit1, ConfirmBit2);
         tTimeout(IN := FALSE);
 
         (* Exit timeout when motion enable drops - simpler and more reliable *)
         IF NOT MotionEnable THEN
             HandshakeTimeout_Q := FALSE;
             eState := HS_IDLE;
-        END_IF
+        END_IF;
 
-END_CASE
-
-END_FUNCTION_BLOCK
-
-(* ============================================================================
-   Helper Method: Set Confirmation Bits from Mode
-   Uses centralized conversion functions from EnumConversions.st
-   ============================================================================ *)
-METHOD PRIVATE SetConfirmBits
-VAR_INPUT
-    Mode : E_OperatingMode;
-END_VAR
-
-(* Use centralized ModeToBits function *)
-ModeToBits(Mode, ConfirmBit0, ConfirmBit1, ConfirmBit2);
-
-END_METHOD
+END_CASE;

@@ -24,55 +24,35 @@
    - Called from ST_ENCODER_CHECK state in PRG_Main
    - Sets AbsHomeRequired output if encoder invalid
    - PRG_Main uses this to set flagAbsHomeRequired
+
+   Variables (define in MWiec GUI):
+     VAR_INPUT:
+       Enable              : BOOL             (* Enable the function block *)
+       Axis                : AXIS_REF         (* PLCopen axis reference *)
+       CheckOnStartup      : BOOL             (* Trigger startup check *)
+     VAR_OUTPUT:
+       EncoderValid        : BOOL             (* Absolute position is valid *)
+       BatteryOK           : BOOL             (* Encoder battery status OK *)
+       MultiTurnValid      : BOOL             (* Multi-turn counter data valid *)
+       AbsHomeRequired     : BOOL             (* Homing required due to encoder issue *)
+       CheckComplete       : BOOL             (* Startup check finished *)
+       Busy                : BOOL             (* Check in progress *)
+       Error               : BOOL             (* Error occurred during check *)
+       ErrorID             : DWORD            (* Error code if Error=TRUE *)
+     VAR:
+       fbAbsPosManager     : AbsolutePositionManager
+       eState              : INT := 0         (* State machine *)
+       rTrigCheck          : R_TRIG
+       tCheckTimeout       : TON
+       bCheckTriggered     : BOOL
+     VAR CONSTANT:
+       ENC_IDLE            : INT := 0
+       ENC_CHECK_INIT      : INT := 1
+       ENC_CHECK_STATUS    : INT := 2
+       ENC_COMPLETE        : INT := 3
+       ENC_ERROR           : INT := 4
+       CHECK_TIMEOUT       : TIME := T#2S
    ============================================================================ *)
-
-FUNCTION_BLOCK FB_EncoderManager
-VAR_INPUT
-    Enable              : BOOL;             (* Enable the function block *)
-    Axis                : AXIS_REF;         (* PLCopen axis reference *)
-    CheckOnStartup      : BOOL;             (* Trigger startup check *)
-END_VAR
-
-VAR_OUTPUT
-    EncoderValid        : BOOL;             (* Absolute position is valid *)
-    BatteryOK           : BOOL;             (* Encoder battery status OK *)
-    MultiTurnValid      : BOOL;             (* Multi-turn counter data valid *)
-    AbsHomeRequired     : BOOL;             (* Homing required due to encoder issue *)
-    CheckComplete       : BOOL;             (* Startup check finished *)
-    Busy                : BOOL;             (* Check in progress *)
-    Error               : BOOL;             (* Error occurred during check *)
-    ErrorID             : DWORD;            (* Error code if Error=TRUE *)
-END_VAR
-
-VAR
-    (* Yaskawa AbsolutePositionManager function block *)
-    fbAbsPosManager     : AbsolutePositionManager;
-
-    (* State machine *)
-    eState              : INT := ENC_IDLE;
-
-    (* Edge detection *)
-    rTrigCheck          : R_TRIG;
-
-    (* Timeout *)
-    tCheckTimeout       : TON;
-
-    (* Internal status *)
-    bCheckTriggered     : BOOL;
-END_VAR
-
-(* ============================================================================
-   Constants
-   ============================================================================ *)
-VAR CONSTANT
-    ENC_IDLE            : INT := 0;         (* Idle state *)
-    ENC_CHECK_INIT      : INT := 1;         (* Initialize check *)
-    ENC_CHECK_STATUS    : INT := 2;         (* Query status *)
-    ENC_COMPLETE        : INT := 3;         (* Check complete *)
-    ENC_ERROR           : INT := 4;         (* Error state *)
-
-    CHECK_TIMEOUT       : TIME := T#2S;     (* Timeout for encoder check *)
-END_VAR
 
 (* ============================================================================
    Main Logic
@@ -92,7 +72,7 @@ IF NOT Enable THEN
     tCheckTimeout(IN := FALSE);
     fbAbsPosManager(Enable := FALSE);
     RETURN;
-END_IF
+END_IF;
 
 (* Detect rising edge on CheckOnStartup *)
 rTrigCheck(CLK := CheckOnStartup);
@@ -111,7 +91,7 @@ CASE eState OF
             ErrorID := 0;
             tCheckTimeout(IN := FALSE);
             eState := ENC_CHECK_INIT;
-        END_IF
+        END_IF;
 
     ENC_CHECK_INIT:
         (* Initialize AbsolutePositionManager *)
@@ -135,7 +115,7 @@ CASE eState OF
             Error := TRUE;
             ErrorID := 16#8001;  (* Timeout error code *)
             eState := ENC_ERROR;
-        END_IF
+        END_IF;
 
     ENC_CHECK_STATUS:
         (* Query encoder status from AbsolutePositionManager *)
@@ -145,19 +125,8 @@ CASE eState OF
         );
 
         (* Read status outputs *)
-        (* Note: Actual output names depend on Yaskawa's AbsolutePositionManager interface *)
-        (* Common outputs: AbsolutePositionValid, BatteryStatus, etc. *)
-
-        (* Check for valid absolute position *)
         IF fbAbsPosManager.Valid THEN
             (* Evaluate encoder health *)
-            (* AbsolutePositionManager typically provides:
-               - Valid: Overall validity
-               - AbsolutePositionValid: Position data is valid
-               - BatteryAlarm: Battery has failed or is low
-               - MultiTurnOverflow: Multi-turn counter overflow *)
-
-            (* For Sigma-7, check if position is valid and no alarms *)
             EncoderValid := fbAbsPosManager.AbsolutePositionValid;
             BatteryOK := NOT fbAbsPosManager.BatteryAlarm;
             MultiTurnValid := NOT fbAbsPosManager.MultiTurnOverflow;
@@ -181,7 +150,7 @@ CASE eState OF
             Error := TRUE;
             ErrorID := 16#8001;  (* Timeout error code *)
             eState := ENC_ERROR;
-        END_IF
+        END_IF;
 
     ENC_COMPLETE:
         (* Check complete - hold outputs until disabled or new check *)
@@ -191,7 +160,7 @@ CASE eState OF
         (* Allow re-check if CheckOnStartup toggled *)
         IF NOT CheckOnStartup THEN
             bCheckTriggered := FALSE;
-        END_IF
+        END_IF;
 
         IF rTrigCheck.Q THEN
             (* New check requested *)
@@ -199,7 +168,7 @@ CASE eState OF
             Busy := TRUE;
             tCheckTimeout(IN := FALSE);
             eState := ENC_CHECK_INIT;
-        END_IF
+        END_IF;
 
     ENC_ERROR:
         (* Error state *)
@@ -222,8 +191,6 @@ CASE eState OF
             Error := FALSE;
             ErrorID := 0;
             eState := ENC_IDLE;
-        END_IF
+        END_IF;
 
-END_CASE
-
-END_FUNCTION_BLOCK
+END_CASE;

@@ -18,99 +18,65 @@
    - Transition (Inter-Mode): ST_HOLD_POSITION
    - Transition (Deactivation): ST_BRAKE_ENGAGE, ST_DRIVE_DISABLE
    - Fault: ST_FAULT, ST_FAULT_RECOVERY
+
+   Variables (define in MWiec GUI):
+     VAR:
+       (* Function block instances *)
+       fbFilterModeBit0    : FB_DigitalInputFilter
+       fbFilterModeBit1    : FB_DigitalInputFilter
+       fbFilterModeBit2    : FB_DigitalInputFilter
+       fbFilterMotionEnable: FB_DigitalInputFilter
+       fbFilterLimitRetract: FB_DigitalInputFilter
+       fbFilterLimitHome   : FB_DigitalInputFilter
+       fbFilterFaultReset  : FB_DigitalInputFilter
+       fbFilterAnalog      : FB_AnalogInputFilter
+       fbModeDecoder       : FB_ModeDecoder
+       fbHandshake         : FB_HandshakeManager
+       fbOutputMux         : FB_OutputMux
+       fbAnalogProc        : FB_AnalogProcessor
+       fbPosOutput         : FB_PositionOutput
+       fbSafetyMonitor     : FB_SafetyMonitor
+       fbPistonExitGuard   : FB_PistonExitGuard
+       fbGoHome            : FB_GoHome
+       fbHomeLimit         : FB_HomeLimit
+       fbHomeEOT           : FB_HomeEOT
+       fbEncoderManager    : FB_EncoderManager
+       fbPower             : MC_Power
+       fbReadActualPos     : MC_ReadActualPosition
+       fbReadActualVel     : MC_ReadActualVelocity
+       fbReadActualTorque  : MC_ReadActualTorque
+       fbHalt              : MC_Halt
+       fbStop              : MC_Stop
+       fbReset             : MC_Reset
+       fbSetPosition       : MC_SetPosition
+       fbMoveAbsolute      : MC_MoveAbsolute
+       fbMoveVelocity      : MC_MoveVelocity
+       fbDirectControl     : Y_DirectControl
+       (* Timers *)
+       tStateTimer         : TON
+       tBrakeTimer         : TON
+       tDriveReadyTimer    : TON
+       tHandshakeTimer     : TON
+       (* Edge triggers *)
+       rTrigFaultReset     : R_TRIG
+       rTrigMotionEnable   : R_TRIG
+       fTrigMotionEnable   : F_TRIG
+       (* Local variables *)
+       bFirstScan          : BOOL := TRUE
+       bEnterState         : BOOL
+       eTargetState        : E_SystemState
+       eTargetMode         : E_OperatingMode
+       stCurrentLimits     : ST_AxisLimits
+       bFilteredModeBit0   : BOOL
+       bFilteredModeBit1   : BOOL
+       bFilteredModeBit2   : BOOL
+       bFilteredMotionEnable : BOOL
+       bFilteredLimitRetract : BOOL
+       bFilteredLimitHome  : BOOL
+       bFilteredFaultReset : BOOL
+       nFilteredAnalog     : INT
+       rAnalogFilterAlpha  : LREAL := 0.0
    ============================================================================ *)
-
-PROGRAM PRG_Main
-VAR
-    (* ========================================================================
-       FUNCTION BLOCK INSTANCES
-       ======================================================================== *)
-
-    (* Input filters *)
-    fbFilterModeBit0    : FB_DigitalInputFilter;
-    fbFilterModeBit1    : FB_DigitalInputFilter;
-    fbFilterModeBit2    : FB_DigitalInputFilter;
-    fbFilterMotionEnable: FB_DigitalInputFilter;
-    fbFilterLimitRetract: FB_DigitalInputFilter;
-    fbFilterLimitHome   : FB_DigitalInputFilter;
-    fbFilterFaultReset  : FB_DigitalInputFilter;
-    fbFilterAnalog      : FB_AnalogInputFilter;
-
-    (* Core infrastructure *)
-    fbModeDecoder       : FB_ModeDecoder;
-    fbHandshake         : FB_HandshakeManager;
-    fbOutputMux         : FB_OutputMux;
-    fbAnalogProc        : FB_AnalogProcessor;
-    fbPosOutput         : FB_PositionOutput;
-
-    (* Safety and homing *)
-    fbSafetyMonitor     : FB_SafetyMonitor;
-    fbPistonExitGuard   : FB_PistonExitGuard;
-    fbGoHome            : FB_GoHome;
-    fbHomeLimit         : FB_HomeLimit;
-    fbHomeEOT           : FB_HomeEOT;
-    fbEncoderManager    : FB_EncoderManager;
-
-    (* PLCopen Motion Control Function Blocks *)
-    fbPower             : MC_Power;
-    fbReadActualPos     : MC_ReadActualPosition;
-    fbReadActualVel     : MC_ReadActualVelocity;
-    fbReadActualTorque  : MC_ReadActualTorque;
-    fbHalt              : MC_Halt;
-    fbStop              : MC_Stop;
-    fbReset             : MC_Reset;
-    fbSetPosition       : MC_SetPosition;
-    fbMoveAbsolute      : MC_MoveAbsolute;
-    fbMoveVelocity      : MC_MoveVelocity;
-
-    (* Yaskawa-specific function blocks *)
-    fbDirectControl     : Y_DirectControl;
-    (* fbAbsPosManager     : AbsolutePositionManager; *)
-    (* fbResetAbsEncoder   : Y_ResetAbsoluteEncoder; *)
-
-
-    (* ========================================================================
-       TIMERS
-       ======================================================================== *)
-    tStateTimer         : TON;              (* General purpose state timer *)
-    tBrakeTimer         : TON;              (* Brake engage/disengage timer *)
-    tDriveReadyTimer    : TON;              (* Drive ready timeout *)
-    tHandshakeTimer     : TON;              (* Handshake timeout *)
-
-
-    (* ========================================================================
-       EDGE TRIGGERS
-       ======================================================================== *)
-    rTrigFaultReset     : R_TRIG;           (* Rising edge on fault reset *)
-    rTrigMotionEnable   : R_TRIG;           (* Rising edge on motion enable *)
-    fTrigMotionEnable   : F_TRIG;           (* Falling edge on motion enable *)
-
-
-    (* ========================================================================
-       LOCAL VARIABLES
-       ======================================================================== *)
-    bFirstScan          : BOOL := TRUE;     (* First scan flag *)
-    bEnterState         : BOOL;             (* Flag for state entry logic *)
-    eTargetState        : E_SystemState;    (* Target state for transitions *)
-    eTargetMode         : E_OperatingMode;  (* Target operating mode *)
-
-    (* Mode-dependent limits *)
-    stCurrentLimits     : ST_AxisLimits;
-
-    (* Filtered input values *)
-    bFilteredModeBit0   : BOOL;
-    bFilteredModeBit1   : BOOL;
-    bFilteredModeBit2   : BOOL;
-    bFilteredMotionEnable : BOOL;
-    bFilteredLimitRetract : BOOL;
-    bFilteredLimitHome  : BOOL;
-    bFilteredFaultReset : BOOL;
-    nFilteredAnalog     : INT;
-
-    (* Analog filter alpha - calculated once in ST_INIT *)
-    rAnalogFilterAlpha  : LREAL := 0.0;
-
-END_VAR
 
 (* ============================================================================
    MAIN PROGRAM BODY
@@ -144,9 +110,9 @@ IF bFirstScan THEN
         rAnalogFilterAlpha := 0.001 / ((TIME_TO_LREAL(cfgAnalogFilterTimeConst) / 1000.0) + 0.001);
     ELSE
         rAnalogFilterAlpha := 1.0;  (* No filtering if time constant is zero *)
-    END_IF
+    END_IF;
     rAnalogFilterAlpha := LIMIT(0.0, rAnalogFilterAlpha, 1.0);
-END_IF
+END_IF;
 
 
 (* --------------------------------------------------------------------------
@@ -216,21 +182,17 @@ fbReadActualTorque(Axis := sysAxis, Enable := TRUE);
 
 IF fbReadActualPos.Valid THEN
     sysActualPosition := fbReadActualPos.Position;
-END_IF
+END_IF;
 IF fbReadActualVel.Valid THEN
     sysActualVelocity := fbReadActualVel.Velocity;
-END_IF
+END_IF;
 IF fbReadActualTorque.Valid THEN
     sysActualTorque := fbReadActualTorque.Torque;
-END_IF
+END_IF;
 
 (* Update limit switch status from filtered inputs (PNP NC: FALSE = triggered) *)
 sysLimitRetractActive := NOT bFilteredLimitRetract;
 sysLimitHomeActive := NOT bFilteredLimitHome;
-
-(* Update cylinder zone status *)
-sysInCylinderZone := (sysActualPosition >= posCylinderEntry) AND
-                     (sysActualPosition <= posCylinderEOT);
 
 (* Process filtered analog input - uses two-stage mapping for position reference *)
 fbAnalogProc(
@@ -261,9 +223,13 @@ fbAnalogProc(
 (* Detect state entry *)
 bEnterState := (sysCurrentState <> sysPreviousState);
 IF bEnterState THEN
+    (* Capture fault origin before sysPreviousState is overwritten *)
+    IF sysCurrentState = ST_FAULT THEN
+        sysLastFaultState := sysPreviousState;
+    END_IF;
     sysPreviousState := sysCurrentState;
     tStateTimer(IN := FALSE);   (* Reset state timer on entry *)
-END_IF
+END_IF;
 
 CASE sysCurrentState OF
 
@@ -278,7 +244,7 @@ CASE sysCurrentState OF
             doBrakeDisengage := FALSE;
             doFaultActive := FALSE;
             fbPower(Axis := sysAxis, Enable := FALSE);
-        END_IF
+        END_IF;
 
         (* Proceed to encoder check *)
         sysCurrentState := ST_ENCODER_CHECK;
@@ -288,7 +254,7 @@ CASE sysCurrentState OF
         (* Validate absolute encoder status using AbsolutePositionManager *)
         IF bEnterState THEN
             fbEncoderManager(Enable := FALSE);  (* Reset *)
-        END_IF
+        END_IF;
 
         (* Run encoder check *)
         fbEncoderManager(
@@ -309,20 +275,20 @@ CASE sysCurrentState OF
             ELSE
                 (* Encoder invalid - set flag and proceed *)
                 sysCurrentState := ST_REQUIRE_ABS_HOME;
-            END_IF
+            END_IF;
 
         ELSIF fbEncoderManager.Error THEN
             (* Encoder check error - assume invalid, require homing *)
             sysEncoderValid := FALSE;
             sysCurrentState := ST_REQUIRE_ABS_HOME;
-        END_IF
+        END_IF;
 
 
     ST_REQUIRE_ABS_HOME:
         (* Set absolute home requirement flag *)
         IF bEnterState THEN
             flagAbsHomeRequired := TRUE;
-        END_IF
+        END_IF;
 
         (* Proceed to idle *)
         sysCurrentState := ST_IDLE;
@@ -337,11 +303,12 @@ CASE sysCurrentState OF
             (* Ensure safe state *)
             doBrakeDisengage := FALSE;  (* Brake engaged *)
             sysDriveEnabled := FALSE;
+            sysDriveReady := FALSE;
             fbPower(Axis := sysAxis, Enable := FALSE);
             (* NOTE: sysConfirmedMode is used by fbHandshake to set DO0-2 output bits.
                It represents the mode the slave is confirming to the master. *)
             sysConfirmedMode := MODE_IDLE;
-        END_IF
+        END_IF;
 
         (* Update handshake manager - it handles mode confirmation output *)
         (* NOTE: Uses filtered inputs for noise immunity *)
@@ -369,7 +336,7 @@ CASE sysCurrentState OF
                 ELSE
                     (* Requirements met - proceed to drive enable *)
                     sysCurrentState := ST_DRIVE_ENABLE;
-                END_IF
+                END_IF;
 
             ELSIF IsHomingMode(eTargetMode) THEN
                 (* Homing modes - check ordering requirements *)
@@ -380,13 +347,13 @@ CASE sysCurrentState OF
                 ELSE
                     (* Homing mode allowed - proceed *)
                     sysCurrentState := ST_DRIVE_ENABLE;
-                END_IF
+                END_IF;
 
             ELSE
                 (* Unknown mode - stay in idle *)
                 ;
-            END_IF
-        END_IF
+            END_IF;
+        END_IF;
 
 
     (* ======================================================================
@@ -396,7 +363,7 @@ CASE sysCurrentState OF
     ST_DRIVE_ENABLE:
         IF bEnterState THEN
             tDriveReadyTimer(IN := FALSE);
-        END_IF
+        END_IF;
 
         (* Enable drive power and wait for ready *)
         fbPower(Axis := sysAxis, Enable := TRUE,
@@ -415,14 +382,14 @@ CASE sysCurrentState OF
             (* Drive error or timeout *)
             sysActiveFault := FAULT_DRIVE;
             sysCurrentState := ST_FAULT;
-        END_IF
+        END_IF;
 
 
     ST_BRAKE_RELEASE:
         IF bEnterState THEN
             doBrakeDisengage := TRUE;   (* Release brake *)
             tBrakeTimer(IN := FALSE);
-        END_IF
+        END_IF;
 
         (* Wait for brake release delay *)
         tBrakeTimer(IN := TRUE, PT := cfgBrakeDisengageDelay);
@@ -442,8 +409,8 @@ CASE sysCurrentState OF
             ELSE
                 (* Unknown mode - brake is released, hold position until handshake *)
                 sysCurrentState := ST_HOLD_POSITION;
-            END_CASE
-        END_IF
+            END_CASE;
+        END_IF;
 
 
     (* ======================================================================
@@ -455,7 +422,7 @@ CASE sysCurrentState OF
             doBrakeDisengage := FALSE;  (* Engage brake *)
             sysConfirmedMode := MODE_BRAKE_HOLD;
             tHandshakeTimer(IN := FALSE);
-        END_IF
+        END_IF;
 
         doInMotion := FALSE;
 
@@ -474,21 +441,28 @@ CASE sysCurrentState OF
         IF fbHandshake.HandshakeComplete THEN
             eTargetMode := sysRequestedMode;
 
-            CASE eTargetMode OF
-                MODE_IDLE:
-                    (* Return to idle - disable drive *)
-                    sysCurrentState := ST_DRIVE_DISABLE;
+            (* Check homing requirements for operational modes *)
+            IF IsOperationalMode(eTargetMode) AND
+               (flagAbsHomeRequired OR flagEOTHomeRequired) THEN
+                sysActiveFault := FAULT_HOMING_REQ;
+                sysCurrentState := ST_FAULT;
+            ELSE
+                CASE eTargetMode OF
+                    MODE_IDLE:
+                        (* Return to idle - disable drive *)
+                        sysCurrentState := ST_DRIVE_DISABLE;
 
-                MODE_BRAKE_HOLD:
-                    (* Stay in brake hold - do nothing *)
-                    ;
+                    MODE_BRAKE_HOLD:
+                        (* Stay in brake hold - do nothing *)
+                        ;
 
-                MODE_POSITION, MODE_VELOCITY, MODE_TORQUE,
-                MODE_GO_HOME, MODE_HOME_LIMIT, MODE_HOME_EOT:
-                    (* Other operational modes - need to release brake first *)
-                    sysCurrentState := ST_BRAKE_RELEASE;
-            END_CASE
-        END_IF
+                    MODE_POSITION, MODE_VELOCITY, MODE_TORQUE,
+                    MODE_GO_HOME, MODE_HOME_LIMIT, MODE_HOME_EOT:
+                        (* Other operational modes - need to release brake first *)
+                        sysCurrentState := ST_BRAKE_RELEASE;
+                END_CASE;
+            END_IF;
+        END_IF;
 
         (* Note: ST_BRAKE_HOLD does NOT transition to ST_HOLD_POSITION on motion enable drop.
            It is safer to keep the brake engaged. Mode changes are handled via handshake above. *)
@@ -502,7 +476,7 @@ CASE sysCurrentState OF
             stCurrentLimits.PosMin := cfgPosSoftLimitMin;
             stCurrentLimits.VelMax := cfgVelLimitNormal;
             stCurrentLimits.TorqueMax := cfgTorqueLimitNormal;
-        END_IF
+        END_IF;
 
         (* Get position reference from analog input and apply EOT offset *)
         (* Master commands in master coordinates, convert to slave coordinates *)
@@ -527,7 +501,7 @@ CASE sysCurrentState OF
         (* Check for motion enable drop *)
         IF fTrigMotionEnable.Q THEN
             sysCurrentState := ST_HOLD_POSITION;
-        END_IF
+        END_IF;
 
 
     ST_VELOCITY_CTRL:
@@ -535,7 +509,7 @@ CASE sysCurrentState OF
             sysConfirmedMode := MODE_VELOCITY;
             stCurrentLimits.VelMax := cfgVelLimitMax;
             stCurrentLimits.TorqueMax := cfgTorqueLimitNormal;
-        END_IF
+        END_IF;
 
         (* Get velocity reference from analog input *)
         sysCommandedVelocity := fbAnalogProc.ScaledVelocity;
@@ -556,7 +530,7 @@ CASE sysCurrentState OF
 
         IF fTrigMotionEnable.Q THEN
             sysCurrentState := ST_HOLD_POSITION;
-        END_IF
+        END_IF;
 
 
     ST_TORQUE_CTRL:
@@ -564,7 +538,7 @@ CASE sysCurrentState OF
             sysConfirmedMode := MODE_TORQUE;
             stCurrentLimits.TorqueMax := cfgTorqueLimitMax;
             stCurrentLimits.VelMax := cfgVelLimitMax;
-        END_IF
+        END_IF;
 
         (* Get torque reference from analog input *)
         sysCommandedTorque := fbAnalogProc.ScaledTorque;
@@ -585,14 +559,14 @@ CASE sysCurrentState OF
 
         IF fTrigMotionEnable.Q THEN
             sysCurrentState := ST_HOLD_POSITION;
-        END_IF
+        END_IF;
 
 
     ST_GO_HOME:
         IF bEnterState THEN
             sysConfirmedMode := MODE_GO_HOME;
             fbGoHome(Enable := FALSE);  (* Reset FB *)
-        END_IF
+        END_IF;
 
         (* Use FB_GoHome for homing requirement checking and move *)
         (* Apply offset: Slave position = Master position - Offset *)
@@ -629,7 +603,7 @@ CASE sysCurrentState OF
             (* Note: ELSIF ensures RedirectToHoming is FALSE at this point *)
             fbGoHome(Enable := FALSE);
             sysCurrentState := ST_HOLD_POSITION;
-        END_IF
+        END_IF;
 
 
     ST_HOME_LIMIT:
@@ -640,7 +614,7 @@ CASE sysCurrentState OF
             sysConfirmedMode := MODE_HOME_LIMIT;
             flagHomingInProgress := TRUE;
             fbHomeLimit(Enable := FALSE);  (* Reset FB *)
-        END_IF
+        END_IF;
 
         (* Call homing FB *)
         fbHomeLimit(
@@ -659,9 +633,10 @@ CASE sysCurrentState OF
         doInMotion := fbHomeLimit.InMotion;
 
         IF fbHomeLimit.Done THEN
-            (* Homing complete - clear requirement *)
+            (* Homing complete - clear requirement and restore encoder validity *)
             fbHomeLimit(Enable := FALSE);
             flagAbsHomeRequired := FALSE;
+            sysEncoderValid := TRUE;
             flagHomingComplete := TRUE;
             sysCurrentState := ST_HOME_COMPLETE;
 
@@ -675,7 +650,7 @@ CASE sysCurrentState OF
             (* Motion enable dropped - abort and hold *)
             fbHomeLimit(Enable := FALSE);
             sysCurrentState := ST_HOLD_POSITION;
-        END_IF
+        END_IF;
 
 
     (* Deprecated sub-states - kept for E_SystemState compatibility *)
@@ -696,7 +671,7 @@ CASE sysCurrentState OF
             sysConfirmedMode := MODE_HOME_EOT;
             flagHomingInProgress := TRUE;
             fbHomeEOT(Enable := FALSE);  (* Reset FB *)
-        END_IF
+        END_IF;
 
         (* Call homing FB *)
         fbHomeEOT(
@@ -745,7 +720,7 @@ CASE sysCurrentState OF
             (* Motion enable dropped - abort and hold *)
             fbHomeEOT(Enable := FALSE);
             sysCurrentState := ST_HOLD_POSITION;
-        END_IF
+        END_IF;
 
 
     (* Deprecated sub-states - kept for E_SystemState compatibility *)
@@ -762,14 +737,14 @@ CASE sysCurrentState OF
         IF bEnterState THEN
             flagHomingInProgress := FALSE;
             doHomingComplete := TRUE;
-        END_IF
+        END_IF;
 
         doInMotion := FALSE;
 
         IF fTrigMotionEnable.Q THEN
             doHomingComplete := FALSE;
             sysCurrentState := ST_HOLD_POSITION;
-        END_IF
+        END_IF;
 
 
     (* ======================================================================
@@ -790,14 +765,16 @@ CASE sysCurrentState OF
             fbDirectControl(Axis := sysAxis, Enable := FALSE);
             sysHalted := FALSE;
             tHandshakeTimer(IN := FALSE);
-        END_IF
+        END_IF;
 
         (* Wait for halt to complete *)
-        fbHalt(Axis := sysAxis, Execute := TRUE);
-        IF fbHalt.Done THEN
-            sysHalted := TRUE;
-            fbHalt(Execute := FALSE);
-        END_IF
+        IF NOT sysHalted THEN
+            fbHalt(Axis := sysAxis, Execute := TRUE);
+            IF fbHalt.Done THEN
+                sysHalted := TRUE;
+                fbHalt(Execute := FALSE);
+            END_IF;
+        END_IF;
 
         doInMotion := NOT sysHalted;
 
@@ -836,14 +813,14 @@ CASE sysCurrentState OF
                     MODE_HOME_LIMIT:    sysCurrentState := ST_HOME_LIMIT;
                     MODE_HOME_EOT:      sysCurrentState := ST_HOME_EOT;
                     MODE_IDLE:          sysCurrentState := ST_BRAKE_ENGAGE;
-                END_CASE
-            END_IF
+                END_CASE;
+            END_IF;
 
         ELSIF tHandshakeTimer.Q THEN
             (* Handshake timeout *)
             sysActiveFault := FAULT_HANDSHAKE;
             sysCurrentState := ST_FAULT;
-        END_IF
+        END_IF;
 
 
     (* ======================================================================
@@ -855,7 +832,7 @@ CASE sysCurrentState OF
             doBrakeDisengage := FALSE;  (* Engage brake *)
             tBrakeTimer(IN := FALSE);
             fbDirectControl(Axis := sysAxis, Enable := FALSE);
-        END_IF
+        END_IF;
 
         (* Wait for brake engage delay *)
         tBrakeTimer(IN := TRUE, PT := cfgBrakeEngageDelay);
@@ -863,20 +840,21 @@ CASE sysCurrentState OF
         IF tBrakeTimer.Q THEN
             sysBrakeEngaged := TRUE;
             sysCurrentState := ST_DRIVE_DISABLE;
-        END_IF
+        END_IF;
 
 
     ST_DRIVE_DISABLE:
         IF bEnterState THEN
             fbPower(Axis := sysAxis, Enable := FALSE);
-        END_IF
+        END_IF;
 
         fbPower(Axis := sysAxis, Enable := FALSE);
 
         IF NOT fbPower.Status THEN
             sysDriveEnabled := FALSE;
+            sysDriveReady := FALSE;
             sysCurrentState := ST_IDLE;
-        END_IF
+        END_IF;
 
 
     (* ======================================================================
@@ -889,8 +867,8 @@ CASE sysCurrentState OF
 
            NO brake engagement here - drive holds position via MC_Halt.
            Two exit paths:
-           - Fast recovery: Handshake before timeout → ST_BRAKE_HOLD (drive stays on)
-           - Slow recovery: Timeout → ST_FAULT_IDLE (drive off, brake on)
+           - Fast recovery: Handshake before timeout -> ST_BRAKE_HOLD (drive stays on)
+           - Slow recovery: Timeout -> ST_FAULT_IDLE (drive off, brake on)
            ---------------------------------------------------------------- *)
         IF bEnterState THEN
             (* DO NOT engage brake - keep it disengaged for controlled stop *)
@@ -906,12 +884,12 @@ CASE sysCurrentState OF
 
             (* Record fault information *)
             sysLastFaultCode := sysActiveFault;
-            sysLastFaultState := sysPreviousState;
+            (* Note: sysLastFaultState is set above, before sysPreviousState is overwritten *)
             sysFaultCount := sysFaultCount + 1;
 
             (* Start timeout timer for slow recovery path *)
             tStateTimer(IN := FALSE);
-        END_IF
+        END_IF;
 
         (* Continue halt until done *)
         fbHalt(Axis := sysAxis, Execute := NOT fbHalt.Done);
@@ -947,7 +925,7 @@ CASE sysCurrentState OF
             (* Transition to fault-idle: disable drive, engage brake *)
             fbHalt(Axis := sysAxis, Execute := FALSE);
             sysCurrentState := ST_FAULT_IDLE;
-        END_IF
+        END_IF;
 
 
     ST_FAULT_RECOVERY:
@@ -958,7 +936,7 @@ CASE sysCurrentState OF
         IF bEnterState THEN
             fbReset(Axis := sysAxis, Execute := TRUE);
             fbHalt(Axis := sysAxis, Execute := FALSE);
-        END_IF
+        END_IF;
 
         fbReset(Axis := sysAxis, Execute := TRUE);
 
@@ -973,7 +951,7 @@ CASE sysCurrentState OF
             (* Cannot recover - return to fault *)
             fbReset(Execute := FALSE);
             sysCurrentState := ST_FAULT;
-        END_IF
+        END_IF;
 
 
     ST_FAULT_IDLE:
@@ -994,7 +972,7 @@ CASE sysCurrentState OF
             (* Clear motion outputs *)
             doInMotion := FALSE;
             fbHalt(Axis := sysAxis, Execute := FALSE);
-        END_IF
+        END_IF;
 
         (* Wait for brake engage delay before disabling drive *)
         tBrakeTimer(IN := TRUE, PT := cfgBrakeEngageDelay);
@@ -1006,8 +984,8 @@ CASE sysCurrentState OF
             fbPower(Axis := sysAxis, Enable := FALSE);
             IF NOT fbPower.Status THEN
                 sysDriveEnabled := FALSE;
-            END_IF
-        END_IF
+            END_IF;
+        END_IF;
 
         (* Update handshake manager for fault reset *)
         fbHandshake(
@@ -1027,9 +1005,9 @@ CASE sysCurrentState OF
             doFaultActive := FALSE;
             sysActiveFault := FAULT_NONE;
             sysCurrentState := ST_IDLE;
-        END_IF
+        END_IF;
 
-END_CASE
+END_CASE;
 
 
 (* --------------------------------------------------------------------------
@@ -1067,7 +1045,8 @@ fbSafetyMonitor(
     EncoderBatteryOK := sysEncoderBatteryOK,
     CurrentState := sysCurrentState,
     CurrentMode := sysConfirmedMode,
-    ExitGuardTriggered := fbPistonExitGuard.FaultTriggered
+    ExitGuardTriggered := fbPistonExitGuard.FaultTriggered,
+    AbsHomeRequired := flagAbsHomeRequired
 );
 
 (* Trigger fault if safety monitor detects issue (unless already in fault) *)
@@ -1079,7 +1058,7 @@ IF fbSafetyMonitor.FaultDetected AND
    (sysCurrentState <> ST_ENCODER_CHECK) THEN
     sysActiveFault := fbSafetyMonitor.FaultCode;
     sysCurrentState := ST_FAULT;
-END_IF
+END_IF;
 
 
 (* --------------------------------------------------------------------------
@@ -1120,46 +1099,3 @@ aoPositionOutput := fbPosOutput.RawAnalogOutput;
 
 (* Increment cycle counter *)
 sysCycleCount := sysCycleCount + 1;
-
-END_PROGRAM
-
-
-(* ============================================================================
-   HELPER FUNCTIONS
-   ============================================================================ *)
-
-(* Check if mode is an operational mode requiring homing *)
-FUNCTION IsOperationalMode : BOOL
-VAR_INPUT
-    Mode : E_OperatingMode;
-END_VAR
-
-CASE Mode OF
-    MODE_BRAKE_HOLD,
-    MODE_POSITION,
-    MODE_VELOCITY,
-    MODE_TORQUE:
-        IsOperationalMode := TRUE;
-ELSE
-    IsOperationalMode := FALSE;
-END_CASE
-
-END_FUNCTION
-
-
-(* Check if mode is a homing mode *)
-FUNCTION IsHomingMode : BOOL
-VAR_INPUT
-    Mode : E_OperatingMode;
-END_VAR
-
-CASE Mode OF
-    MODE_GO_HOME,
-    MODE_HOME_LIMIT,
-    MODE_HOME_EOT:
-        IsHomingMode := TRUE;
-ELSE
-    IsHomingMode := FALSE;
-END_CASE
-
-END_FUNCTION

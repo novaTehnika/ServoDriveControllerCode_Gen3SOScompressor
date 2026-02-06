@@ -22,64 +22,41 @@
    - Called from ST_GO_HOME state in PRG_Main
    - RedirectToHoming signals PRG_Main to switch to ST_HOME_LIMIT
    - Abort input for motion enable drop handling
+
+   Variables (define in MWiec GUI):
+     VAR_INPUT:
+       Enable              : BOOL             (* Enable the function block *)
+       Execute             : BOOL             (* Start go home sequence *)
+       Axis                : AXIS_REF         (* PLCopen axis reference *)
+       AbsHomeRequired     : BOOL             (* Encoder homing required (blocks Go Home) *)
+       EOTHomeRequired     : BOOL             (* EOT homing required (does NOT block) *)
+       HomePosition        : LREAL            (* Target home position (mm) *)
+       HomeVelocity        : LREAL            (* Movement velocity (mm/s) *)
+       Abort               : BOOL             (* Abort the move *)
+     VAR_OUTPUT:
+       Active              : BOOL             (* Sequence is running *)
+       Done                : BOOL             (* At home position *)
+       AtPosition          : BOOL             (* Currently at home position *)
+       HomingRequired      : BOOL             (* Homing must be done first *)
+       RedirectToHoming    : BOOL             (* Caller should switch to homing mode *)
+       InMotion            : BOOL             (* Currently moving *)
+       Error               : BOOL             (* Error occurred *)
+       ErrorID             : DWORD            (* Error code if Error=TRUE *)
+     VAR:
+       fbMoveAbsolute      : MC_MoveAbsolute
+       fbHalt              : MC_Halt
+       eState              : INT := 0         (* State machine *)
+       rTrigExecute        : R_TRIG
+       rPosTolerance       : LREAL := 0.1     (* mm *)
+     VAR CONSTANT:
+       GOH_IDLE            : INT := 0
+       GOH_CHECK_REQ       : INT := 1
+       GOH_REDIRECT        : INT := 2
+       GOH_MOVING          : INT := 3
+       GOH_AT_POSITION     : INT := 4
+       GOH_ABORTING        : INT := 5
+       GOH_ERROR           : INT := 6
    ============================================================================ *)
-
-FUNCTION_BLOCK FB_GoHome
-VAR_INPUT
-    Enable              : BOOL;             (* Enable the function block *)
-    Execute             : BOOL;             (* Start go home sequence *)
-    Axis                : AXIS_REF;         (* PLCopen axis reference *)
-
-    (* Homing requirement flags *)
-    AbsHomeRequired     : BOOL;             (* Encoder homing required (blocks Go Home) *)
-    EOTHomeRequired     : BOOL;             (* EOT homing required (does NOT block) *)
-
-    (* Configuration *)
-    HomePosition        : LREAL;            (* Target home position (mm) *)
-    HomeVelocity        : LREAL;            (* Movement velocity (mm/s) *)
-
-    (* Control *)
-    Abort               : BOOL;             (* Abort the move *)
-END_VAR
-
-VAR_OUTPUT
-    Active              : BOOL;             (* Sequence is running *)
-    Done                : BOOL;             (* At home position *)
-    AtPosition          : BOOL;             (* Currently at home position *)
-    HomingRequired      : BOOL;             (* Homing must be done first *)
-    RedirectToHoming    : BOOL;             (* Caller should switch to homing mode *)
-    InMotion            : BOOL;             (* Currently moving *)
-    Error               : BOOL;             (* Error occurred *)
-    ErrorID             : DWORD;            (* Error code if Error=TRUE *)
-END_VAR
-
-VAR
-    (* PLCopen function blocks *)
-    fbMoveAbsolute      : MC_MoveAbsolute;
-    fbHalt              : MC_Halt;
-
-    (* State machine *)
-    eState              : INT := GOH_IDLE;
-
-    (* Edge detection *)
-    rTrigExecute        : R_TRIG;
-
-    (* Position tolerance for "at position" detection *)
-    rPosTolerance       : LREAL := 0.1;     (* mm *)
-END_VAR
-
-(* ============================================================================
-   Constants
-   ============================================================================ *)
-VAR CONSTANT
-    GOH_IDLE            : INT := 0;         (* Idle state *)
-    GOH_CHECK_REQ       : INT := 1;         (* Check requirements *)
-    GOH_REDIRECT        : INT := 2;         (* Redirect to homing *)
-    GOH_MOVING          : INT := 3;         (* Moving to home *)
-    GOH_AT_POSITION     : INT := 4;         (* At home position *)
-    GOH_ABORTING        : INT := 5;         (* Aborting move *)
-    GOH_ERROR           : INT := 6;         (* Error state *)
-END_VAR
 
 (* ============================================================================
    Main Logic
@@ -99,7 +76,7 @@ IF NOT Enable THEN
     fbMoveAbsolute(Execute := FALSE);
     fbHalt(Execute := FALSE);
     RETURN;
-END_IF
+END_IF;
 
 (* Detect rising edge on Execute *)
 rTrigExecute(CLK := Execute);
@@ -108,7 +85,7 @@ rTrigExecute(CLK := Execute);
 IF Abort AND (eState <> GOH_IDLE) AND (eState <> GOH_ERROR) AND (eState <> GOH_REDIRECT) THEN
     fbMoveAbsolute(Execute := FALSE);
     eState := GOH_ABORTING;
-END_IF
+END_IF;
 
 CASE eState OF
 
@@ -130,7 +107,7 @@ CASE eState OF
         IF rTrigExecute.Q OR Execute THEN
             Active := TRUE;
             eState := GOH_CHECK_REQ;
-        END_IF
+        END_IF;
 
 
     GOH_CHECK_REQ:
@@ -147,7 +124,7 @@ CASE eState OF
             HomingRequired := FALSE;
             RedirectToHoming := FALSE;
             eState := GOH_MOVING;
-        END_IF
+        END_IF;
 
 
     GOH_REDIRECT:
@@ -195,7 +172,7 @@ CASE eState OF
             (* Move was aborted externally *)
             fbMoveAbsolute(Execute := FALSE);
             eState := GOH_ABORTING;
-        END_IF
+        END_IF;
 
 
     GOH_AT_POSITION:
@@ -212,7 +189,7 @@ CASE eState OF
         IF NOT Execute THEN
             Done := FALSE;
             eState := GOH_IDLE;
-        END_IF
+        END_IF;
 
 
     GOH_ABORTING:
@@ -232,7 +209,7 @@ CASE eState OF
             (* Halt failed - still try to go to idle *)
             fbHalt(Execute := FALSE);
             eState := GOH_ERROR;
-        END_IF
+        END_IF;
 
 
     GOH_ERROR:
@@ -246,8 +223,6 @@ CASE eState OF
             Error := FALSE;
             ErrorID := 0;
             eState := GOH_IDLE;
-        END_IF
+        END_IF;
 
-END_CASE
-
-END_FUNCTION_BLOCK
+END_CASE;

@@ -26,61 +26,39 @@
    Integration:
    - Called every scan after state machine, before output update
    - FaultDetected triggers transition to ST_FAULT in PRG_Main
+
+   Variables (define in MWiec GUI):
+     VAR_INPUT:
+       Enable              : BOOL             (* Enable safety monitoring *)
+       LimitRetractActive  : BOOL             (* TRUE = retract limit triggered *)
+       LimitHomeActive     : BOOL             (* TRUE = home limit triggered *)
+       ActualPosition      : LREAL            (* Current axis position (mm) *)
+       SoftLimitMin        : LREAL            (* Minimum allowed position (mm) *)
+       SoftLimitMax        : LREAL            (* Maximum allowed position (mm) *)
+       DriveReady          : BOOL             (* Drive is ready for motion *)
+       DriveFault          : BOOL             (* Drive has reported a fault *)
+       DriveErrorID        : DWORD            (* Drive error code if fault *)
+       EncoderValid        : BOOL             (* Absolute encoder position valid *)
+       EncoderBatteryOK    : BOOL             (* Encoder battery status OK *)
+       CurrentState        : E_SystemState    (* Current state machine state *)
+       CurrentMode         : E_OperatingMode  (* Current operating mode *)
+       ExitGuardTriggered  : BOOL             (* Piston exit guard triggered fault *)
+       AbsHomeRequired     : BOOL             (* Homing required - suppresses encoder fault *)
+     VAR_OUTPUT:
+       FaultDetected       : BOOL             (* A fault condition exists *)
+       FaultCode           : E_FaultCode      (* Fault code to report *)
+       FaultLimitSwitch    : BOOL             (* Limit switch fault detected *)
+       FaultPosition       : BOOL             (* Position limit exceeded *)
+       FaultDrive          : BOOL             (* Drive fault detected *)
+       FaultEncoder        : BOOL             (* Encoder fault detected *)
+       FaultPistonExit     : BOOL             (* Piston exit guard fault *)
+     VAR:
+       bLatchedFault       : BOOL
+       eLatchedFaultCode   : E_FaultCode
+       bInMotionState      : BOOL
+       bInHomingState      : BOOL
+       bInFaultState       : BOOL
    ============================================================================ *)
-
-FUNCTION_BLOCK FB_SafetyMonitor
-VAR_INPUT
-    Enable              : BOOL;             (* Enable safety monitoring *)
-
-    (* Limit switch status - from filtered digital inputs *)
-    LimitRetractActive  : BOOL;             (* TRUE = retract limit triggered *)
-    LimitHomeActive     : BOOL;             (* TRUE = home limit triggered *)
-
-    (* Position information *)
-    ActualPosition      : LREAL;            (* Current axis position (mm) *)
-    SoftLimitMin        : LREAL;            (* Minimum allowed position (mm) *)
-    SoftLimitMax        : LREAL;            (* Maximum allowed position (mm) *)
-
-    (* Drive status *)
-    DriveReady          : BOOL;             (* Drive is ready for motion *)
-    DriveFault          : BOOL;             (* Drive has reported a fault *)
-    DriveErrorID        : DWORD;            (* Drive error code if fault *)
-
-    (* Encoder status *)
-    EncoderValid        : BOOL;             (* Absolute encoder position valid *)
-    EncoderBatteryOK    : BOOL;             (* Encoder battery status OK *)
-
-    (* Operating context *)
-    CurrentState        : E_SystemState;    (* Current state machine state *)
-    CurrentMode         : E_OperatingMode;  (* Current operating mode *)
-
-    (* Piston exit guard status *)
-    ExitGuardTriggered  : BOOL;             (* Piston exit guard triggered fault *)
-END_VAR
-
-VAR_OUTPUT
-    (* Primary fault output *)
-    FaultDetected       : BOOL;             (* A fault condition exists *)
-    FaultCode           : E_FaultCode;      (* Fault code to report *)
-
-    (* Individual fault flags for diagnostics *)
-    FaultLimitSwitch    : BOOL;             (* Limit switch fault detected *)
-    FaultPosition       : BOOL;             (* Position limit exceeded *)
-    FaultDrive          : BOOL;             (* Drive fault detected *)
-    FaultEncoder        : BOOL;             (* Encoder fault detected *)
-    FaultPistonExit     : BOOL;             (* Piston exit guard fault *)
-END_VAR
-
-VAR
-    (* Latching for fault persistence *)
-    bLatchedFault       : BOOL;
-    eLatchedFaultCode   : E_FaultCode;
-
-    (* Internal flags *)
-    bInMotionState      : BOOL;
-    bInHomingState      : BOOL;
-    bInFaultState       : BOOL;
-END_VAR
 
 (* ============================================================================
    Main Logic
@@ -98,7 +76,7 @@ IF NOT Enable THEN
     bLatchedFault := FALSE;
     eLatchedFaultCode := FAULT_NONE;
     RETURN;
-END_IF
+END_IF;
 
 (* --------------------------------------------------------------------------
    Determine operating context
@@ -113,15 +91,7 @@ bInMotionState := (CurrentState = ST_POSITION_CTRL) OR
 
 (* Check if in a homing state *)
 bInHomingState := (CurrentState = ST_HOME_LIMIT) OR
-                  (CurrentState = ST_HOME_LIM_APPROACH) OR
-                  (CurrentState = ST_HOME_LIM_DETECT) OR
-                  (CurrentState = ST_HOME_LIM_BACKOFF) OR
-                  (CurrentState = ST_HOME_LIM_SETREF) OR
                   (CurrentState = ST_HOME_EOT) OR
-                  (CurrentState = ST_HOME_EOT_FAST) OR
-                  (CurrentState = ST_HOME_EOT_SLOW) OR
-                  (CurrentState = ST_HOME_EOT_DETECT) OR
-                  (CurrentState = ST_HOME_EOT_SETREF) OR
                   (CurrentState = ST_HOME_COMPLETE);
 
 (* Check if already in fault state *)
@@ -138,8 +108,8 @@ IF (CurrentState = ST_FAULT_IDLE) OR (CurrentState = ST_IDLE) THEN
     IF NOT FaultDetected THEN
         bLatchedFault := FALSE;
         eLatchedFaultCode := FAULT_NONE;
-    END_IF
-END_IF
+    END_IF;
+END_IF;
 
 (* --------------------------------------------------------------------------
    DRIVE FAULT MONITORING
@@ -154,12 +124,14 @@ FaultDrive := DriveFault;
    -------------------------------------------------------------------------- *)
 
 (* Encoder is faulty if position invalid (but only check when relevant) *)
-(* Don't trigger encoder fault during initialization before check completes *)
-IF (CurrentState > ST_ENCODER_CHECK) THEN
+(* Don't trigger during initialization (before check completes) or when
+   AbsHomeRequired is set (system is aware and trying to resolve via homing) *)
+IF (CurrentState <> ST_INIT) AND (CurrentState <> ST_ENCODER_CHECK)
+   AND NOT AbsHomeRequired THEN
     FaultEncoder := NOT EncoderValid;
 ELSE
     FaultEncoder := FALSE;
-END_IF
+END_IF;
 
 (* --------------------------------------------------------------------------
    LIMIT SWITCH FAULT MONITORING
@@ -174,11 +146,11 @@ IF bInMotionState AND NOT bInHomingState THEN
         FaultLimitSwitch := TRUE;
     ELSE
         FaultLimitSwitch := FALSE;
-    END_IF
+    END_IF;
 ELSE
     (* Not in motion or in homing - limits are OK or expected *)
     FaultLimitSwitch := FALSE;
-END_IF
+END_IF;
 
 (* --------------------------------------------------------------------------
    POSITION LIMIT MONITORING
@@ -190,7 +162,7 @@ IF (ActualPosition < SoftLimitMin) OR (ActualPosition > SoftLimitMax) THEN
     FaultPosition := TRUE;
 ELSE
     FaultPosition := FALSE;
-END_IF
+END_IF;
 
 (* --------------------------------------------------------------------------
    PISTON EXIT GUARD MONITORING
@@ -228,7 +200,7 @@ ELSIF FaultPistonExit THEN
 ELSE
     FaultDetected := FALSE;
     FaultCode := FAULT_NONE;
-END_IF
+END_IF;
 
 (* --------------------------------------------------------------------------
    FAULT LATCHING
@@ -238,12 +210,10 @@ END_IF
 IF FaultDetected AND NOT bLatchedFault AND NOT bInFaultState THEN
     bLatchedFault := TRUE;
     eLatchedFaultCode := FaultCode;
-END_IF
+END_IF;
 
 (* Use latched fault if current scan doesn't detect new fault *)
 IF bLatchedFault AND NOT FaultDetected THEN
     FaultDetected := TRUE;
     FaultCode := eLatchedFaultCode;
-END_IF
-
-END_FUNCTION_BLOCK
+END_IF;

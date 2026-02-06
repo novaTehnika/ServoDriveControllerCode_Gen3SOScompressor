@@ -24,75 +24,48 @@
    Integration:
    - Called from ST_HOME_LIMIT state in PRG_Main
    - Abort input for motion enable drop handling
+
+   Variables (define in MWiec GUI):
+     VAR_INPUT:
+       Enable              : BOOL             (* Enable the function block *)
+       Execute             : BOOL             (* Start homing sequence *)
+       Axis                : AXIS_REF         (* PLCopen axis reference *)
+       ApproachVelocity    : LREAL            (* Approach velocity (mm/s) *)
+       BackoffVelocity     : LREAL            (* Backoff velocity (mm/s) *)
+       SetPosition         : LREAL            (* Position to set at home switch (mm) *)
+       Timeout             : TIME             (* Overall sequence timeout *)
+       LimitHomeActive     : BOOL             (* Home limit switch is triggered *)
+       LimitRetractActive  : BOOL             (* Retract limit switch is triggered *)
+       Abort               : BOOL             (* Abort the sequence *)
+     VAR_OUTPUT:
+       Active              : BOOL             (* Sequence is running *)
+       Done                : BOOL             (* Homing complete *)
+       InMotion            : BOOL             (* Currently moving *)
+       Error               : BOOL             (* Error occurred *)
+       ErrorID             : DWORD            (* Error code if Error=TRUE *)
+       ApproachingPositive : BOOL             (* Currently approaching from positive direction *)
+     VAR:
+       fbMoveVelocity      : MC_MoveVelocity
+       fbHalt              : MC_Halt
+       fbSetPosition       : MC_SetPosition
+       eState              : INT := 0         (* State machine *)
+       rTrigExecute        : R_TRIG
+       tTimeout            : TON
+       bApproachFromPositive : BOOL := FALSE
+     VAR CONSTANT:
+       HL_IDLE             : INT := 0
+       HL_APPROACH         : INT := 1
+       HL_DETECT           : INT := 2
+       HL_BACKOFF          : INT := 3
+       HL_SETREF           : INT := 4
+       HL_DONE             : INT := 5
+       HL_ABORTING         : INT := 6
+       HL_ERROR            : INT := 7
+       ERR_TIMEOUT         : DWORD := 16#8001
+       ERR_DRIVE           : DWORD := 16#8002
+       ERR_LIMIT_INVALID   : DWORD := 16#8003
+       ERR_SETPOS          : DWORD := 16#8004
    ============================================================================ *)
-
-FUNCTION_BLOCK FB_HomeLimit
-VAR_INPUT
-    Enable              : BOOL;             (* Enable the function block *)
-    Execute             : BOOL;             (* Start homing sequence *)
-    Axis                : AXIS_REF;         (* PLCopen axis reference *)
-
-    (* Configuration *)
-    ApproachVelocity    : LREAL;            (* Approach velocity (mm/s) *)
-    BackoffVelocity     : LREAL;            (* Backoff velocity (mm/s) *)
-    SetPosition         : LREAL;            (* Position to set at home switch (mm) *)
-    Timeout             : TIME;             (* Overall sequence timeout *)
-
-    (* Limit switch inputs *)
-    LimitHomeActive     : BOOL;             (* Home limit switch is triggered *)
-    LimitRetractActive  : BOOL;             (* Retract limit switch is triggered *)
-
-    (* Control *)
-    Abort               : BOOL;             (* Abort the sequence *)
-END_VAR
-
-VAR_OUTPUT
-    Active              : BOOL;             (* Sequence is running *)
-    Done                : BOOL;             (* Homing complete *)
-    InMotion            : BOOL;             (* Currently moving *)
-    Error               : BOOL;             (* Error occurred *)
-    ErrorID             : DWORD;            (* Error code if Error=TRUE *)
-    ApproachingPositive : BOOL;             (* Currently approaching from positive direction *)
-END_VAR
-
-VAR
-    (* PLCopen function blocks *)
-    fbMoveVelocity      : MC_MoveVelocity;
-    fbHalt              : MC_Halt;
-    fbSetPosition       : MC_SetPosition;
-
-    (* State machine *)
-    eState              : INT := HL_IDLE;
-
-    (* Edge detection *)
-    rTrigExecute        : R_TRIG;
-
-    (* Timers *)
-    tTimeout            : TON;
-
-    (* Internal flags *)
-    bApproachFromPositive : BOOL := FALSE;  (* Direction flag for over-travel handling *)
-END_VAR
-
-(* ============================================================================
-   Constants
-   ============================================================================ *)
-VAR CONSTANT
-    HL_IDLE             : INT := 0;         (* Idle state *)
-    HL_APPROACH         : INT := 1;         (* Approaching limit switch *)
-    HL_DETECT           : INT := 2;         (* Halt after limit detected *)
-    HL_BACKOFF          : INT := 3;         (* Backing off from switch *)
-    HL_SETREF           : INT := 4;         (* Setting position reference *)
-    HL_DONE             : INT := 5;         (* Sequence complete *)
-    HL_ABORTING         : INT := 6;         (* Aborting sequence *)
-    HL_ERROR            : INT := 7;         (* Error state *)
-
-    (* Error codes *)
-    ERR_TIMEOUT         : DWORD := 16#8001; (* Homing timeout *)
-    ERR_DRIVE           : DWORD := 16#8002; (* Drive error during homing *)
-    ERR_LIMIT_INVALID   : DWORD := 16#8003; (* Invalid limit switch sequence *)
-    ERR_SETPOS          : DWORD := 16#8004; (* Set position failed *)
-END_VAR
 
 (* ============================================================================
    Main Logic
@@ -113,7 +86,7 @@ IF NOT Enable THEN
     fbSetPosition(Execute := FALSE);
     tTimeout(IN := FALSE);
     RETURN;
-END_IF
+END_IF;
 
 (* Detect rising edge on Execute *)
 rTrigExecute(CLK := Execute);
@@ -124,7 +97,7 @@ IF Abort AND (eState <> HL_IDLE) AND (eState <> HL_ERROR) AND (eState <> HL_DONE
     fbSetPosition(Execute := FALSE);
     tTimeout(IN := FALSE);
     eState := HL_ABORTING;
-END_IF
+END_IF;
 
 (* Overall timeout check *)
 tTimeout(IN := (eState <> HL_IDLE) AND (eState <> HL_DONE) AND (eState <> HL_ERROR) AND (eState <> HL_ABORTING),
@@ -137,7 +110,7 @@ IF tTimeout.Q THEN
     Error := TRUE;
     ErrorID := ERR_TIMEOUT;
     eState := HL_ERROR;
-END_IF
+END_IF;
 
 CASE eState OF
 
@@ -161,7 +134,7 @@ CASE eState OF
             Active := TRUE;
             bApproachFromPositive := FALSE;  (* Start approaching from negative *)
             eState := HL_APPROACH;
-        END_IF
+        END_IF;
 
 
     HL_APPROACH:
@@ -185,7 +158,7 @@ CASE eState OF
                 Velocity := ApproachVelocity,
                 Direction := MC_Negative_Direction
             );
-        END_IF
+        END_IF;
 
         InMotion := fbMoveVelocity.Busy;
 
@@ -208,14 +181,14 @@ CASE eState OF
                 Error := TRUE;
                 ErrorID := ERR_LIMIT_INVALID;
                 eState := HL_ERROR;
-            END_IF
+            END_IF;
 
         ELSIF fbMoveVelocity.Error THEN
             fbMoveVelocity(Execute := FALSE);
             Error := TRUE;
             ErrorID := ERR_DRIVE;
             eState := HL_ERROR;
-        END_IF
+        END_IF;
 
 
     HL_DETECT:
@@ -236,7 +209,7 @@ CASE eState OF
             Error := TRUE;
             ErrorID := ERR_DRIVE;
             eState := HL_ERROR;
-        END_IF
+        END_IF;
 
 
     HL_BACKOFF:
@@ -260,7 +233,7 @@ CASE eState OF
             Error := TRUE;
             ErrorID := ERR_DRIVE;
             eState := HL_ERROR;
-        END_IF
+        END_IF;
 
 
     HL_SETREF:
@@ -292,8 +265,8 @@ CASE eState OF
                 Error := TRUE;
                 ErrorID := ERR_SETPOS;
                 eState := HL_ERROR;
-            END_IF
-        END_IF
+            END_IF;
+        END_IF;
 
 
     HL_DONE:
@@ -307,7 +280,7 @@ CASE eState OF
         IF NOT Execute THEN
             Done := FALSE;
             eState := HL_IDLE;
-        END_IF
+        END_IF;
 
 
     HL_ABORTING:
@@ -327,7 +300,7 @@ CASE eState OF
             (* Halt failed - still try to go to idle *)
             fbHalt(Execute := FALSE);
             eState := HL_ERROR;
-        END_IF
+        END_IF;
 
 
     HL_ERROR:
@@ -341,8 +314,6 @@ CASE eState OF
             Error := FALSE;
             ErrorID := 0;
             eState := HL_IDLE;
-        END_IF
+        END_IF;
 
-END_CASE
-
-END_FUNCTION_BLOCK
+END_CASE;

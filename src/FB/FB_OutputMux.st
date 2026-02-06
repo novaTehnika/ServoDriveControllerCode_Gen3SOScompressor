@@ -9,11 +9,7 @@
    - Normal mode: DO0-DO2 = Mode confirmation bits
    - Fault mode:  DO0-DO2 = Fault code bits
 
-   Uses centralized conversion functions from EnumConversions.st
-
-   Output Multiplexing:
-   - Normal mode: DO0-DO2 = Mode confirmation bits (000-111)
-   - Fault mode:  DO0-DO2 = Fault code bits (000-111)
+   Uses centralized conversion functions from FN_FaultToBits.
 
    Fault Codes (3-bit):
    000 = No fault / cleared
@@ -24,30 +20,25 @@
    101 = Piston exit prevention triggered
    110 = Limit switch fault
    111 = Encoder/absolute position fault
+
+   Variables (define in MWiec GUI):
+     VAR_INPUT:
+       Enable              : BOOL             (* Enable the function block *)
+       FaultActive         : BOOL             (* Fault state is active *)
+       FaultCode           : E_FaultCode      (* Current fault code *)
+       ModeConfirmBit0     : BOOL             (* Mode confirmation bit 0 *)
+       ModeConfirmBit1     : BOOL             (* Mode confirmation bit 1 *)
+       ModeConfirmBit2     : BOOL             (* Mode confirmation bit 2 *)
+     VAR_OUTPUT:
+       DO0_Output          : BOOL             (* Output for DO0 *)
+       DO1_Output          : BOOL             (* Output for DO1 *)
+       DO2_Output          : BOOL             (* Output for DO2 *)
+       FaultActiveOutput   : BOOL             (* Output for doFaultActive (DO5) *)
+     VAR:
+       bFaultBit0          : BOOL             (* Fault code bit 0 *)
+       bFaultBit1          : BOOL             (* Fault code bit 1 *)
+       bFaultBit2          : BOOL             (* Fault code bit 2 *)
    ============================================================================ *)
-
-FUNCTION_BLOCK FB_OutputMux
-VAR_INPUT
-    Enable              : BOOL;             (* Enable the function block *)
-    FaultActive         : BOOL;             (* Fault state is active *)
-    FaultCode           : E_FaultCode;      (* Current fault code *)
-    ModeConfirmBit0     : BOOL;             (* Mode confirmation bit 0 *)
-    ModeConfirmBit1     : BOOL;             (* Mode confirmation bit 1 *)
-    ModeConfirmBit2     : BOOL;             (* Mode confirmation bit 2 *)
-END_VAR
-
-VAR_OUTPUT
-    DO0_Output          : BOOL;             (* Output for DO0 *)
-    DO1_Output          : BOOL;             (* Output for DO1 *)
-    DO2_Output          : BOOL;             (* Output for DO2 *)
-    FaultActiveOutput   : BOOL;             (* Output for doFaultActive (DO5) *)
-END_VAR
-
-VAR
-    bFaultBit0          : BOOL;             (* Fault code bit 0 *)
-    bFaultBit1          : BOOL;             (* Fault code bit 1 *)
-    bFaultBit2          : BOOL;             (* Fault code bit 2 *)
-END_VAR
 
 (* ============================================================================
    Main Logic
@@ -60,7 +51,7 @@ IF NOT Enable THEN
     DO2_Output := FALSE;
     FaultActiveOutput := FALSE;
     RETURN;
-END_IF
+END_IF;
 
 (* Set fault active output *)
 FaultActiveOutput := FaultActive;
@@ -78,6 +69,4 @@ ELSE
     DO0_Output := ModeConfirmBit0;
     DO1_Output := ModeConfirmBit1;
     DO2_Output := ModeConfirmBit2;
-END_IF
-
-END_FUNCTION_BLOCK
+END_IF;

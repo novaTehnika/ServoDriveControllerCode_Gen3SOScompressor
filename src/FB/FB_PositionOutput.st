@@ -20,49 +20,35 @@
 
    Output:
    - Raw INT: -32768 to +32767 corresponds to -10V to +10V
+
+   Variables (define in MWiec GUI):
+     VAR_INPUT:
+       Enable              : BOOL             (* Enable the mapper *)
+       ActualPosition      : LREAL            (* Current position in mm *)
+       Stage1PosMin        : LREAL            (* Stage 1 position start (mm) *)
+       Stage1PosMax        : LREAL            (* Stage 1 position end (mm) *)
+       Stage1VoltMin       : LREAL            (* Stage 1 voltage start (V) *)
+       Stage1VoltMax       : LREAL            (* Stage 1 voltage end (V) *)
+       Stage2PosMin        : LREAL            (* Stage 2 position start (mm) *)
+       Stage2PosMax        : LREAL            (* Stage 2 position end (mm) *)
+       Stage2VoltMin       : LREAL            (* Stage 2 voltage start (V) *)
+       Stage2VoltMax       : LREAL            (* Stage 2 voltage end (V) *)
+     VAR_OUTPUT:
+       RawAnalogOutput     : INT              (* Raw analog output value *)
+       OutputVoltage       : LREAL            (* Calculated output voltage *)
+       InStage1            : BOOL             (* Position is in stage 1 region *)
+       InStage2            : BOOL             (* Position is in stage 2 region *)
+     VAR:
+       rVoltage            : LREAL            (* Calculated voltage *)
+       rNormalized         : LREAL            (* Normalized position within stage *)
+       rRawValue           : LREAL            (* Raw value before conversion *)
+     VAR CONSTANT:
+       RAW_MIN             : LREAL := -32768.0
+       RAW_MAX             : LREAL := 32767.0
+       VOLT_MIN            : LREAL := -10.0
+       VOLT_MAX            : LREAL := 10.0
+       VOLT_RANGE          : LREAL := 20.0
    ============================================================================ *)
-
-FUNCTION_BLOCK FB_PositionOutput
-VAR_INPUT
-    Enable              : BOOL;             (* Enable the mapper *)
-    ActualPosition      : LREAL;            (* Current position in mm *)
-
-    (* Stage 1 configuration (in-cylinder, higher resolution) *)
-    Stage1PosMin        : LREAL;            (* Stage 1 position start (mm) *)
-    Stage1PosMax        : LREAL;            (* Stage 1 position end (mm) *)
-    Stage1VoltMin       : LREAL;            (* Stage 1 voltage start (V) *)
-    Stage1VoltMax       : LREAL;            (* Stage 1 voltage end (V) *)
-
-    (* Stage 2 configuration (out-of-cylinder, lower resolution) *)
-    Stage2PosMin        : LREAL;            (* Stage 2 position start (mm) *)
-    Stage2PosMax        : LREAL;            (* Stage 2 position end (mm) *)
-    Stage2VoltMin       : LREAL;            (* Stage 2 voltage start (V) *)
-    Stage2VoltMax       : LREAL;            (* Stage 2 voltage end (V) *)
-END_VAR
-
-VAR_OUTPUT
-    RawAnalogOutput     : INT;              (* Raw analog output value *)
-    OutputVoltage       : LREAL;            (* Calculated output voltage *)
-    InStage1            : BOOL;             (* Position is in stage 1 region *)
-    InStage2            : BOOL;             (* Position is in stage 2 region *)
-END_VAR
-
-VAR
-    rVoltage            : LREAL;            (* Calculated voltage *)
-    rNormalized         : LREAL;            (* Normalized position within stage *)
-    rRawValue           : LREAL;            (* Raw value before conversion *)
-END_VAR
-
-(* ============================================================================
-   Constants
-   ============================================================================ *)
-VAR CONSTANT
-    RAW_MIN             : LREAL := -32768.0;    (* Minimum raw value *)
-    RAW_MAX             : LREAL := 32767.0;     (* Maximum raw value *)
-    VOLT_MIN            : LREAL := -10.0;       (* Minimum voltage *)
-    VOLT_MAX            : LREAL := 10.0;        (* Maximum voltage *)
-    VOLT_RANGE          : LREAL := 20.0;        (* Total voltage range *)
-END_VAR
 
 (* ============================================================================
    Main Logic
@@ -74,7 +60,7 @@ IF NOT Enable THEN
     InStage1 := FALSE;
     InStage2 := FALSE;
     RETURN;
-END_IF
+END_IF;
 
 (* Determine which stage the position falls into *)
 IF ActualPosition <= Stage1PosMax THEN
@@ -87,7 +73,7 @@ IF ActualPosition <= Stage1PosMax THEN
         rNormalized := (ActualPosition - Stage1PosMin) / (Stage1PosMax - Stage1PosMin);
     ELSE
         rNormalized := 0.0;
-    END_IF
+    END_IF;
 
     (* Clamp to 0.0-1.0 range *)
     rNormalized := LIMIT(0.0, rNormalized, 1.0);
@@ -105,14 +91,14 @@ ELSE
         rNormalized := (ActualPosition - Stage2PosMin) / (Stage2PosMax - Stage2PosMin);
     ELSE
         rNormalized := 0.0;
-    END_IF
+    END_IF;
 
     (* Clamp to 0.0-1.0 range *)
     rNormalized := LIMIT(0.0, rNormalized, 1.0);
 
     (* Calculate voltage for stage 2 *)
     rVoltage := Stage2VoltMin + (rNormalized * (Stage2VoltMax - Stage2VoltMin));
-END_IF
+END_IF;
 
 (* Clamp voltage to valid range *)
 rVoltage := LIMIT(VOLT_MIN, rVoltage, VOLT_MAX);
@@ -129,6 +115,4 @@ ELSIF rRawValue > RAW_MAX THEN
     RawAnalogOutput := 32767;
 ELSE
     RawAnalogOutput := LREAL_TO_INT(rRawValue);
-END_IF
-
-END_FUNCTION_BLOCK
+END_IF;

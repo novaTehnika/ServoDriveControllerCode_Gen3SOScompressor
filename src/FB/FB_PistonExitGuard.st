@@ -29,39 +29,25 @@
    - Called from PRG_Main safety monitoring section
    - FaultTriggered connects to FB_SafetyMonitor.ExitGuardTriggered
    - Caller is responsible for transitioning to ST_FAULT when triggered
+
+   Variables (define in MWiec GUI):
+     VAR_INPUT:
+       Enable              : BOOL             (* Enable the guard *)
+       ActualPosition      : LREAL            (* Current position (mm) *)
+       ActualVelocity      : LREAL            (* Current velocity (mm/s) *)
+       ActualTorque        : LREAL            (* Current torque (%) *)
+       SoftLimitMin        : LREAL            (* Minimum allowed position (mm) *)
+       GuardMargin         : LREAL            (* Safety margin before limit (mm) *)
+       VelocityThreshold   : LREAL            (* Motion detection threshold (mm/s) *)
+       TorqueThreshold     : LREAL            (* Torque threshold for detection (%) *)
+     VAR_OUTPUT:
+       FaultTriggered      : BOOL             (* Dangerous condition detected - transition to fault *)
+       GuardActive         : BOOL             (* Guard is actively monitoring *)
+       InDangerZone        : BOOL             (* Position is near exit limit *)
+       ApproachingLimit    : BOOL             (* Moving toward exit limit *)
+     VAR:
+       rGuardBoundary      : LREAL            (* Boundary = SoftLimitMin + GuardMargin *)
    ============================================================================ *)
-
-FUNCTION_BLOCK FB_PistonExitGuard
-VAR_INPUT
-    Enable              : BOOL;             (* Enable the guard *)
-
-    (* Axis state - actual values only *)
-    ActualPosition      : LREAL;            (* Current position (mm) *)
-    ActualVelocity      : LREAL;            (* Current velocity (mm/s) *)
-    ActualTorque        : LREAL;            (* Current torque (%) *)
-
-    (* Limit configuration *)
-    SoftLimitMin        : LREAL;            (* Minimum allowed position (mm) *)
-    GuardMargin         : LREAL;            (* Safety margin before limit (mm) *)
-
-    (* Detection thresholds *)
-    VelocityThreshold   : LREAL;            (* Motion detection threshold (mm/s) *)
-    TorqueThreshold     : LREAL;            (* Torque threshold for detection (%) *)
-END_VAR
-
-VAR_OUTPUT
-    (* Status outputs *)
-    FaultTriggered      : BOOL;             (* Dangerous condition detected - transition to fault *)
-    GuardActive         : BOOL;             (* Guard is actively monitoring *)
-
-    (* Diagnostic outputs *)
-    InDangerZone        : BOOL;             (* Position is near exit limit *)
-    ApproachingLimit    : BOOL;             (* Moving toward exit limit *)
-END_VAR
-
-VAR
-    rGuardBoundary      : LREAL;            (* Boundary = SoftLimitMin + GuardMargin *)
-END_VAR
 
 (* ============================================================================
    Main Logic
@@ -74,7 +60,7 @@ IF NOT Enable THEN
     InDangerZone := FALSE;
     ApproachingLimit := FALSE;
     RETURN;
-END_IF
+END_IF;
 
 (* Calculate guard boundary *)
 rGuardBoundary := SoftLimitMin + GuardMargin;
@@ -111,8 +97,8 @@ IF InDangerZone THEN
        (ActualVelocity < -VelocityThreshold) THEN    (* But still moving toward exit *)
         (* DANGEROUS: Pressure overcoming motor resistance *)
         FaultTriggered := TRUE;
-    END_IF
-END_IF
+    END_IF;
+END_IF;
 
 (* --------------------------------------------------------------------------
    HARD LIMIT VIOLATION
@@ -123,6 +109,4 @@ END_IF
 
 IF ActualPosition < SoftLimitMin THEN
     FaultTriggered := TRUE;
-END_IF
-
-END_FUNCTION_BLOCK
+END_IF;

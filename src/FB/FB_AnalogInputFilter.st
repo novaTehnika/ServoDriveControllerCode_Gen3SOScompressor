@@ -23,41 +23,29 @@
    Configuration:
    - Alpha: Filter coefficient (0.0-1.0), calculated in PRG_Main ST_INIT
    - MedianFilterSize: 3 or 5 samples for median filter
+
+   Variables (define in MWiec GUI):
+     VAR_INPUT:
+       Enable              : BOOL := TRUE     (* Enable filtering *)
+       RawInput            : INT              (* Raw analog input (-32768 to +32767) *)
+       Alpha               : LREAL            (* Low-pass filter coefficient (0.0-1.0) *)
+       MedianFilterSize    : INT := 3         (* Median filter size: 3 or 5 *)
+     VAR_OUTPUT:
+       FilteredOutput      : INT              (* Filtered output value *)
+       FilteredReal        : LREAL            (* Filtered output as LREAL *)
+       RawReal             : LREAL            (* Raw input as LREAL *)
+     VAR:
+       aMedianBuffer       : ARRAY[0..4] OF LREAL  (* Median filter buffer *)
+       nMedianIndex        : INT := 0
+       aSortBuffer         : ARRAY[0..4] OF LREAL
+       rFilteredValue      : LREAL := 0.0     (* Low-pass filter state *)
+       rAlpha              : LREAL
+       bInitialized        : BOOL := FALSE
+       i, j                : INT
+       rTemp               : LREAL
+       rMedianResult       : LREAL
+       nSize               : INT
    ============================================================================ *)
-
-FUNCTION_BLOCK FB_AnalogInputFilter
-VAR_INPUT
-    Enable              : BOOL := TRUE;     (* Enable filtering *)
-    RawInput            : INT;              (* Raw analog input (-32768 to +32767) *)
-    Alpha               : LREAL;            (* Low-pass filter coefficient (0.0-1.0) *)
-    MedianFilterSize    : INT := 3;         (* Median filter size: 3 or 5 *)
-END_VAR
-
-VAR_OUTPUT
-    FilteredOutput      : INT;              (* Filtered output value *)
-    FilteredReal        : LREAL;            (* Filtered output as LREAL *)
-    RawReal             : LREAL;            (* Raw input as LREAL *)
-END_VAR
-
-VAR
-    (* Median filter buffer (size 5, use 3 or 5 based on config) *)
-    aMedianBuffer       : ARRAY[0..4] OF LREAL;
-    nMedianIndex        : INT := 0;
-    aSortBuffer         : ARRAY[0..4] OF LREAL;
-
-    (* Low-pass filter state *)
-    rFilteredValue      : LREAL := 0.0;
-    rAlpha              : LREAL;
-
-    (* Initialization flag *)
-    bInitialized        : BOOL := FALSE;
-
-    (* Temporary variables *)
-    i, j                : INT;
-    rTemp               : LREAL;
-    rMedianResult       : LREAL;
-    nSize               : INT;
-END_VAR
 
 (* ============================================================================
    Main Logic
@@ -69,7 +57,7 @@ IF NOT Enable THEN
     FilteredReal := RawReal;
     FilteredOutput := RawInput;
     RETURN;
-END_IF
+END_IF;
 
 (* Convert raw input to LREAL *)
 RawReal := INT_TO_LREAL(RawInput);
@@ -85,10 +73,10 @@ IF NOT bInitialized THEN
     (* Fill median buffer with current value *)
     FOR i := 0 TO 4 DO
         aMedianBuffer[i] := RawReal;
-    END_FOR
+    END_FOR;
     rFilteredValue := RawReal;
     bInitialized := TRUE;
-END_IF
+END_IF;
 
 (* --------------------------------------------------------------------------
    Stage 1: Median Filter
@@ -99,19 +87,19 @@ IF MedianFilterSize >= 5 THEN
     nSize := 5;
 ELSE
     nSize := 3;
-END_IF
+END_IF;
 
 (* Add new sample to circular buffer *)
 aMedianBuffer[nMedianIndex] := RawReal;
 nMedianIndex := nMedianIndex + 1;
 IF nMedianIndex >= nSize THEN
     nMedianIndex := 0;
-END_IF
+END_IF;
 
 (* Copy to sort buffer *)
 FOR i := 0 TO nSize - 1 DO
     aSortBuffer[i] := aMedianBuffer[i];
-END_FOR
+END_FOR;
 
 (* Simple bubble sort (efficient for small arrays) *)
 FOR i := 0 TO nSize - 2 DO
@@ -120,9 +108,9 @@ FOR i := 0 TO nSize - 2 DO
             rTemp := aSortBuffer[j];
             aSortBuffer[j] := aSortBuffer[j + 1];
             aSortBuffer[j + 1] := rTemp;
-        END_IF
-    END_FOR
-END_FOR
+        END_IF;
+    END_FOR;
+END_FOR;
 
 (* Get median value (middle element) *)
 rMedianResult := aSortBuffer[nSize / 2];
@@ -147,6 +135,4 @@ ELSIF rFilteredValue > 32767.0 THEN
     FilteredOutput := 32767;
 ELSE
     FilteredOutput := LREAL_TO_INT(rFilteredValue);
-END_IF
-
-END_FUNCTION_BLOCK
+END_IF;

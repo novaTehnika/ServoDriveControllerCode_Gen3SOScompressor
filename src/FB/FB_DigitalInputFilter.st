@@ -12,29 +12,24 @@
    - Configurable debounce time
    - Edge detection outputs
    - Raw input passthrough for debugging
+
+   Variables (define in MWiec GUI):
+     VAR_INPUT:
+       RawInput            : BOOL             (* Raw digital input *)
+       DebounceTime        : TIME := T#10MS   (* Debounce time *)
+     VAR_OUTPUT:
+       FilteredOutput      : BOOL             (* Debounced output *)
+       RisingEdge          : BOOL             (* Rising edge detected on filtered output *)
+       FallingEdge         : BOOL             (* Falling edge detected on filtered output *)
+       Stable              : BOOL             (* Output has been stable (not changing) *)
+       RawPassthrough      : BOOL             (* Raw input passthrough for debugging *)
+     VAR:
+       tDebounce           : TON              (* Debounce timer *)
+       bLastRaw            : BOOL             (* Previous raw input state *)
+       bLastFiltered       : BOOL             (* Previous filtered output state *)
+       bPendingState       : BOOL             (* State we're debouncing toward *)
+       bFirstScan          : BOOL := TRUE     (* First scan flag for initialization *)
    ============================================================================ *)
-
-FUNCTION_BLOCK FB_DigitalInputFilter
-VAR_INPUT
-    RawInput            : BOOL;             (* Raw digital input *)
-    DebounceTime        : TIME := T#10MS;   (* Debounce time *)
-END_VAR
-
-VAR_OUTPUT
-    FilteredOutput      : BOOL;             (* Debounced output *)
-    RisingEdge          : BOOL;             (* Rising edge detected on filtered output *)
-    FallingEdge         : BOOL;             (* Falling edge detected on filtered output *)
-    Stable              : BOOL;             (* Output has been stable (not changing) *)
-    RawPassthrough      : BOOL;             (* Raw input passthrough for debugging *)
-END_VAR
-
-VAR
-    tDebounce           : TON;              (* Debounce timer *)
-    bLastRaw            : BOOL;             (* Previous raw input state *)
-    bLastFiltered       : BOOL;             (* Previous filtered output state *)
-    bPendingState       : BOOL;             (* State we're debouncing toward *)
-    bFirstScan          : BOOL := TRUE;     (* First scan flag for initialization *)
-END_VAR
 
 (* ============================================================================
    Main Logic
@@ -54,14 +49,14 @@ IF bFirstScan THEN
     FallingEdge := FALSE;
     bFirstScan := FALSE;
     RETURN;
-END_IF
+END_IF;
 
 (* Detect raw input change *)
 IF RawInput <> bLastRaw THEN
     (* Input changed - start debouncing toward new state *)
     bPendingState := RawInput;
     tDebounce(IN := FALSE);  (* Reset timer *)
-END_IF
+END_IF;
 
 bLastRaw := RawInput;
 
@@ -75,16 +70,14 @@ IF bPendingState <> FilteredOutput THEN
         FilteredOutput := bPendingState;
         tDebounce(IN := FALSE);
         Stable := TRUE;
-    END_IF
+    END_IF;
 ELSE
     (* No state change pending *)
     tDebounce(IN := FALSE);
     Stable := TRUE;
-END_IF
+END_IF;
 
 (* Edge detection on filtered output *)
 RisingEdge := FilteredOutput AND NOT bLastFiltered;
 FallingEdge := NOT FilteredOutput AND bLastFiltered;
 bLastFiltered := FilteredOutput;
-
-END_FUNCTION_BLOCK
