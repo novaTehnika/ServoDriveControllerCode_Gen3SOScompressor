@@ -11,13 +11,13 @@ These are outputs from the NI DAQ master, inputs to the MP2600iec slave.
 
 | Pin | Signal Name | Type | Description |
 |-----|-------------|------|-------------|
-| DI0 | `diModeBit0` | BOOL | Mode command bit 0 (LSB) |
-| DI1 | `diModeBit1` | BOOL | Mode command bit 1 |
-| DI2 | `diModeBit2` | BOOL | Mode command bit 2 (MSB) |
-| DI3 | `diMotionEnable` | BOOL | Motion enable from master |
-| DI4 | `diLimitRetract` | BOOL | Retracted limit switch (PNP NC) |
-| DI5 | `diLimitHome` | BOOL | Home reference limit switch (PNP NC) |
-| DI6 | `diFaultReset` | BOOL | Fault reset command (rising edge) |
+| DI0 | `G_diModeBit0` | BOOL | Mode command bit 0 (LSB) |
+| DI1 | `G_diModeBit1` | BOOL | Mode command bit 1 |
+| DI2 | `G_diModeBit2` | BOOL | Mode command bit 2 (MSB) |
+| DI3 | `G_diMotionEnable` | BOOL | Motion enable from master |
+| DI4 | `G_diLimitRetract` | BOOL | Retracted limit switch (PNP NC) |
+| DI5 | `G_diLimitHome` | BOOL | Home reference limit switch (PNP NC) |
+| DI6 | `G_diFaultReset` | BOOL | Fault reset command (rising edge) |
 | DI7 | Reserved | BOOL | Future use |
 
 ### Signal Details
@@ -69,9 +69,9 @@ mode_command = DI2 * 4 + DI1 * 2 + DI0
 | LOW | Normal state after reset complete |
 
 **Requirements for Valid Reset**:
-1. `diMotionEnable` must be LOW
+1. `G_diMotionEnable` must be LOW
 2. Mode bits (DI0-DI2) must mirror fault code
-3. Rising edge on `diFaultReset`
+3. Rising edge on `G_diFaultReset`
 
 ---
 
@@ -81,26 +81,26 @@ These are outputs from the MP2600iec slave, inputs to the NI DAQ master.
 
 | Pin | Signal Name | Normal Mode | Fault Mode |
 |-----|-------------|-------------|------------|
-| DO0 | `doModeConfBit0` | Mode confirm bit 0 | Fault code bit 0 |
-| DO1 | `doModeConfBit1` | Mode confirm bit 1 | Fault code bit 1 |
-| DO2 | `doModeConfBit2` | Mode confirm bit 2 | Fault code bit 2 |
-| DO3 | `doBrakeDisengage` | Brake status | Brake status |
-| DO4 | `doPerformanceStatus` | Mode-dependent | - |
-| DO5 | `doFaultActive` | LOW | HIGH |
-| DO6 | `doInMotion` | Motion indicator | - |
-| DO7 | `doHomingComplete` | Homing status | Homing status |
+| DO0 | `G_doModeConfBit0` | Mode confirm bit 0 | Fault code bit 0 |
+| DO1 | `G_doModeConfBit1` | Mode confirm bit 1 | Fault code bit 1 |
+| DO2 | `G_doModeConfBit2` | Mode confirm bit 2 | Fault code bit 2 |
+| DO3 | `G_doBrakeDisengage` | Brake status | Brake status |
+| DO4 | `G_doPerformanceStatus` | Mode-dependent | - |
+| DO5 | `G_doFaultActive` | LOW | HIGH |
+| DO6 | `G_doInMotion` | Motion indicator | - |
+| DO7 | `G_doHomingComplete` | Homing status | Homing status |
 
 ### Signal Details
 
 #### DO0-DO2: Mode Confirmation / Fault Code
 
-**Normal Mode** (`doFaultActive` = LOW):
+**Normal Mode** (`G_doFaultActive` = LOW):
 ```
 mode_confirmed = DO2 * 4 + DO1 * 2 + DO0
 ```
 Matches mode command when handshake complete.
 
-**Fault Mode** (`doFaultActive` = HIGH):
+**Fault Mode** (`G_doFaultActive` = HIGH):
 ```
 fault_code = DO2 * 4 + DO1 * 2 + DO0
 ```
@@ -351,7 +351,7 @@ float voltage_to_position(float voltage) {
 | Input Debounce | 5 ms | Software filter in slave |
 | Output Update | 1 ms | Scan cycle time |
 | Handshake Timeout | 500 ms | Mode confirmation |
-| Fault Code Stable | 10 ms | Before reading after doFaultActive rises |
+| Fault Code Stable | 10 ms | Before reading after G_doFaultActive rises |
 
 ### Analog Signal Timing
 
@@ -401,20 +401,20 @@ float voltage_to_position(float voltage) {
 
 | MP2600iec | Signal | Direction | NI 6251 |
 |-----------|--------|-----------|---------|
-| DI0 | diModeBit0 | NI→MP | P0.0 |
-| DI1 | diModeBit1 | NI→MP | P0.1 |
-| DI2 | diModeBit2 | NI→MP | P0.2 |
-| DI3 | diMotionEnable | NI→MP | P0.3 |
-| DI6 | diFaultReset | NI→MP | P0.4 |
-| DO0 | doModeConfBit0 | MP→NI | P1.0 |
-| DO1 | doModeConfBit1 | MP→NI | P1.1 |
-| DO2 | doModeConfBit2 | MP→NI | P1.2 |
-| DO3 | doBrakeDisengage | MP→NI | P1.3 |
-| DO4 | doPerformanceStatus | MP→NI | P1.4 |
-| DO5 | doFaultActive | MP→NI | P1.5 |
-| DO6 | doInMotion | MP→NI | P1.6 |
-| DO7 | doHomingComplete | MP→NI | P1.7 |
-| AI0 | aiReference | NI→MP | AO0 |
+| DI0 | G_diModeBit0 | NI→MP | P0.0 |
+| DI1 | G_diModeBit1 | NI→MP | P0.1 |
+| DI2 | G_diModeBit2 | NI→MP | P0.2 |
+| DI3 | G_diMotionEnable | NI→MP | P0.3 |
+| DI6 | G_diFaultReset | NI→MP | P0.4 |
+| DO0 | G_doModeConfBit0 | MP→NI | P1.0 |
+| DO1 | G_doModeConfBit1 | MP→NI | P1.1 |
+| DO2 | G_doModeConfBit2 | MP→NI | P1.2 |
+| DO3 | G_doBrakeDisengage | MP→NI | P1.3 |
+| DO4 | G_doPerformanceStatus | MP→NI | P1.4 |
+| DO5 | G_doFaultActive | MP→NI | P1.5 |
+| DO6 | G_doInMotion | MP→NI | P1.6 |
+| DO7 | G_doHomingComplete | MP→NI | P1.7 |
+| AI0 | G_aiReference | NI→MP | AO0 |
 | AO0 | aoPositionFeedback | MP→NI | AI0 |
 
 **Note**: Verify actual MP2600iec I/O module addresses in MotionWorksIEC configuration.

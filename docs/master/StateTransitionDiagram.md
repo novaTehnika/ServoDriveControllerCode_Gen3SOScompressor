@@ -27,7 +27,7 @@
                     | ST_IDLE  |<---------------+         |
                     +----------+                          |
                            |                              |
-            (Mode != 000 + diMotionEnable)                |
+            (Mode != 000 + G_diMotionEnable)                |
                            |                              |
             +--------------+--------------+               |
             |                             |               |
@@ -82,7 +82,7 @@
     |        |              |              |         |
     |        +------+-------+------+-------+         |
     |               |              |                 |
-    |      (diMotionEnable   (Mode change           |
+    |      (G_diMotionEnable   (Mode change           |
     |       = LOW)            or fault)             |
     |               |              |                 |
     |               v              v                 |
@@ -123,7 +123,7 @@
         | (LimitHomeActive = TRUE)
         v
 +-------------------+
-| HL_DETECT         |  MC_Halt
+| HL_DETECT         |  MC_Stop
 |                   |  Confirm switch triggered
 +-------+-----------+
         |
@@ -138,7 +138,7 @@
 +-------------------+
 | HL_SETREF         |  MC_SetPosition
 |                   |  Set position reference
-+-------+-----------+  Clear flagAbsHomeRequired
++-------+-----------+  Clear G_flagAbsHomeRequired
         |
         v
 +---------------+
@@ -180,7 +180,7 @@
 +-------------------+
 | HE_SETREF         |  Calculate EOTOffset
 |                   |  EOTOffset := Expected - Actual
-+-------+-----------+  (PRG_Main clears flagEOTHomeRequired)
++-------+-----------+  (PRG_Main clears G_flagEOTHomeRequired)
         |
         v
 +---------------+
@@ -196,7 +196,7 @@
 | ST_GO_HOME    |  Entry point from mode command
 +-------+-------+
         |
-        | Check flagAbsHomeRequired
+        | Check G_flagAbsHomeRequired
         |
    +----+----+
    |         |
@@ -229,29 +229,29 @@
     +---------------+
     | ST_FAULT      |
     |               |
-    | - doFaultActive = HIGH
+    | - G_doFaultActive = HIGH
     | - Output fault code on DO0-DO2
-    | - MC_Halt (motion stopped)
+    | - MC_Stop (motion stopped)
     +-------+-------+
             |
             +---------------------------+
             |                           |
     (Fast recovery:                (Slow recovery:
-     diFaultReset rising edge       cfgFaultIdleTimeout
+     G_diFaultReset rising edge       G_cfgFaultIdleTimeout
      + valid mirrored code          expires)
-     + diMotionEnable HIGH)              |
+     + G_diMotionEnable HIGH)              |
             |                           v
             v                   +---------------+
     +---------------+           | ST_FAULT_IDLE |
     | ST_BRAKE_HOLD |           |               |
     | (drive stays  |           | - Brake engaged
     |  enabled)     |           | - Drive disabled
-    +---------------+           | - doFaultActive = HIGH
+    +---------------+           | - G_doFaultActive = HIGH
                                 +-------+-------+
                                         |
-                                (diFaultReset rising edge
+                                (G_diFaultReset rising edge
                                  + valid mirrored code
-                                 + diMotionEnable LOW)
+                                 + G_diMotionEnable LOW)
                                         |
                                         v
                                 +---------------+
@@ -279,8 +279,8 @@
 
 | From | To | Condition | Path |
 |------|----|-----------| -----|
-| Any Operational | Different Mode | diMotionEnable LOW→HIGH | HOLD_POSITION → DRIVE_ENABLE → New Mode |
-| Any Operational | IDLE (000) | diMotionEnable LOW | HOLD_POSITION → timeout → FAULT |
+| Any Operational | Different Mode | G_diMotionEnable LOW→HIGH | HOLD_POSITION → DRIVE_ENABLE → New Mode |
+| Any Operational | IDLE (000) | G_diMotionEnable LOW | HOLD_POSITION → timeout → FAULT |
 | Any Operational | FAULT | Fault detected | Direct transition |
 
 ### Homing Mode Exits
@@ -336,13 +336,13 @@ MASTER STATES
 |       |                                                  |
 |       v                                                  |
 |  +--------+                                              |
-|  | IDLE   | <--+  Monitor doFaultActive                  |
+|  | IDLE   | <--+  Monitor G_doFaultActive                  |
 |  +----+---+    |  Mode bits = 000                        |
 |       |        |                                         |
 |       | (Mode request)                                   |
 |       v        |                                         |
 |  +----------+  |                                         |
-|  | REQUEST  |  |  Set mode bits, raise diMotionEnable    |
+|  | REQUEST  |  |  Set mode bits, raise G_diMotionEnable    |
 |  | _MODE    |  |  Start handshake timer                  |
 |  +----+-----+  |                                         |
 |       |        |                                         |
@@ -359,12 +359,12 @@ MASTER STATES
 |     | (Mode change)                                      |
 |     v          |                                         |
 |  +--------+    |                                         |
-|  | STOP   |----+  Drop diMotionEnable, wait for halt     |
+|  | STOP   |----+  Drop G_diMotionEnable, wait for halt     |
 |  | _MOTION|                                              |
 |  +--------+                                              |
 |                                                          |
 |  +--------+                                              |
-|  | FAULT  | <-- When doFaultActive goes HIGH             |
+|  | FAULT  | <-- When G_doFaultActive goes HIGH             |
 |  | _HANDLE|     Read code, mirror, reset                 |
 |  +----+---+                                              |
 |       |                                                  |
@@ -386,9 +386,9 @@ MASTER STATES
 | Transition | Timing | Notes |
 |------------|--------|-------|
 | Mode request → Confirm | < 500 ms | Handshake timeout |
-| diMotionEnable LOW → doInMotion LOW | Variable | Deceleration time |
+| G_diMotionEnable LOW → G_doInMotion LOW | Variable | Deceleration time |
 | Fault detect → Fault code stable | < 10 ms | Wait before reading |
-| diFaultReset edge → doFaultActive LOW | < 1000 ms | Reset timeout |
+| G_diFaultReset edge → G_doFaultActive LOW | < 1000 ms | Reset timeout |
 | Brake engage → Brake hold | 200 ms | Mechanical delay |
 | Brake release → Motion allowed | 100 ms | Mechanical delay |
 
@@ -397,7 +397,7 @@ MASTER STATES
 ```
 Time ------>
 
-diMotionEnable  _____/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\___________
+G_diMotionEnable  _____/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\___________
                      ^                        ^
                      |                        |
                   Request                   Stop
@@ -417,12 +417,12 @@ Mode Confirm    000__|________/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾�
 ## 9. Decision Points Summary
 
 ### At ST_IDLE
-- Check: `diMotionEnable` rising edge?
+- Check: `G_diMotionEnable` rising edge?
 - Check: Mode bits != 000?
 - Check: If operational mode, are homing requirements met?
 
 ### At Operational State
-- Check: `diMotionEnable` falling edge → ST_HOLD_POSITION
+- Check: `G_diMotionEnable` falling edge → ST_HOLD_POSITION
 - Check: Fault condition → ST_FAULT
 - Check: Mode bits changed (invalid) → ST_FAULT
 

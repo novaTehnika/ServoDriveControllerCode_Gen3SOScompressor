@@ -61,7 +61,7 @@
        EOTOffset           : LREAL            (* Calculated coordinate offset
      VAR:
        fbDirectControl     : Y_DirectControl
-       fbHalt              : MC_Halt
+       fbStop              : MC_Stop
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
        tTimeout            : TON
@@ -100,7 +100,7 @@ IF NOT Enable THEN
     EOTOffset := 0.0;
     eState := HE_IDLE;
     fbDirectControl(Enable := FALSE);
-    fbHalt(Execute := FALSE);
+    fbStop(Execute := FALSE);
     tTimeout(IN := FALSE);
     tStallConfirm(IN := FALSE);
     RETURN;
@@ -124,16 +124,19 @@ tTimeout(IN := (eState >= HE_FAST_APPROACH) AND (eState <= HE_SETREF),
 
 IF tTimeout.Q THEN
     fbDirectControl(Enable := FALSE);
-    fbHalt(Execute := FALSE);
+    fbStop(Execute := FALSE);
     Error := TRUE;
     ErrorID := ERR_TIMEOUT;
     eState := HE_ERROR;
 END_IF;
 
-CASE eState OF
+(* --------------------------------------------------------------------------
+   State Machine
+   -------------------------------------------------------------------------- *)
 
-    HE_IDLE:
-        (* Waiting for execute command *)
+IF eState = HE_IDLE THEN
+
+    (* HE_IDLE - Waiting for execute command *)
         Active := FALSE;
         Done := FALSE;
         InMotion := FALSE;
@@ -145,7 +148,7 @@ CASE eState OF
 
         (* Reset function blocks *)
         fbDirectControl(Enable := FALSE);
-        fbHalt(Execute := FALSE);
+        fbStop(Execute := FALSE);
         tTimeout(IN := FALSE);
         tStallConfirm(IN := FALSE);
 
@@ -155,8 +158,9 @@ CASE eState OF
         END_IF;
 
 
-    HE_CHECK_REQ:
-        (* Check if limit switch homing is required first *)
+ELSIF eState = HE_CHECK_REQ THEN
+
+    (* HE_CHECK_REQ - Check if limit switch homing is required first *)
         IF AbsHomeRequired THEN
             (* Must do limit switch homing before EOT homing *)
             RequiresLimitHome := TRUE;
@@ -168,16 +172,18 @@ CASE eState OF
         END_IF;
 
 
-    HE_REQUIRES_HOME:
-        (* Waiting for caller to handle the requirement *)
+ELSIF eState = HE_REQUIRES_HOME THEN
+
+    (* HE_REQUIRES_HOME - Waiting for caller to handle the requirement *)
         (* PRG_Main should transition to fault or Mode 110 *)
         Active := TRUE;
         RequiresLimitHome := TRUE;
         (* Note: Caller should disable this FB and handle the error *)
 
 
-    HE_FAST_APPROACH:
-        (* Fast jog toward EOT (positive/extend direction) with torque limit *)
+ELSIF eState = HE_FAST_APPROACH THEN
+
+    (* HE_FAST_APPROACH - Fast jog toward EOT (positive/extend direction) with torque limit *)
         fbDirectControl(
             Axis := Axis,
             Enable := TRUE,
@@ -201,8 +207,9 @@ CASE eState OF
         END_IF;
 
 
-    HE_SLOW_APPROACH:
-        (* Slow torque-limited approach to EOT *)
+ELSIF eState = HE_SLOW_APPROACH THEN
+
+    (* HE_SLOW_APPROACH - Slow torque-limited approach to EOT *)
         fbDirectControl(
             Axis := Axis,
             Enable := TRUE,
@@ -228,8 +235,9 @@ CASE eState OF
         END_IF;
 
 
-    HE_STALL_DETECT:
-        (* Confirm stall condition for StallDetectTime *)
+ELSIF eState = HE_STALL_DETECT THEN
+
+    (* HE_STALL_DETECT - Confirm stall condition for StallDetectTime *)
         (* Continue pushing against EOT to confirm *)
         fbDirectControl(
             Axis := Axis,
@@ -259,18 +267,19 @@ CASE eState OF
         END_IF;
 
 
-    HE_SETREF:
-        (* Calculate EOT offset - DO NOT call MC_SetPosition
-           This preserves the limit switch zero reference from Mode 110 *)
+ELSIF eState = HE_SETREF THEN
 
-        (* First halt to ensure fully stopped *)
-        fbHalt(
+    (* HE_SETREF - Calculate EOT offset - DO NOT call MC_SetPosition
+       This preserves the limit switch zero reference from Mode 110 *)
+
+        (* First stop to ensure fully stopped *)
+        fbStop(
             Axis := Axis,
-            Execute := NOT fbHalt.Done
+            Execute := NOT fbStop.Done
         );
 
-        IF fbHalt.Done THEN
-            fbHalt(Execute := FALSE);
+        IF fbStop.Done THEN
+            fbStop(Execute := FALSE);
 
             (* Record actual encoder position at EOT stall *)
             EOTPosition := ActualPosition;
@@ -288,8 +297,9 @@ CASE eState OF
         END_IF;
 
 
-    HE_DONE:
-        (* Homing sequence complete *)
+ELSIF eState = HE_DONE THEN
+
+    (* HE_DONE - Homing sequence complete *)
         Done := TRUE;
         Active := TRUE;
         InMotion := FALSE;
@@ -301,29 +311,31 @@ CASE eState OF
         END_IF;
 
 
-    HE_ABORTING:
-        (* Aborting sequence - halt motion *)
+ELSIF eState = HE_ABORTING THEN
+
+    (* HE_ABORTING - Stop motion *)
         fbDirectControl(Enable := FALSE);
-        fbHalt(
+        fbStop(
             Axis := Axis,
             Execute := TRUE
         );
 
-        IF fbHalt.Done THEN
-            fbHalt(Execute := FALSE);
+        IF fbStop.Done THEN
+            fbStop(Execute := FALSE);
             Active := FALSE;
             InMotion := FALSE;
             eState := HE_IDLE;
 
-        ELSIF fbHalt.Error THEN
-            (* Halt failed - still try to go to idle *)
-            fbHalt(Execute := FALSE);
+        ELSIF fbStop.Error THEN
+            (* Stop failed - still try to go to idle *)
+            fbStop(Execute := FALSE);
             eState := HE_ERROR;
         END_IF;
 
 
-    HE_ERROR:
-        (* Error state *)
+ELSIF eState = HE_ERROR THEN
+
+    (* HE_ERROR *)
         Active := FALSE;
         InMotion := FALSE;
         Done := FALSE;
@@ -336,4 +348,4 @@ CASE eState OF
             eState := HE_IDLE;
         END_IF;
 
-END_CASE;
+END_IF;

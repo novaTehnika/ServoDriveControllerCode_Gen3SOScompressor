@@ -44,7 +44,7 @@
        ErrorID             : DWORD            (* Error code if Error=TRUE
      VAR:
        fbMoveAbsolute      : MC_MoveAbsolute
-       fbHalt              : MC_Halt
+       fbStop              : MC_Stop
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
        rPosTolerance       : LREAL := 0.1     (* mm
@@ -74,7 +74,7 @@ IF NOT Enable THEN
     ErrorID := 0;
     eState := GOH_IDLE;
     fbMoveAbsolute(Execute := FALSE);
-    fbHalt(Execute := FALSE);
+    fbStop(Execute := FALSE);
     RETURN;
 END_IF;
 
@@ -87,10 +87,13 @@ IF Abort AND (eState <> GOH_IDLE) AND (eState <> GOH_ERROR) AND (eState <> GOH_R
     eState := GOH_ABORTING;
 END_IF;
 
-CASE eState OF
+(* --------------------------------------------------------------------------
+   State Machine
+   -------------------------------------------------------------------------- *)
 
-    GOH_IDLE:
-        (* Waiting for execute command *)
+IF eState = GOH_IDLE THEN
+
+    (* GOH_IDLE - Waiting for execute command *)
         Active := FALSE;
         Done := FALSE;
         AtPosition := FALSE;
@@ -102,7 +105,7 @@ CASE eState OF
 
         (* Reset function blocks *)
         fbMoveAbsolute(Execute := FALSE);
-        fbHalt(Execute := FALSE);
+        fbStop(Execute := FALSE);
 
         IF rTrigExecute.Q OR Execute THEN
             Active := TRUE;
@@ -110,8 +113,9 @@ CASE eState OF
         END_IF;
 
 
-    GOH_CHECK_REQ:
-        (* Check homing requirements *)
+ELSIF eState = GOH_CHECK_REQ THEN
+
+    (* GOH_CHECK_REQ - Check homing requirements *)
 
         IF AbsHomeRequired THEN
             (* Encoder homing required - cannot go home without valid position *)
@@ -127,8 +131,9 @@ CASE eState OF
         END_IF;
 
 
-    GOH_REDIRECT:
-        (* Waiting for PRG_Main to handle redirect *)
+ELSIF eState = GOH_REDIRECT THEN
+
+    (* GOH_REDIRECT - Waiting for PRG_Main to handle redirect *)
         (* Stay in this state - PRG_Main will transition to ST_HOME_LIMIT *)
         (* This FB will be disabled when state changes *)
         Active := TRUE;
@@ -136,8 +141,9 @@ CASE eState OF
         RedirectToHoming := TRUE;
 
 
-    GOH_MOVING:
-        (* Execute move to home position *)
+ELSIF eState = GOH_MOVING THEN
+
+    (* GOH_MOVING - Execute move to home position *)
         fbMoveAbsolute(
             Axis := Axis,
             Execute := TRUE,
@@ -175,8 +181,9 @@ CASE eState OF
         END_IF;
 
 
-    GOH_AT_POSITION:
-        (* At home position - hold here until mode change *)
+ELSIF eState = GOH_AT_POSITION THEN
+
+    (* GOH_AT_POSITION - At home position - hold here until mode change *)
         Done := TRUE;
         AtPosition := TRUE;
         InMotion := FALSE;
@@ -192,28 +199,30 @@ CASE eState OF
         END_IF;
 
 
-    GOH_ABORTING:
-        (* Aborting move - execute halt *)
-        fbHalt(
+ELSIF eState = GOH_ABORTING THEN
+
+    (* GOH_ABORTING - Stop motion *)
+        fbStop(
             Axis := Axis,
             Execute := TRUE
         );
 
-        IF fbHalt.Done THEN
-            fbHalt(Execute := FALSE);
+        IF fbStop.Done THEN
+            fbStop(Execute := FALSE);
             Active := FALSE;
             InMotion := FALSE;
             eState := GOH_IDLE;
 
-        ELSIF fbHalt.Error THEN
-            (* Halt failed - still try to go to idle *)
-            fbHalt(Execute := FALSE);
+        ELSIF fbStop.Error THEN
+            (* Stop failed - still try to go to idle *)
+            fbStop(Execute := FALSE);
             eState := GOH_ERROR;
         END_IF;
 
 
-    GOH_ERROR:
-        (* Error state *)
+ELSIF eState = GOH_ERROR THEN
+
+    (* GOH_ERROR *)
         Active := FALSE;
         InMotion := FALSE;
         Done := FALSE;
@@ -225,4 +234,4 @@ CASE eState OF
             eState := GOH_IDLE;
         END_IF;
 
-END_CASE;
+END_IF;

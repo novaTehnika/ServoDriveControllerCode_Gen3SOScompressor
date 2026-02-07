@@ -20,8 +20,8 @@ This document clarifies the torque threshold calculation used for stall detectio
 ### Code
 ```st
 (* Stall detection condition *)
-IF (ABS(sysActualVelocity) < 0.5) AND
-   (ABS(sysActualTorque) >= cfgHomeEOTTorqueThresh * 0.9) THEN
+IF (ABS(G_sysActualVelocity) < 0.5) AND
+   (ABS(G_sysActualTorque) >= G_cfgHomeEOTTorqueThresh * 0.9) THEN
     (* Stall detected - proceed to confirmation *)
 END_IF
 ```
@@ -32,10 +32,10 @@ END_IF
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| `cfgHomeEOTTorqueThresh` | 50.0 | Torque threshold in % of rated |
-| `cfgStallDetectTime` | 200 | Confirmation time in ms |
-| `cfgHomeEOTSlowVel` | 5.0 | Commanded slow approach velocity (mm/s) |
-| `cfgTorqueHomingLimit` | 60.0 | Torque limit during slow approach (%) |
+| `G_cfgHomeEOTTorqueThresh` | 50.0 | Torque threshold in % of rated |
+| `G_cfgStallDetectTime` | 200 | Confirmation time in ms |
+| `G_cfgHomeEOTSlowVel` | 5.0 | Commanded slow approach velocity (mm/s) |
+| `G_cfgTorqueHomingLimit` | 60.0 | Torque limit during slow approach (%) |
 
 ---
 
@@ -43,7 +43,7 @@ END_IF
 
 ### Step 1: Torque Limit Applied During Slow Approach
 During ST_HOME_EOT_SLOW, Y_DirectControl limits torque to:
-- **60%** of rated torque (`cfgTorqueHomingLimit`)
+- **60%** of rated torque (`G_cfgTorqueHomingLimit`)
 
 ### Step 2: Stall Detection Threshold
 The stall is detected when actual torque reaches:
@@ -69,18 +69,18 @@ The specification phrase "torque >= 90% threshold" could be interpreted two ways
 
 ### Interpretation A (Implemented)
 "90% of the configured torque threshold"
-- cfgHomeEOTTorqueThresh = 50%
+- G_cfgHomeEOTTorqueThresh = 50%
 - 90% of 50% = **45% of rated torque**
 
 ### Interpretation B (Not Used)
 "90% of the torque limit being applied"
-- cfgTorqueHomingLimit = 60%
+- G_cfgTorqueHomingLimit = 60%
 - 90% of 60% = **54% of rated torque**
 
 ### Rationale for Interpretation A
 1. **Earlier Detection**: Lower threshold (45%) detects stall sooner, reducing mechanical stress
 2. **Safety Margin**: Stall detected before torque limit is fully reached
-3. **Configurable**: `cfgHomeEOTTorqueThresh` is specifically named for this purpose
+3. **Configurable**: `G_cfgHomeEOTTorqueThresh` is specifically named for this purpose
 4. **Separate Concerns**: Detection threshold is independent of torque limiting
 
 ---
@@ -140,10 +140,10 @@ RETRY  ST_HOME_EOT_SETREF
 
 | Parameter | Effect of Increasing | Effect of Decreasing |
 |-----------|---------------------|---------------------|
-| `cfgHomeEOTTorqueThresh` | Later detection, more force | Earlier detection, less force |
-| `cfgStallDetectTime` | More reliable but slower | Faster but risk of false triggers |
-| `cfgHomeEOTSlowVel` | Faster approach, harder impact | Slower approach, softer contact |
-| `cfgTorqueHomingLimit` | More force available | Gentler but may not reach EOT |
+| `G_cfgHomeEOTTorqueThresh` | Later detection, more force | Earlier detection, less force |
+| `G_cfgStallDetectTime` | More reliable but slower | Faster but risk of false triggers |
+| `G_cfgHomeEOTSlowVel` | Faster approach, harder impact | Slower approach, softer contact |
+| `G_cfgTorqueHomingLimit` | More force available | Gentler but may not reach EOT |
 
 ### Recommended Starting Values (Current Defaults)
 - Torque threshold: 50% (detects at 45%)

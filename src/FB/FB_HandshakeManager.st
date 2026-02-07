@@ -105,10 +105,10 @@ FaultResetValid := FaultReset AND
 (* --------------------------------------------------------------------------
    Mode Handshake State Machine
    -------------------------------------------------------------------------- *)
-CASE eState OF
 
-    HS_IDLE:
-        (* Reset outputs *)
+IF eState = HS_IDLE THEN
+
+    (* HS_IDLE - Reset outputs *)
         HandshakeActive := FALSE;
         HandshakeComplete := FALSE;
         HandshakeTimeout_Q := FALSE;
@@ -131,8 +131,9 @@ CASE eState OF
             ModeToBits(MODE_IDLE, ConfirmBit0, ConfirmBit1, ConfirmBit2);
         END_IF;
 
-    HS_WAIT_MOTION_EN:
-        (* Waiting for master to assert motion enable *)
+ELSIF eState = HS_WAIT_MOTION_EN THEN
+
+    (* HS_WAIT_MOTION_EN - Waiting for master to assert motion enable *)
         (* Timer must be called each scan to update *)
         tTimeout(IN := TRUE, PT := HandshakeTimeout);
 
@@ -151,8 +152,9 @@ CASE eState OF
             eState := HS_VERIFY_MODE;
         END_IF;
 
-    HS_VERIFY_MODE:
-        (* Verify requested mode hasn't changed since handshake start *)
+ELSIF eState = HS_VERIFY_MODE THEN
+
+    (* HS_VERIFY_MODE - Verify requested mode hasn't changed since handshake start *)
         IF RequestedMode = eModeAtStart THEN
             (* Mode matches - handshake complete *)
             HandshakeComplete := TRUE;
@@ -165,16 +167,18 @@ CASE eState OF
             eState := HS_TIMEOUT;
         END_IF;
 
-    HS_COMPLETE:
-        (* Handshake complete - stay here until motion enable drops *)
+ELSIF eState = HS_COMPLETE THEN
+
+    (* HS_COMPLETE - Handshake complete - stay here until motion enable drops *)
         IF NOT MotionEnable THEN
             (* Motion disabled - return to idle *)
             HandshakeComplete := FALSE;
             eState := HS_IDLE;
         END_IF;
 
-    HS_TIMEOUT:
-        (* Handshake timed out or failed *)
+ELSIF eState = HS_TIMEOUT THEN
+
+    (* HS_TIMEOUT - Handshake timed out or failed *)
         HandshakeTimeout_Q := TRUE;
         HandshakeActive := FALSE;
         ConfirmedMode := MODE_IDLE;  (* Reset confirmed mode on failure *)
@@ -187,4 +191,4 @@ CASE eState OF
             eState := HS_IDLE;
         END_IF;
 
-END_CASE;
+END_IF;

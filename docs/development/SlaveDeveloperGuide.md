@@ -51,11 +51,11 @@ Global variables defined in a `GVL` use a prefix to indicate their scope.
 
 | Prefix | Scope | Example | Description |
 |--------|-------|---------|-------------|
-| `cfg` | Configuration | `cfgDebounceTimeMode` | A static configuration parameter used for tuning. |
-| `sys` | System | `sysCurrentState` | A dynamic system status variable. |
-| `pos` | Position | `posEOTOffset` | A position-related value, often calculated during homing. |
-| `di` / `do` | I/O | `diModeBit0` | A digital input (`di`) or output (`do`). |
-| `ai` / `ao` | I/O | `aiReference` | An analog input (`ai`) or output (`ao`). |
+| `cfg` | Configuration | `G_cfgDebounceTimeMode` | A static configuration parameter used for tuning. |
+| `sys` | System | `G_sysCurrentState` | A dynamic system status variable. |
+| `pos` | Position | `G_posEOTOffset` | A position-related value, often calculated during homing. |
+| `di` / `do` | I/O | `G_diModeBit0` | A digital input (`di`) or output (`do`). |
+| `ai` / `ao` | I/O | `G_aiReference` | An analog input (`ai`) or output (`ao`). |
 
 > All global variables are documented in `src/GVL/GlobalVariables_Reference.st` and defined in the MWiec GUI.
 
@@ -77,14 +77,14 @@ MotionWorks IEC Express does not support enum types as CASE selectors. Always us
 
 ```structuredtext
 (* ✓ CORRECT - Use IF-ELSIF with enums *)
-IF sysCurrentState = ST_IDLE THEN
+IF G_sysCurrentState = ST_IDLE THEN
     (* logic *)
-ELSIF sysCurrentState = ST_RUNNING THEN
+ELSIF G_sysCurrentState = ST_RUNNING THEN
     (* logic *)
 END_IF;
 
 (* ✗ WRONG - CASE with enum will not compile in MWiec Express *)
-CASE sysCurrentState OF
+CASE G_sysCurrentState OF
     ST_IDLE:
         (* logic *)
     ST_RUNNING:
@@ -92,7 +92,7 @@ CASE sysCurrentState OF
 END_CASE;
 ```
 
-**Note:** CASE statements with INT types (used in some internal FB state machines) are allowed and compile correctly.
+**Note:** All state machines in this project (both `PRG_Main` with enums and internal FB state machines with INT constants) use the IF-ELSIF pattern for MWiec Express compatibility.
 
 **Function Output Limitation:**
 
@@ -109,12 +109,12 @@ The core logic resides in a state machine within `PRG_Main.st`. Understanding th
 - **Initialization (`ST_INIT`, `ST_ENCODER_CHECK`, `ST_REQUIRE_ABS_HOME`)**: Runs once on startup. Checks encoder validity and sets homing flags.
 - **Idle (`ST_IDLE`)**: The default safe state. The drive is disabled, and the brake is engaged. It waits here for a valid handshake from the master.
 - **Activation (`ST_DRIVE_ENABLE`, `ST_BRAKE_RELEASE`)**: A transitional sequence to power on the drive and release the brake before entering an operational mode.
-- **Operational States (`ST_POSITION_CTRL`, `ST_VELOCITY_CTRL`, etc.)**: The active motion or control states. Each state runs its specific logic (e.g., calling `Y_DirectControl`) and checks for a `diMotionEnable` drop to exit.
+- **Operational States (`ST_POSITION_CTRL`, `ST_VELOCITY_CTRL`, etc.)**: The active motion or control states. Each state runs its specific logic (e.g., calling `Y_DirectControl`) and checks for a `G_diMotionEnable` drop to exit.
 - **Homing States (`ST_HOME_LIMIT`, `ST_HOME_EOT`)**: These states execute the encapsulated logic within the `FB_HomeLimit` and `FB_HomeEOT` function blocks.
-- **Transition (`ST_HOLD_POSITION`)**: A critical intermediate state entered when `diMotionEnable` drops. It brings the axis to a controlled halt (`MC_Halt`) and waits for a new mode handshake from the master.
+- **Transition (`ST_HOLD_POSITION`)**: A critical intermediate state entered when `G_diMotionEnable` drops. It brings the axis to a controlled halt (`MC_Stop`) and waits for a new mode handshake from the master.
 - **Deactivation (`ST_BRAKE_ENGAGE`, `ST_DRIVE_DISABLE`)**: A transitional sequence to engage the brake and disable the drive before returning to `ST_IDLE`.
 - **Fault Handling (`ST_FAULT`, `ST_FAULT_IDLE`)**:
-    - `ST_FAULT`: The active fault state. It performs a controlled `MC_Halt` and waits for a fault reset handshake. It includes logic for a "fast recovery" (to `ST_BRAKE_HOLD`) or a "slow recovery" timeout to `ST_FAULT_IDLE`.
+    - `ST_FAULT`: The active fault state. It performs a controlled `MC_Stop` and waits for a fault reset handshake. It includes logic for a "fast recovery" (to `ST_BRAKE_HOLD`) or a "slow recovery" timeout to `ST_FAULT_IDLE`.
     - `ST_FAULT_IDLE`: The safe, powered-down fault state. The brake is engaged and the drive is off. It waits for a fault reset handshake to return to `ST_IDLE`.
 
 ---
@@ -138,22 +138,22 @@ Let's say you want to add `MODE_NEW_FEATURE` with a value of `101` (currently un
 
 5.  **Add State Logic:** In `PRG_Main.st`, add a new `ELSIF` branch in the main state machine for `ST_NEW_FEATURE`. Implement the logic for this state.
     ```structuredtext
-    ELSIF sysCurrentState = ST_NEW_FEATURE THEN
+    ELSIF G_sysCurrentState = ST_NEW_FEATURE THEN
         IF bEnterState THEN
-            sysConfirmedMode := MODE_NEW_FEATURE;
+            G_sysConfirmedMode := MODE_NEW_FEATURE;
             (* ... initialization logic ... *)
         END_IF;
 
         (* ... continuous logic for the new mode ... *)
 
         IF fTrigMotionEnable.Q THEN
-            sysCurrentState := ST_HOLD_POSITION;
+            G_sysCurrentState := ST_HOLD_POSITION;
         END_IF;
     ```
 
 6.  **Handle Transitions:** In `PRG_Main.st`, update the state transitions to allow entry into your new state.
-    *   In `ST_BRAKE_RELEASE`, add: `ELSIF eTargetMode = MODE_NEW_FEATURE THEN sysCurrentState := ST_NEW_FEATURE;`
-    *   In `ST_HOLD_POSITION`, add: `ELSIF eTargetMode = MODE_NEW_FEATURE THEN sysCurrentState := ST_NEW_FEATURE;`
+    *   In `ST_BRAKE_RELEASE`, add: `ELSIF eTargetMode = MODE_NEW_FEATURE THEN G_sysCurrentState := ST_NEW_FEATURE;`
+    *   In `ST_HOLD_POSITION`, add: `ELSIF eTargetMode = MODE_NEW_FEATURE THEN G_sysCurrentState := ST_NEW_FEATURE;`
 
 ### How to Add a New Fault Condition
 

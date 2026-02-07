@@ -35,24 +35,24 @@ This document provides step-by-step guidance for implementing the Simulink Deskt
 
 | NI DAQ Pin | Signal Name | Function |
 |------------|-------------|----------|
-| DO0 | `diModeBit0` | Mode command bit 0 (LSB) |
-| DO1 | `diModeBit1` | Mode command bit 1 |
-| DO2 | `diModeBit2` | Mode command bit 2 (MSB) |
-| DO3 | `diMotionEnable` | Motion enable signal |
-| DO6 | `diFaultReset` | Fault reset request |
+| DO0 | `G_diModeBit0` | Mode command bit 0 (LSB) |
+| DO1 | `G_diModeBit1` | Mode command bit 1 |
+| DO2 | `G_diModeBit2` | Mode command bit 2 (MSB) |
+| DO3 | `G_diMotionEnable` | Motion enable signal |
+| DO6 | `G_diFaultReset` | Fault reset request |
 
 ### Master Inputs (Slave Digital Outputs)
 
 | NI DAQ Pin | Signal Name | Normal Mode | Fault Mode |
 |------------|-------------|-------------|------------|
-| DI0 | `doModeConfBit0` | Mode confirm bit 0 | Fault code bit 0 |
-| DI1 | `doModeConfBit1` | Mode confirm bit 1 | Fault code bit 1 |
-| DI2 | `doModeConfBit2` | Mode confirm bit 2 | Fault code bit 2 |
-| DI3 | `doBrakeDisengage` | Brake status (HIGH = released) | - |
-| DI4 | `doPerformanceStatus` | Mode-dependent status | - |
-| DI5 | `doFaultActive` | LOW (normal) | HIGH (fault) |
-| DI6 | `doInMotion` | Axis moving indicator | - |
-| DI7 | `doHomingComplete` | Homing complete flag | - |
+| DI0 | `G_doModeConfBit0` | Mode confirm bit 0 | Fault code bit 0 |
+| DI1 | `G_doModeConfBit1` | Mode confirm bit 1 | Fault code bit 1 |
+| DI2 | `G_doModeConfBit2` | Mode confirm bit 2 | Fault code bit 2 |
+| DI3 | `G_doBrakeDisengage` | Brake status (HIGH = released) | - |
+| DI4 | `G_doPerformanceStatus` | Mode-dependent status | - |
+| DI5 | `G_doFaultActive` | LOW (normal) | HIGH (fault) |
+| DI6 | `G_doInMotion` | Axis moving indicator | - |
+| DI7 | `G_doHomingComplete` | Homing complete flag | - |
 
 ---
 
@@ -79,7 +79,7 @@ This document provides step-by-step guidance for implementing the Simulink Deskt
 
 ```
 Master                                          Slave
-  | (diMotionEnable is LOW)                       |
+  | (G_diMotionEnable is LOW)                       |
   |                                               |
   |  1. Set mode bits (DI0-DI2)                   |
   |---------------------------------------------->|
@@ -92,7 +92,7 @@ Master                                          Slave
   |  3. Master verifies confirmation              |
   |     (command == confirmation)                 |
   |                                               |
-  |  4. Set diMotionEnable = HIGH                 |
+  |  4. Set G_diMotionEnable = HIGH                 |
   |---------------------------------------------->|
   |                                               |
   |             [Slave sees MotionEnable HIGH     |
@@ -117,7 +117,7 @@ Master                                          Slave
 ```
 IDLE:
     IF mode_request != current_mode THEN
-        SET diMotionEnable = TRUE
+        SET G_diMotionEnable = TRUE
         SET mode_bits = mode_request
         START handshake_timer
         GOTO WAIT_CONFIRM
@@ -135,20 +135,20 @@ WAIT_CONFIRM:
 MODE_ACTIVE:
     // Normal operation
     IF want_different_mode THEN
-        SET diMotionEnable = FALSE
+        SET G_diMotionEnable = FALSE
         GOTO WAIT_HOLD
     END_IF
 
 WAIT_HOLD:
     // Slave transitions to ST_HOLD_POSITION
-    IF doInMotion == FALSE THEN
+    IF G_doInMotion == FALSE THEN
         // Slave has halted, ready for new mode
         GOTO IDLE
     END_IF
 
 HANDSHAKE_TIMEOUT:
     // Slave will enter fault state
-    // Wait for doFaultActive = TRUE
+    // Wait for G_doFaultActive = TRUE
     GOTO FAULT_HANDLING
 ```
 
@@ -156,13 +156,13 @@ HANDSHAKE_TIMEOUT:
 
 When changing between operational modes (e.g., Position to Velocity):
 
-1. **Drop diMotionEnable LOW** - signals mode change request
-2. **Wait for doInMotion = FALSE** - slave performs controlled halt
-3. **Set new mode bits** - while diMotionEnable still LOW
-4. **Raise diMotionEnable HIGH** - initiates handshake for new mode
+1. **Drop G_diMotionEnable LOW** - signals mode change request
+2. **Wait for G_doInMotion = FALSE** - slave performs controlled halt
+3. **Set new mode bits** - while G_diMotionEnable still LOW
+4. **Raise G_diMotionEnable HIGH** - initiates handshake for new mode
 5. **Wait for confirmation** - slave confirms new mode
 
-**WARNING**: Do NOT change mode bits while diMotionEnable is HIGH. This will cause handshake timeout fault.
+**WARNING**: Do NOT change mode bits while G_diMotionEnable is HIGH. This will cause handshake timeout fault.
 
 ---
 
@@ -170,18 +170,18 @@ When changing between operational modes (e.g., Position to Velocity):
 
 ### Detecting Faults
 
-Monitor `doFaultActive` (DI5) continuously:
+Monitor `G_doFaultActive` (DI5) continuously:
 - **LOW**: Normal operation
 - **HIGH**: Fault condition active
 
-When `doFaultActive` goes HIGH:
+When `G_doFaultActive` goes HIGH:
 - DO0-DO2 now contain fault code (not mode confirmation)
 - All motion stops
 - Slave is in ST_FAULT state
 
 ### Fault Code Reading
 
-When `doFaultActive == HIGH`, read DO0-DO2 as fault code:
+When `G_doFaultActive == HIGH`, read DO0-DO2 as fault code:
 
 | Binary | Fault | Description | Recovery Action |
 |--------|-------|-------------|-----------------|
@@ -201,30 +201,30 @@ When `doFaultActive == HIGH`, read DO0-DO2 as fault code:
 ```
 Master                                          Slave
   |                                               |
-  |  1. Observe doFaultActive = HIGH              |
+  |  1. Observe G_doFaultActive = HIGH              |
   |<----------------------------------------------|
   |                                               |
   |  2. Read fault code from DO0-DO2              |
   |<----------------------------------------------|
   |     (e.g., fault_code = 100 = Homing Req)     |
   |                                               |
-  |  3. Set diMotionEnable = LOW                  |
+  |  3. Set G_diMotionEnable = LOW                  |
   |---------------------------------------------->|
   |                                               |
   |  4. MIRROR fault code to DI0-DI2              |
   |---------------------------------------------->|
   |     (e.g., set DI0=0, DI1=0, DI2=1)           |
   |                                               |
-  |  5. Assert diFaultReset = HIGH (rising edge)  |
+  |  5. Assert G_diFaultReset = HIGH (rising edge)  |
   |---------------------------------------------->|
   |                                               |
   |              [Slave validates mirror]         |
   |              [If match: clear fault]          |
   |                                               |
-  |  6. doFaultActive goes LOW                    |
+  |  6. G_doFaultActive goes LOW                    |
   |<----------------------------------------------|
   |                                               |
-  |  7. Release diFaultReset = LOW                |
+  |  7. Release G_diFaultReset = LOW                |
   |---------------------------------------------->|
   |                                               |
   |  8. Return to normal mode commands            |
@@ -236,23 +236,23 @@ Master                                          Slave
 ```
 FAULT_DETECTED:
     fault_code = READ(DO0-DO2)
-    SET diMotionEnable = FALSE
+    SET G_diMotionEnable = FALSE
     SET mode_bits = fault_code  // MIRROR the code
     WAIT 50ms  // Ensure stable
     GOTO ASSERT_RESET
 
 ASSERT_RESET:
-    SET diFaultReset = TRUE (rising edge)
+    SET G_diFaultReset = TRUE (rising edge)
     START reset_timer
     GOTO WAIT_CLEAR
 
 WAIT_CLEAR:
-    IF doFaultActive == FALSE THEN
-        SET diFaultReset = FALSE
+    IF G_doFaultActive == FALSE THEN
+        SET G_diFaultReset = FALSE
         GOTO FAULT_CLEARED
     ELSIF reset_timer > 1000ms THEN
         // Reset failed - may need operator intervention
-        SET diFaultReset = FALSE
+        SET G_diFaultReset = FALSE
         GOTO FAULT_PERSISTENT
     END_IF
 
@@ -335,7 +335,7 @@ END_IF
 - Manages inter-mode transitions via HOLD state
 
 #### 2. Fault Handler
-- Monitors doFaultActive continuously
+- Monitors G_doFaultActive continuously
 - Implements fault code mirroring
 - Manages fault reset handshake
 
@@ -362,26 +362,26 @@ END_IF
 ```
 1. Power on MP2600iec
    - Slave initializes, checks encoder
-   - Slave sets flagEOTHomeRequired = TRUE
-   - If encoder invalid: flagAbsHomeRequired = TRUE
+   - Slave sets G_flagEOTHomeRequired = TRUE
+   - If encoder invalid: G_flagAbsHomeRequired = TRUE
    - Slave enters ST_IDLE
 
 2. Initialize Simulink model
    - Set all outputs LOW initially
    - mode_bits = 000 (Idle)
-   - diMotionEnable = FALSE
-   - diFaultReset = FALSE
+   - G_diMotionEnable = FALSE
+   - G_diFaultReset = FALSE
 
 3. Verify communication
-   - Read doFaultActive (should be LOW)
+   - Read G_doFaultActive (should be LOW)
    - Read confirmation bits (should match 000)
 
 4. Perform homing if required
-   a. If doHomingComplete = FALSE or first power-up:
+   a. If G_doHomingComplete = FALSE or first power-up:
       - Command Mode 110 (Home to Limit)
-      - Wait for doHomingComplete = TRUE
+      - Wait for G_doHomingComplete = TRUE
       - Command Mode 111 (Home to EOT)
-      - Wait for doHomingComplete = TRUE
+      - Wait for G_doHomingComplete = TRUE
 
 5. Enter operational mode
    - Command desired mode (010, 011, or 100)
@@ -397,9 +397,9 @@ Before commanding operational modes (001-100), verify homing status:
 IF first_power_cycle OR encoder_was_invalid THEN
     // Must complete both homing sequences
     command_mode(110)  // Home to Limit
-    WAIT doHomingComplete
+    WAIT G_doHomingComplete
     command_mode(111)  // Home to EOT
-    WAIT doHomingComplete
+    WAIT G_doHomingComplete
 END_IF
 ```
 
@@ -412,7 +412,7 @@ END_IF
 ### Scenario 1: Normal Position Control
 
 ```
-1. Master: Set mode_bits = 010, diMotionEnable = TRUE
+1. Master: Set mode_bits = 010, G_diMotionEnable = TRUE
 2. Slave: Enables drive, releases brake
 3. Slave: Sets confirm_bits = 010
 4. Master: Handshake complete
@@ -424,11 +424,11 @@ END_IF
 ### Scenario 2: Mode Change (Position to Velocity)
 
 ```
-1. Master: Set diMotionEnable = FALSE
-2. Slave: Executes MC_Halt, enters ST_HOLD_POSITION
-3. Master: Wait for doInMotion = FALSE
+1. Master: Set G_diMotionEnable = FALSE
+2. Slave: Executes MC_Stop, enters ST_HOLD_POSITION
+3. Master: Wait for G_doInMotion = FALSE
 4. Master: Set mode_bits = 011 (Velocity)
-5. Master: Set diMotionEnable = TRUE
+5. Master: Set G_diMotionEnable = TRUE
 6. Slave: Confirms mode_bits = 011
 7. Master: Handshake complete, begin velocity control
 ```
@@ -437,14 +437,14 @@ END_IF
 
 ```
 1. [Fault occurs - e.g., position limit exceeded]
-2. Slave: Sets doFaultActive = HIGH, fault_code = 011
-3. Master: Detects doFaultActive = HIGH
+2. Slave: Sets G_doFaultActive = HIGH, fault_code = 011
+3. Master: Detects G_doFaultActive = HIGH
 4. Master: Reads fault_code = 011
-5. Master: Sets diMotionEnable = FALSE
+5. Master: Sets G_diMotionEnable = FALSE
 6. Master: Mirrors code: mode_bits = 011
-7. Master: Pulses diFaultReset HIGH
+7. Master: Pulses G_diFaultReset HIGH
 8. Slave: Validates mirror, clears fault
-9. Slave: Sets doFaultActive = LOW
+9. Slave: Sets G_doFaultActive = LOW
 10. Master: Returns to IDLE state
 ```
 
@@ -458,25 +458,25 @@ END_IF
 
 **Possible Causes**:
 - Drive not ready (check drive status)
-- Homing requirements not met (check doHomingComplete)
+- Homing requirements not met (check G_doHomingComplete)
 - I/O wiring issue
 
 **Resolution**:
-1. Check doFaultActive - if HIGH, handle fault first
+1. Check G_doFaultActive - if HIGH, handle fault first
 2. Verify DI/DO wiring connections
 3. Ensure mode bits are stable for 20ms before expecting confirmation
 
 ### Fault Won't Clear
 
-**Symptom**: diFaultReset asserted but doFaultActive stays HIGH
+**Symptom**: G_diFaultReset asserted but G_doFaultActive stays HIGH
 
 **Possible Causes**:
 - Fault code not mirrored correctly
-- diMotionEnable not LOW
+- G_diMotionEnable not LOW
 - Underlying condition still present
 
 **Resolution**:
-1. Verify diMotionEnable = FALSE
+1. Verify G_diMotionEnable = FALSE
 2. Verify mode_bits exactly matches fault code
 3. Check if fault condition persists (e.g., still at position limit)
 

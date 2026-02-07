@@ -7,11 +7,11 @@
 
 ## 1. Overview
 
-When `doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 contain the fault code instead of mode confirmation. The master must handle fault conditions by:
+When `G_doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 contain the fault code instead of mode confirmation. The master must handle fault conditions by:
 
 1. Reading the fault code
 2. Mirroring the code on DI0-DI2
-3. Asserting `diFaultReset` with `diMotionEnable` LOW
+3. Asserting `G_diFaultReset` with `G_diMotionEnable` LOW
 4. Waiting for fault to clear
 
 ---
@@ -59,9 +59,9 @@ When `doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 cont
 **Master Recovery**:
 ```
 1. Read fault code (001)
-2. Set diMotionEnable = FALSE
+2. Set G_diMotionEnable = FALSE
 3. Mirror code: DI0=1, DI1=0, DI2=0
-4. Pulse diFaultReset
+4. Pulse G_diFaultReset
 5. After clear: retry mode command
 ```
 
@@ -92,9 +92,9 @@ When `doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 cont
 ```
 1. Read fault code (010)
 2. Check drive status (if accessible)
-3. Set diMotionEnable = FALSE
+3. Set G_diMotionEnable = FALSE
 4. Mirror code: DI0=0, DI1=1, DI2=0
-5. Pulse diFaultReset
+5. Pulse G_diFaultReset
 6. If persists: may require power cycle
 ```
 
@@ -111,8 +111,8 @@ When `doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 cont
 **Description**: Position exceeded software limits.
 
 **Triggered When**:
-- Actual position < `posSoftLimitMin`
-- Actual position > `posSoftLimitMax`
+- Actual position < `G_posSoftLimitMin`
+- Actual position > `G_posSoftLimitMax`
 - Position drifted outside limits during stop
 
 **Symptoms**:
@@ -123,9 +123,9 @@ When `doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 cont
 ```
 1. Read fault code (011)
 2. Note current position from AO0
-3. Set diMotionEnable = FALSE
+3. Set G_diMotionEnable = FALSE
 4. Mirror code: DI0=1, DI1=1, DI2=0
-5. Pulse diFaultReset
+5. Pulse G_diFaultReset
 6. After clear: command position away from limit
 ```
 
@@ -138,26 +138,26 @@ When `doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 cont
 **Description**: Operational mode attempted without homing complete.
 
 **Triggered When**:
-- Mode 001-100 commanded when `flagAbsHomeRequired = TRUE`
-- Mode 001-100 commanded when `flagEOTHomeRequired = TRUE`
+- Mode 001-100 commanded when `G_flagAbsHomeRequired = TRUE`
+- Mode 001-100 commanded when `G_flagEOTHomeRequired = TRUE`
 - Both flags are enforced for safety
 
 **Symptoms**:
 - Cannot enter operational modes
-- `doHomingComplete` is LOW
+- `G_doHomingComplete` is LOW
 
 **Master Recovery**:
 ```
 1. Read fault code (100)
-2. Set diMotionEnable = FALSE
+2. Set G_diMotionEnable = FALSE
 3. Mirror code: DI0=0, DI1=0, DI2=1
-4. Pulse diFaultReset
+4. Pulse G_diFaultReset
 5. After clear: command homing modes
 
-   If flagAbsHomeRequired (encoder invalid):
+   If G_flagAbsHomeRequired (encoder invalid):
    - Command Mode 110 (Home to Limit)
 
-   If flagEOTHomeRequired (every power-up):
+   If G_flagEOTHomeRequired (every power-up):
    - Command Mode 111 (Home to EOT)
 
    Or command Mode 101 (Go Home) which auto-redirects
@@ -172,7 +172,7 @@ When `doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 cont
 **Description**: Piston exit prevention guard triggered.
 
 **Triggered When**:
-- Position near `posSoftLimitMin` (exit boundary)
+- Position near `G_posSoftLimitMin` (exit boundary)
 - Torque mode anomaly: commanding torque one direction, moving opposite (indicates external pressure overcoming motor)
 - Guard detected dangerous approach to exit boundary
 
@@ -184,9 +184,9 @@ When `doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 cont
 ```
 1. Read fault code (101)
 2. CRITICAL: Check if cylinder is pressurized
-3. Set diMotionEnable = FALSE
+3. Set G_diMotionEnable = FALSE
 4. Mirror code: DI0=1, DI1=0, DI2=1
-5. Pulse diFaultReset
+5. Pulse G_diFaultReset
 6. After clear: command position away from exit
 ```
 
@@ -216,7 +216,7 @@ When `doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 cont
 ```
 1. Read fault code (110)
 2. Stop all operations
-3. Set diMotionEnable = FALSE
+3. Set G_diMotionEnable = FALSE
 4. Mirror code: DI0=0, DI1=1, DI2=1
 5. DO NOT automatically retry
 6. Requires investigation
@@ -248,15 +248,15 @@ When `doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 cont
 
 **Symptoms**:
 - Position feedback may be incorrect
-- `flagAbsHomeRequired` was set TRUE
+- `G_flagAbsHomeRequired` was set TRUE
 - Cannot trust absolute position
 
 **Master Recovery**:
 ```
 1. Read fault code (111)
-2. Set diMotionEnable = FALSE
+2. Set G_diMotionEnable = FALSE
 3. Mirror code: DI0=1, DI1=1, DI2=1
-4. Pulse diFaultReset
+4. Pulse G_diFaultReset
 5. After clear: MUST perform homing
    - Command Mode 110 (Home to Limit)
 ```
@@ -276,13 +276,13 @@ When `doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 cont
 
 ```
 DETECT_FAULT:
-    // doFaultActive = HIGH
+    // G_doFaultActive = HIGH
     fault_code = (DO2 << 2) | (DO1 << 1) | DO0
     log_fault(fault_code)
 
 PREPARE_RESET:
     // Ensure motion disabled
-    SET diMotionEnable = FALSE
+    SET G_diMotionEnable = FALSE
     WAIT 20ms  // Ensure stable
 
     // Mirror fault code to mode bits
@@ -293,20 +293,20 @@ PREPARE_RESET:
 
 EXECUTE_RESET:
     // Assert reset (rising edge)
-    SET diFaultReset = FALSE  // Ensure low first
+    SET G_diFaultReset = FALSE  // Ensure low first
     WAIT 10ms
-    SET diFaultReset = TRUE   // Rising edge
+    SET G_diFaultReset = TRUE   // Rising edge
 
     // Wait for acknowledgment
     START timeout_timer (1000ms)
 
 WAIT_CLEAR:
-    IF doFaultActive = FALSE THEN
+    IF G_doFaultActive = FALSE THEN
         // Fault cleared successfully
-        SET diFaultReset = FALSE
+        SET G_diFaultReset = FALSE
         GOTO SUCCESS
     ELSIF timeout_timer expired THEN
-        SET diFaultReset = FALSE
+        SET G_diFaultReset = FALSE
         GOTO RESET_FAILED
 
 SUCCESS:
@@ -322,13 +322,13 @@ RESET_FAILED:
 ### Reset Timing Diagram
 
 ```
-doFaultActive  ____/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\____
+G_doFaultActive  ____/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\____
                    ^                         ^
                    |                         |
                    Fault                     Cleared
                    detected
 
-diMotionEnable ‾‾‾‾\________________________/‾‾‾‾
+G_diMotionEnable ‾‾‾‾\________________________/‾‾‾‾
                     ^                       ^
                     |                       |
                     Disable                 Re-enable
@@ -340,7 +340,7 @@ mode_bits      XXXX|--- fault_code ---------|0000
                    Mirror                   Return
                    code                     to idle
 
-diFaultReset   ____/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\____
+G_diFaultReset   ____/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\____
                    ^                   ^
                    |                   |
                    Rising              Release
@@ -352,7 +352,7 @@ diFaultReset   ____/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\____
 ## 5. Recovery Decision Tree
 
 ```
-FAULT DETECTED (doFaultActive = HIGH)
+FAULT DETECTED (G_doFaultActive = HIGH)
            |
            v
     Read fault code
@@ -398,7 +398,7 @@ After reset, determine appropriate next action:
 
 ### Homing Requirement Faults
 - Always complete homing after power cycle
-- Check `doHomingComplete` before operational modes
+- Check `G_doHomingComplete` before operational modes
 - Use Mode 101 (Go Home) for automatic handling
 
 ### Piston Exit Faults
@@ -435,11 +435,11 @@ After reset, determine appropriate next action:
 
 ### Reset Checklist
 
-1. [ ] diMotionEnable = FALSE
+1. [ ] G_diMotionEnable = FALSE
 2. [ ] Mode bits = fault code (mirror)
 3. [ ] Wait 20ms for stable
-4. [ ] Rising edge on diFaultReset
-5. [ ] Wait for doFaultActive = FALSE
-6. [ ] Release diFaultReset
+4. [ ] Rising edge on G_diFaultReset
+5. [ ] Wait for G_doFaultActive = FALSE
+6. [ ] Release G_diFaultReset
 7. [ ] Set mode bits = 000
 8. [ ] Take corrective action per fault type

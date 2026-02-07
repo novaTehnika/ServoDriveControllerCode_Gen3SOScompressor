@@ -76,26 +76,26 @@ Configure the axis scaling in MotionWorksIEC:
 ### 4.1 Digital Input Addresses
 | Pin | Address | Signal | External Connection |
 |-----|---------|--------|---------------------|
-| DI0 | %IX0.0 | diModeBit0 | NI DAQ DIO0 |
-| DI1 | %IX0.1 | diModeBit1 | NI DAQ DIO1 |
-| DI2 | %IX0.2 | diModeBit2 | NI DAQ DIO2 |
-| DI3 | %IX0.3 | diMotionEnable | NI DAQ DIO3 |
-| DI4 | %IX0.4 | diLimitRetract | Limit Switch (Retract) |
-| DI5 | %IX0.5 | diLimitHome | Limit Switch (Home) |
-| DI6 | %IX0.6 | diFaultReset | NI DAQ DIO6 |
-| DI7 | %IX0.7 | diReserved | (Not connected) |
+| DI0 | %IX0.0 | G_diModeBit0 | NI DAQ DIO0 |
+| DI1 | %IX0.1 | G_diModeBit1 | NI DAQ DIO1 |
+| DI2 | %IX0.2 | G_diModeBit2 | NI DAQ DIO2 |
+| DI3 | %IX0.3 | G_diMotionEnable | NI DAQ DIO3 |
+| DI4 | %IX0.4 | G_diLimitRetract | Limit Switch (Retract) |
+| DI5 | %IX0.5 | G_diLimitHome | Limit Switch (Home) |
+| DI6 | %IX0.6 | G_diFaultReset | NI DAQ DIO6 |
+| DI7 | %IX0.7 | G_diReserved | (Not connected) |
 
 ### 4.2 Digital Output Addresses
 | Pin | Address | Signal | External Connection |
 |-----|---------|--------|---------------------|
-| DO0 | %QX0.0 | doModeConfBit0 | NI DAQ DIO (input) |
-| DO1 | %QX0.1 | doModeConfBit1 | NI DAQ DIO (input) |
-| DO2 | %QX0.2 | doModeConfBit2 | NI DAQ DIO (input) |
-| DO3 | %QX0.3 | doBrakeDisengage | Brake Relay |
-| DO4 | %QX0.4 | doPerformanceStatus | NI DAQ DIO (input) |
-| DO5 | %QX0.5 | doFaultActive | NI DAQ DIO (input) |
-| DO6 | %QX0.6 | doInMotion | NI DAQ DIO (input) |
-| DO7 | %QX0.7 | doHomingComplete | NI DAQ DIO (input) |
+| DO0 | %QX0.0 | G_doModeConfBit0 | NI DAQ DIO (input) |
+| DO1 | %QX0.1 | G_doModeConfBit1 | NI DAQ DIO (input) |
+| DO2 | %QX0.2 | G_doModeConfBit2 | NI DAQ DIO (input) |
+| DO3 | %QX0.3 | G_doBrakeDisengage | Brake Relay |
+| DO4 | %QX0.4 | G_doPerformanceStatus | NI DAQ DIO (input) |
+| DO5 | %QX0.5 | G_doFaultActive | NI DAQ DIO (input) |
+| DO6 | %QX0.6 | G_doInMotion | NI DAQ DIO (input) |
+| DO7 | %QX0.7 | G_doHomingComplete | NI DAQ DIO (input) |
 
 ### 4.3 Limit Switch Wiring (PNP, Normally Closed)
 ```
@@ -121,7 +121,7 @@ Configure the axis scaling in MotionWorksIEC:
 ### 5.1 Analog Input
 | Pin | Address | Range | Signal |
 |-----|---------|-------|--------|
-| AI0 | %IW0 | -10V to +10V | aiReference |
+| AI0 | %IW0 | -10V to +10V | G_aiReference |
 
 **Scaling**: INT -32768 to +32767 = -10V to +10V
 
@@ -166,7 +166,7 @@ The brake is controlled via DO3 through a relay:
 ### 7.2 Absolute Encoder Setup
 The SGM7J-04A6A6C has a 24-bit absolute encoder:
 - Battery backup maintains position across power cycles
-- If battery fails, homing is required (flagAbsHomeRequired)
+- If battery fails, homing is required (G_flagAbsHomeRequired)
 - Use `AbsolutePositionManager` FB to check validity
 
 ---

@@ -12,7 +12,7 @@
    Sequence:
    1. APPROACH: Move toward home limit switch (negative direction first)
       - If retract limit triggers instead, reverse to positive direction
-   2. DETECT: Halt motion when home limit switch detected
+   2. DETECT: Stop motion when home limit switch detected
    3. BACKOFF: Move away from switch at slow speed until switch clears
    4. SETREF: Set position reference at switch edge location
 
@@ -46,7 +46,7 @@
        ApproachingPositive : BOOL             (* Currently approaching from positive direction
      VAR:
        fbMoveVelocity      : MC_MoveVelocity
-       fbHalt              : MC_Halt
+       fbStop              : MC_Stop
        fbSetPosition       : MC_SetPosition
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
@@ -82,7 +82,7 @@ IF NOT Enable THEN
     eState := HL_IDLE;
     bApproachFromPositive := FALSE;
     fbMoveVelocity(Execute := FALSE);
-    fbHalt(Execute := FALSE);
+    fbStop(Execute := FALSE);
     fbSetPosition(Execute := FALSE);
     tTimeout(IN := FALSE);
     RETURN;
@@ -105,17 +105,20 @@ tTimeout(IN := (eState <> HL_IDLE) AND (eState <> HL_DONE) AND (eState <> HL_ERR
 
 IF tTimeout.Q THEN
     fbMoveVelocity(Execute := FALSE);
-    fbHalt(Execute := FALSE);
+    fbStop(Execute := FALSE);
     fbSetPosition(Execute := FALSE);
     Error := TRUE;
     ErrorID := ERR_TIMEOUT;
     eState := HL_ERROR;
 END_IF;
 
-CASE eState OF
+(* --------------------------------------------------------------------------
+   State Machine
+   -------------------------------------------------------------------------- *)
 
-    HL_IDLE:
-        (* Waiting for execute command *)
+IF eState = HL_IDLE THEN
+
+    (* HL_IDLE - Waiting for execute command *)
         Active := FALSE;
         Done := FALSE;
         InMotion := FALSE;
@@ -126,7 +129,7 @@ CASE eState OF
 
         (* Reset function blocks *)
         fbMoveVelocity(Execute := FALSE);
-        fbHalt(Execute := FALSE);
+        fbStop(Execute := FALSE);
         fbSetPosition(Execute := FALSE);
         tTimeout(IN := FALSE);
 
@@ -137,11 +140,12 @@ CASE eState OF
         END_IF;
 
 
-    HL_APPROACH:
-        (* Move toward home limit switch
-           Direction depends on bApproachFromPositive:
-           - FALSE: Approach from negative direction (default)
-           - TRUE: Approach from positive direction (after over-travel) *)
+ELSIF eState = HL_APPROACH THEN
+
+    (* HL_APPROACH - Move toward home limit switch
+       Direction depends on bApproachFromPositive:
+       - FALSE: Approach from negative direction (default)
+       - TRUE: Approach from positive direction (after over-travel) *)
         ApproachingPositive := bApproachFromPositive;
 
         IF bApproachFromPositive THEN
@@ -191,29 +195,31 @@ CASE eState OF
         END_IF;
 
 
-    HL_DETECT:
-        (* Halt motion after limit switch detected *)
-        fbHalt(
+ELSIF eState = HL_DETECT THEN
+
+    (* HL_DETECT - Stop motion after limit switch detected *)
+        fbStop(
             Axis := Axis,
             Execute := TRUE
         );
 
-        InMotion := NOT fbHalt.Done;
+        InMotion := NOT fbStop.Done;
 
-        IF fbHalt.Done THEN
-            fbHalt(Execute := FALSE);
+        IF fbStop.Done THEN
+            fbStop(Execute := FALSE);
             eState := HL_BACKOFF;
 
-        ELSIF fbHalt.Error THEN
-            fbHalt(Execute := FALSE);
+        ELSIF fbStop.Error THEN
+            fbStop(Execute := FALSE);
             Error := TRUE;
             ErrorID := ERR_DRIVE;
             eState := HL_ERROR;
         END_IF;
 
 
-    HL_BACKOFF:
-        (* Move away from limit switch at slow speed until switch clears *)
+ELSIF eState = HL_BACKOFF THEN
+
+    (* HL_BACKOFF - Move away from limit switch at slow speed until switch clears *)
         fbMoveVelocity(
             Axis := Axis,
             Execute := TRUE,
@@ -224,7 +230,7 @@ CASE eState OF
         InMotion := fbMoveVelocity.Busy;
 
         IF NOT LimitHomeActive THEN
-            (* Switch cleared - halt and set position *)
+            (* Switch cleared - stop and set position *)
             fbMoveVelocity(Execute := FALSE);
             eState := HL_SETREF;
 
@@ -236,16 +242,17 @@ CASE eState OF
         END_IF;
 
 
-    HL_SETREF:
-        (* Set position reference at home switch edge location *)
-        (* First halt to ensure fully stopped *)
-        fbHalt(
+ELSIF eState = HL_SETREF THEN
+
+    (* HL_SETREF - Set position reference at home switch edge location *)
+        (* First stop to ensure fully stopped *)
+        fbStop(
             Axis := Axis,
-            Execute := NOT fbHalt.Done
+            Execute := NOT fbStop.Done
         );
 
-        IF fbHalt.Done THEN
-            fbHalt(Execute := FALSE);
+        IF fbStop.Done THEN
+            fbStop(Execute := FALSE);
 
             (* Set this position as the home reference *)
             fbSetPosition(
@@ -269,8 +276,9 @@ CASE eState OF
         END_IF;
 
 
-    HL_DONE:
-        (* Homing sequence complete *)
+ELSIF eState = HL_DONE THEN
+
+    (* HL_DONE - Homing sequence complete *)
         Done := TRUE;
         Active := TRUE;
         InMotion := FALSE;
@@ -283,28 +291,30 @@ CASE eState OF
         END_IF;
 
 
-    HL_ABORTING:
-        (* Aborting sequence - halt motion *)
-        fbHalt(
+ELSIF eState = HL_ABORTING THEN
+
+    (* HL_ABORTING - Stop motion *)
+        fbStop(
             Axis := Axis,
             Execute := TRUE
         );
 
-        IF fbHalt.Done THEN
-            fbHalt(Execute := FALSE);
+        IF fbStop.Done THEN
+            fbStop(Execute := FALSE);
             Active := FALSE;
             InMotion := FALSE;
             eState := HL_IDLE;
 
-        ELSIF fbHalt.Error THEN
-            (* Halt failed - still try to go to idle *)
-            fbHalt(Execute := FALSE);
+        ELSIF fbStop.Error THEN
+            (* Stop failed - still try to go to idle *)
+            fbStop(Execute := FALSE);
             eState := HL_ERROR;
         END_IF;
 
 
-    HL_ERROR:
-        (* Error state *)
+ELSIF eState = HL_ERROR THEN
+
+    (* HL_ERROR *)
         Active := FALSE;
         InMotion := FALSE;
         Done := FALSE;
@@ -316,4 +326,4 @@ CASE eState OF
             eState := HL_IDLE;
         END_IF;
 
-END_CASE;
+END_IF;

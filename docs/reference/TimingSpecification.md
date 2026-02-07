@@ -23,7 +23,7 @@
 ```
 Signal Timeline:
                     t0        t1           t2          t3
-diMotionEnable      _____/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
+G_diMotionEnable      _____/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 mode_bits           XXXX|---- stable mode value ----------
 confirm_bits        0000|_____|‾‾‾‾‾‾‾‾‾ (matches mode)
 
@@ -43,9 +43,9 @@ confirm_bits        0000|_____|‾‾‾‾‾‾‾‾‾ (matches mode)
 | Parameter | Value | Description |
 |-----------|-------|-------------|
 | Mirror Stable Time | 20 ms | Fault code must be mirrored stably |
-| Reset Pulse Width | 50 ms min | Minimum diFaultReset HIGH duration |
+| Reset Pulse Width | 50 ms min | Minimum G_diFaultReset HIGH duration |
 | Reset Timeout | 1000 ms | Max time for fault to clear |
-| Clear Detection | 10 ms | Time after doFaultActive LOW before release |
+| Clear Detection | 10 ms | Time after G_doFaultActive LOW before release |
 
 ---
 
@@ -95,11 +95,11 @@ Hold Secure ______________________|‾‾‾‾‾‾‾‾‾‾‾‾
 
 | Signal | Debounce Time | Description |
 |--------|---------------|-------------|
-| diModeBit0-2 | 5 ms | Mode command filtering |
-| diMotionEnable | 5 ms | Motion enable filtering |
-| diFaultReset | 5 ms | Fault reset filtering |
-| diLimitRetract | 5 ms | Limit switch filtering |
-| diLimitHome | 5 ms | Limit switch filtering |
+| G_diModeBit0-2 | 5 ms | Mode command filtering |
+| G_diMotionEnable | 5 ms | Motion enable filtering |
+| G_diFaultReset | 5 ms | Fault reset filtering |
+| G_diLimitRetract | 5 ms | Limit switch filtering |
+| G_diLimitHome | 5 ms | Limit switch filtering |
 
 ### Edge Detection
 
@@ -210,9 +210,9 @@ Hold Secure ______________________|‾‾‾‾‾‾‾‾‾‾‾‾
 | Parameter | Value | Description |
 |-----------|-------|-------------|
 | Fault Latch Time | 1 scan | Fault latched in FB_SafetyMonitor |
-| Motion Stop Initiate | 1 scan | MC_Halt issued |
+| Motion Stop Initiate | 1 scan | MC_Stop issued |
 | Fault Code Output | 1 scan | DO0-DO2 updated |
-| doFaultActive Assert | 1 scan | DO5 goes HIGH |
+| G_doFaultActive Assert | 1 scan | DO5 goes HIGH |
 
 ---
 
@@ -319,15 +319,15 @@ FaultReset   _______________|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 
 | Parameter | Default | Range | Description |
 |-----------|---------|-------|-------------|
-| cfgHandshakeTimeout | 500 ms | 100-2000 ms | Mode confirmation timeout |
+| G_cfgHandshakeTimeout | 500 ms | 100-2000 ms | Mode confirmation timeout |
 | cfgFaultResetTimeout | 1000 ms | 500-5000 ms | Fault reset timeout |
-| cfgBrakeEngageDelay | 200 ms | 100-500 ms | Brake engage wait |
-| cfgBrakeDisengageDelay | 100 ms | 50-200 ms | Brake release wait |
-| cfgDriveReadyTimeout | 5000 ms | 1000-10000 ms | Drive enable timeout |
+| G_cfgBrakeEngageDelay | 200 ms | 100-500 ms | Brake engage wait |
+| G_cfgBrakeDisengageDelay | 100 ms | 50-200 ms | Brake release wait |
+| G_cfgDriveReadyTimeout | 5000 ms | 1000-10000 ms | Drive enable timeout |
 | cfgInputDebounceTime | 5 ms | 1-20 ms | Digital input filter |
 | cfgAnalogFilterTC | 10 ms | 1-50 ms | Analog input filter |
-| cfgHomingTimeout | 30000 ms | 10000-60000 ms | Homing sequence timeout |
-| cfgStallDetectTime | 200 ms | 100-500 ms | EOT stall confirmation |
+| G_cfgHomingTimeout | 30000 ms | 10000-60000 ms | Homing sequence timeout |
+| G_cfgStallDetectTime | 200 ms | 100-500 ms | EOT stall confirmation |
 
 ---
 
@@ -346,7 +346,7 @@ FaultReset   _______________|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 
 | After | Wait | Before |
 |-------|------|--------|
-| Mode bits set | 20 ms | diMotionEnable HIGH |
+| Mode bits set | 20 ms | G_diMotionEnable HIGH |
 | Brake disengage | 100 ms | Motion command |
 | Motion stop | 50 ms | Brake engage |
 | Brake engage | 200 ms | Drive disable |

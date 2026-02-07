@@ -67,11 +67,11 @@ This plan does **not** cover the testing of the Simulink master controller softw
 -   **Objective:** Verify the mode entry and fault reset handshakes function correctly.
 -   **Procedure:**
     -   Test a valid mode entry handshake.
-    -   Test a handshake timeout by having the master fail to raise `diMotionEnable`.
+    -   Test a handshake timeout by having the master fail to raise `G_diMotionEnable`.
     -   Test a handshake mismatch by having the master change mode bits after the slave confirms.
     -   Test a valid fault reset handshake with correct fault code mirroring.
     -   Test a failed fault reset due to incorrect code mirroring.
-    -   Test a failed fault reset due to `diMotionEnable` being HIGH.
+    -   Test a failed fault reset due to `G_diMotionEnable` being HIGH.
 -   **Acceptance Criteria:** The slave must enter the correct state (`ST_FAULT` or the new operational state) in each scenario as described in `MasterProtocolGuide.md`.
 
 ### 3.3 Operational Mode Testing
@@ -80,11 +80,11 @@ This plan does **not** cover the testing of the Simulink master controller softw
     -   **Procedure:**
         1.  Perform a valid handshake to enter the mode.
         2.  Provide command inputs (e.g., analog reference voltage).
-        3.  Provide external inputs (e.g., drop `diMotionEnable`).
+        3.  Provide external inputs (e.g., drop `G_diMotionEnable`).
     -   **Acceptance Criteria:**
         -   The slave confirms the correct mode.
         -   The motor behaves as expected (e.g., holds position, follows velocity command).
-        -   Dropping `diMotionEnable` causes a controlled stop and transition to `ST_HOLD_POSITION`.
+        -   Dropping `G_diMotionEnable` causes a controlled stop and transition to `ST_HOLD_POSITION`.
         -   Position feedback is accurate.
 
 ### 3.4 Homing Sequence Verification
@@ -93,15 +93,15 @@ This plan does **not** cover the testing of the Simulink master controller softw
     -   **Mode 110 (Home to Limit):**
         1.  Start from a position away from the home switch.
         2.  Command Mode 110.
-        3.  Verify the axis moves toward the switch, triggers it, backs off, and sets the position to the configured value (`cfgHomeLimSetPosition`).
+        3.  Verify the axis moves toward the switch, triggers it, backs off, and sets the position to the configured value (`G_cfgHomeLimSetPosition`).
     -   **Mode 111 (Home to EOT):**
         1.  Command Mode 111.
         2.  Verify the fast and slow approach, and confirm that a stall is detected at the hard stop.
-        3.  Verify the `posEOTOffset` is calculated correctly.
+        3.  Verify the `G_posEOTOffset` is calculated correctly.
     -   **Mode 101 (Go Home):**
-        1.  Test with `flagAbsHomeRequired = FALSE`. Verify it moves to the home position.
-        2.  Test with `flagAbsHomeRequired = TRUE` (can be simulated). Verify it redirects to Mode 110.
--   **Acceptance Criteria:** All sequences complete successfully, `doHomingComplete` is set HIGH, and the final position is correct and repeatable.
+        1.  Test with `G_flagAbsHomeRequired = FALSE`. Verify it moves to the home position.
+        2.  Test with `G_flagAbsHomeRequired = TRUE` (can be simulated). Verify it redirects to Mode 110.
+-   **Acceptance Criteria:** All sequences complete successfully, `G_doHomingComplete` is set HIGH, and the final position is correct and repeatable.
 
 ### 3.5 Fault Injection Testing
 -   **Objective:** Verify the system detects all specified faults and enters a safe state.
@@ -114,7 +114,7 @@ This plan does **not** cover the testing of the Simulink master controller softw
         -   `FAULT_PISTON_EXIT`: Physically push the actuator back while in torque mode near the exit boundary.
         -   `FAULT_LIMIT_SWITCH`: Manually trigger a limit switch during a normal move.
         -   `FAULT_ENCODER`: Disconnect encoder cable (if safe) or use software to invalidate.
-    -   **Acceptance Criteria:** In every case, the `doFaultActive` signal must go HIGH, and the correct fault code must be present on `doModeConfBit0-2`. The system must perform a controlled stop.
+    -   **Acceptance Criteria:** In every case, the `G_doFaultActive` signal must go HIGH, and the correct fault code must be present on `G_doModeConfBit0-2`. The system must perform a controlled stop.
 
 ### 3.6 Performance and Stability Testing
 -   **Objective:** Verify the system is stable and performant under load and over time.

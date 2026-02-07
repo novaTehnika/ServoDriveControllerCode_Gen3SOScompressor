@@ -77,10 +77,13 @@ END_IF;
 (* Detect rising edge on CheckOnStartup *)
 rTrigCheck(CLK := CheckOnStartup);
 
-CASE eState OF
+(* --------------------------------------------------------------------------
+   State Machine
+   -------------------------------------------------------------------------- *)
 
-    ENC_IDLE:
-        (* Waiting for check trigger *)
+IF eState = ENC_IDLE THEN
+
+    (* ENC_IDLE - Waiting for check trigger *)
         Busy := FALSE;
         CheckComplete := FALSE;
 
@@ -93,8 +96,9 @@ CASE eState OF
             eState := ENC_CHECK_INIT;
         END_IF;
 
-    ENC_CHECK_INIT:
-        (* Initialize AbsolutePositionManager *)
+ELSIF eState = ENC_CHECK_INIT THEN
+
+    (* ENC_CHECK_INIT - Initialize AbsolutePositionManager *)
         (* Start timeout timer *)
         tCheckTimeout(IN := TRUE, PT := CHECK_TIMEOUT);
 
@@ -117,8 +121,9 @@ CASE eState OF
             eState := ENC_ERROR;
         END_IF;
 
-    ENC_CHECK_STATUS:
-        (* Query encoder status from AbsolutePositionManager *)
+ELSIF eState = ENC_CHECK_STATUS THEN
+
+    (* ENC_CHECK_STATUS - Query encoder status from AbsolutePositionManager *)
         fbAbsPosManager(
             Axis := Axis,
             Enable := TRUE
@@ -152,8 +157,9 @@ CASE eState OF
             eState := ENC_ERROR;
         END_IF;
 
-    ENC_COMPLETE:
-        (* Check complete - hold outputs until disabled or new check *)
+ELSIF eState = ENC_COMPLETE THEN
+
+    (* ENC_COMPLETE - Check complete - hold outputs until disabled or new check *)
         Busy := FALSE;
         CheckComplete := TRUE;
 
@@ -170,8 +176,9 @@ CASE eState OF
             eState := ENC_CHECK_INIT;
         END_IF;
 
-    ENC_ERROR:
-        (* Error state *)
+ELSIF eState = ENC_ERROR THEN
+
+    (* ENC_ERROR *)
         Busy := FALSE;
         CheckComplete := FALSE;
 
@@ -193,4 +200,4 @@ CASE eState OF
             eState := ENC_IDLE;
         END_IF;
 
-END_CASE;
+END_IF;

@@ -48,18 +48,18 @@ This document verifies the MC_SetPosition function block usage in PRG_Main.st ag
 - **ST_HOME_LIM_SETREF** (PRG_Main.st lines 764-768):
 ```st
 fbSetPosition(
-    Axis := sysAxis,
+    Axis := G_sysAxis,
     Execute := TRUE,
-    Position := cfgHomeLimSetPosition
+    Position := G_cfgHomeLimSetPosition
 );
 ```
 
 - **ST_HOME_EOT_SETREF** (PRG_Main.st lines 954-958):
 ```st
 fbSetPosition(
-    Axis := sysAxis,
+    Axis := G_sysAxis,
     Execute := TRUE,
-    Position := cfgHomeEOTSetPosition
+    Position := G_cfgHomeEOTSetPosition
 );
 ```
 
@@ -88,9 +88,9 @@ For improved code clarity and maintainability, consider explicitly specifying th
 
 ```st
 fbSetPosition(
-    Axis := sysAxis,
+    Axis := G_sysAxis,
     Execute := TRUE,
-    Position := cfgHomeLimSetPosition,
+    Position := G_cfgHomeLimSetPosition,
     Mode := FALSE  (* ABSOLUTE - set position reference *)
 );
 ```

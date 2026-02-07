@@ -19,8 +19,8 @@ The system requires two types of homing to establish accurate position reference
 
 | Flag | Set When | Cleared By |
 |------|----------|------------|
-| `flagAbsHomeRequired` | Encoder invalid on startup | Completing Mode 110 |
-| `flagEOTHomeRequired` | Every power cycle | Completing Mode 111 |
+| `G_flagAbsHomeRequired` | Encoder invalid on startup | Completing Mode 110 |
+| `G_flagEOTHomeRequired` | Every power cycle | Completing Mode 111 |
 
 ---
 
@@ -49,7 +49,7 @@ Step 1: APPROACH
 Step 2: DETECT
 +------------------------------------------+
 | Step: HL_DETECT                          |
-| Action: MC_Halt (controlled stop)        |
+| Action: MC_Stop (controlled stop)        |
 | Verify: LimitHomeActive still TRUE       |
 | Exit: Motion stopped                     |
 +------------------------------------------+
@@ -69,9 +69,9 @@ Step 4: SET REFERENCE
 +------------------------------------------+
 | Step: HL_SETREF                          |
 | Action: MC_SetPosition                   |
-| Position: cfgHomeLimSetPosition          |
+| Position: G_cfgHomeLimSetPosition          |
 |           (default: 0.0 mm)              |
-| Clear: flagAbsHomeRequired = FALSE       |
+| Clear: G_flagAbsHomeRequired = FALSE       |
 | Exit: MC_SetPosition.Done                |
 +------------------------------------------+
         |
@@ -80,7 +80,7 @@ Step 5: COMPLETE
 +------------------------------------------+
 | State: ST_HOME_COMPLETE                  |
 | Action: Hold position                    |
-| Output: doHomingComplete = TRUE          |
+| Output: G_doHomingComplete = TRUE          |
 | Exit: New mode commanded                 |
 +------------------------------------------+
 ```
@@ -97,8 +97,8 @@ Step 5: COMPLETE
 
 ### Abort Handling
 
-If `diMotionEnable` goes LOW during homing:
-1. MC_Halt executed immediately
+If `G_diMotionEnable` goes LOW during homing:
+1. MC_Stop executed immediately
 2. Homing sequence aborted
 3. Transition to ST_HOLD_POSITION
 4. Homing must be restarted from beginning
@@ -108,12 +108,12 @@ If `diMotionEnable` goes LOW during homing:
 ```
 MASTER:
 1. Command mode 110 (DI0=0, DI1=1, DI2=1)
-2. Set diMotionEnable = HIGH
+2. Set G_diMotionEnable = HIGH
 3. Wait for confirmation (DO0=0, DO1=1, DO2=1)
 4. Monitor progress:
-   - doInMotion = TRUE during approach/backoff
-   - doInMotion = FALSE during detect/setref
-5. Wait for doHomingComplete = TRUE
+   - G_doInMotion = TRUE during approach/backoff
+   - G_doInMotion = FALSE during detect/setref
+5. Wait for G_doHomingComplete = TRUE
 6. Homing success - can now command other modes
 ```
 
@@ -170,9 +170,9 @@ Step 4: SET REFERENCE
 | Step: HE_SETREF                          |
 | Action: Calculate EOTOffset              |
 |   EOTOffset := ExpectedEOTPos - ActualPos|
-| Position: cfgHomeEOTSetPosition          |
+| Position: G_cfgHomeEOTSetPosition          |
 |           (default: 305.0 mm)            |
-| Note: PRG_Main clears flagEOTHomeRequired|
+| Note: PRG_Main clears G_flagEOTHomeRequired|
 |       after FB reports Done              |
 +------------------------------------------+
         |
@@ -181,7 +181,7 @@ Step 5: COMPLETE
 +------------------------------------------+
 | State: ST_HOME_COMPLETE                  |
 | Action: Hold position                    |
-| Output: doHomingComplete = TRUE          |
+| Output: G_doHomingComplete = TRUE          |
 | Exit: New mode commanded                 |
 +------------------------------------------+
 ```
@@ -230,12 +230,12 @@ END_IF
 MASTER:
 1. Ensure Mode 110 completed (if encoder was invalid)
 2. Command mode 111 (DI0=1, DI1=1, DI2=1)
-3. Set diMotionEnable = HIGH
+3. Set G_diMotionEnable = HIGH
 4. Wait for confirmation (DO0=1, DO1=1, DO2=1)
 5. Monitor progress:
-   - doInMotion = TRUE during approach phases
-   - doInMotion = FALSE when stall detected
-6. Wait for doHomingComplete = TRUE
+   - G_doInMotion = TRUE during approach phases
+   - G_doInMotion = FALSE when stall detected
+6. Wait for G_doHomingComplete = TRUE
 7. Homing complete - full position calibration done
 ```
 
@@ -254,7 +254,7 @@ GO HOME REQUESTED
         v
 +-------------------+
 | Check             |
-| flagAbsHomeRequired|
+| G_flagAbsHomeRequired|
 +--------+----------+
          |
     +----+----+
@@ -275,25 +275,25 @@ GO HOME REQUESTED
 
 ### When Redirect Occurs
 
-If `flagAbsHomeRequired = TRUE`:
+If `G_flagAbsHomeRequired = TRUE`:
 1. FB_GoHome sets `RedirectToHoming = TRUE`
 2. PRG_Main transitions to ST_HOME_LIMIT (Mode 110)
 3. Mode 110 sequence executes
 4. After completion, system is at home position
-5. `flagAbsHomeRequired` is cleared
+5. `G_flagAbsHomeRequired` is cleared
 
 ### Normal Go Home Execution
 
-If `flagAbsHomeRequired = FALSE`:
-1. Execute MC_MoveAbsolute to `cfgGoHomePosition` (default: 0.0 mm)
-2. Velocity: `cfgGoHomeVelocity` (default: 50 mm/s)
+If `G_flagAbsHomeRequired = FALSE`:
+1. Execute MC_MoveAbsolute to `G_cfgGoHomePosition` (default: 0.0 mm)
+2. Velocity: `G_cfgGoHomeVelocity` (default: 50 mm/s)
 3. Hold at position until mode change
 
 ### Important Notes
 
-- EOT homing (`flagEOTHomeRequired`) does NOT block Go Home
+- EOT homing (`G_flagEOTHomeRequired`) does NOT block Go Home
 - Go Home can execute even if EOT homing not done
-- Only encoder validity (`flagAbsHomeRequired`) causes redirect
+- Only encoder validity (`G_flagAbsHomeRequired`) causes redirect
 - After Go Home, position is at home switch location
 
 ### Master Coordination
@@ -301,14 +301,14 @@ If `flagAbsHomeRequired = FALSE`:
 ```
 MASTER:
 1. Command mode 101 (DI0=1, DI1=0, DI2=1)
-2. Set diMotionEnable = HIGH
+2. Set G_diMotionEnable = HIGH
 3. Wait for confirmation
 4. IF confirmation changes to 110:
    - Redirect occurred, Mode 110 running
    - Wait for that sequence to complete
    ELSE:
    - Direct move to home executing
-   - Wait for doInMotion = FALSE
+   - Wait for G_doInMotion = FALSE
 5. Axis is now at home position
 ```
 
@@ -324,7 +324,7 @@ MASTER:
 |-----------|---------|-------|-------------|
 | cfgHomeLimApproachVelocity | -20.0 | mm/s | Approach velocity (negative = toward switch) |
 | cfgHomeLimBackoffVelocity | +5.0 | mm/s | Backoff velocity (positive = away from switch) |
-| cfgHomeLimSetPosition | 0.0 | mm | Position value after homing |
+| G_cfgHomeLimSetPosition | 0.0 | mm | Position value after homing |
 | cfgHomeLimTimeout | 30.0 | s | Maximum time for homing |
 
 ### Mode 111 Parameters
@@ -338,15 +338,15 @@ MASTER:
 | cfgHomeEOTStallVelocity | 0.5 | mm/s | Velocity threshold for stall |
 | cfgHomeEOTStallTorquePercent | 90.0 | % | Torque threshold (of limit) |
 | cfgHomeEOTStallTime | 200 | ms | Stall confirmation time |
-| cfgHomeEOTSetPosition | 305.0 | mm | Position value at EOT |
+| G_cfgHomeEOTSetPosition | 305.0 | mm | Position value at EOT |
 | cfgHomeEOTTimeout | 30.0 | s | Maximum time for homing |
 
 ### Mode 101 Parameters
 
 | Parameter | Default | Units | Description |
 |-----------|---------|-------|-------------|
-| cfgGoHomePosition | 0.0 | mm | Target home position |
-| cfgGoHomeVelocity | 50.0 | mm/s | Movement velocity |
+| G_cfgGoHomePosition | 0.0 | mm | Target home position |
+| G_cfgGoHomeVelocity | 50.0 | mm/s | Movement velocity |
 
 ---
 
@@ -361,8 +361,8 @@ POWER ON
 Encoder Check --> Valid
     |
     v
-flagAbsHomeRequired = FALSE
-flagEOTHomeRequired = TRUE (always on power-up)
+G_flagAbsHomeRequired = FALSE
+G_flagEOTHomeRequired = TRUE (always on power-up)
     |
     v
 MASTER: Command Mode 111 (Home to EOT)
@@ -371,8 +371,8 @@ MASTER: Command Mode 111 (Home to EOT)
 EOT homing executes
     |
     v
-flagEOTHomeRequired = FALSE
-doHomingComplete = TRUE
+G_flagEOTHomeRequired = FALSE
+G_doHomingComplete = TRUE
     |
     v
 Ready for operational modes
@@ -387,8 +387,8 @@ POWER ON
 Encoder Check --> INVALID (battery fail)
     |
     v
-flagAbsHomeRequired = TRUE
-flagEOTHomeRequired = TRUE
+G_flagAbsHomeRequired = TRUE
+G_flagEOTHomeRequired = TRUE
     |
     v
 MASTER: Command Mode 110 (Home to Limit)
@@ -397,7 +397,7 @@ MASTER: Command Mode 110 (Home to Limit)
 Limit homing executes
     |
     v
-flagAbsHomeRequired = FALSE
+G_flagAbsHomeRequired = FALSE
     |
     v
 MASTER: Command Mode 111 (Home to EOT)
@@ -406,8 +406,8 @@ MASTER: Command Mode 111 (Home to EOT)
 EOT homing executes
     |
     v
-flagEOTHomeRequired = FALSE
-doHomingComplete = TRUE
+G_flagEOTHomeRequired = FALSE
+G_doHomingComplete = TRUE
     |
     v
 Ready for operational modes
@@ -451,7 +451,7 @@ Ready for operational modes
 
 ### Frequent Homing Required
 
-**Symptom**: `flagAbsHomeRequired` set frequently
+**Symptom**: `G_flagAbsHomeRequired` set frequently
 
 **Possible Causes**:
 - Encoder battery failing
@@ -493,8 +493,8 @@ Ready for operational modes
 
 | Flag | Cleared By |
 |------|------------|
-| flagAbsHomeRequired | Mode 110 complete |
-| flagEOTHomeRequired | Mode 111 complete |
+| G_flagAbsHomeRequired | Mode 110 complete |
+| G_flagEOTHomeRequired | Mode 111 complete |
 
 ### Required Sequence
 

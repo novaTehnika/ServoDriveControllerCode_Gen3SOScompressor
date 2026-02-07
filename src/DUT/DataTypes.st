@@ -119,14 +119,14 @@ TYPE E_SystemState :
     ST_HOME_EOT_SETREF,      (* DEPRECATED - use FB_HomeEOT *)
 
     (* Transition State - Inter-Mode *)
-    ST_HOLD_POSITION,        (* MC_Halt active, brake disengaged, awaiting handshake *)
+    ST_HOLD_POSITION,        (* MC_Stop active, brake disengaged, awaiting handshake *)
 
     (* Transition States - Deactivation *)
     ST_BRAKE_ENGAGE,         (* Engage brake, wait for mechanical delay *)
     ST_DRIVE_DISABLE,        (* Power off drive, return to idle *)
 
     (* Fault States *)
-    ST_FAULT,                (* Fault active, no brake, MC_Halt, await handshake/timeout *)
+    ST_FAULT,                (* Fault active, no brake, MC_Stop, await handshake/timeout *)
     ST_FAULT_RECOVERY,       (* Legacy - may be removed *)
     ST_FAULT_IDLE            (* Drive disabled, brake engaged, await fault reset handshake *)
 );
