@@ -35,9 +35,7 @@
        DO2_Output          : BOOL             (* Output for DO2
        FaultActiveOutput   : BOOL             (* Output for doFaultActive (DO5)
      VAR:
-       bFaultBit0          : BOOL             (* Fault code bit 0
-       bFaultBit1          : BOOL             (* Fault code bit 1
-       bFaultBit2          : BOOL             (* Fault code bit 2
+       fbFaultToBits       : FB_FaultToBits   (* Fault code to bits converter
    ============================================================================ *)
 
 (* ============================================================================
@@ -59,11 +57,10 @@ FaultActiveOutput := FaultActive;
 IF FaultActive THEN
     (* Fault mode: Output fault code on DO0-DO2 *)
     (* Use centralized conversion function *)
-    FaultToBits(FaultCode, bFaultBit0, bFaultBit1, bFaultBit2);
-
-    DO0_Output := bFaultBit0;
-    DO1_Output := bFaultBit1;
-    DO2_Output := bFaultBit2;
+    fbFaultToBits(Fault := FaultCode);
+    DO0_Output := fbFaultToBits.Bit0;
+    DO1_Output := fbFaultToBits.Bit1;
+    DO2_Output := fbFaultToBits.Bit2;
 ELSE
     (* Normal mode: Output mode confirmation bits *)
     DO0_Output := ModeConfirmBit0;
