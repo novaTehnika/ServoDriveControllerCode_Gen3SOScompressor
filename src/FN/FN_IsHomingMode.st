@@ -1,5 +1,5 @@
 (* ============================================================================
-   IsHomingMode - Check if Mode is a Homing Mode
+   FN_IsHomingMode - Check if Mode is a Homing Mode
 
    Project: Gen3 SOS Compressor Servo Controller
    Controller: Yaskawa MP2600iec
@@ -15,6 +15,6 @@
        Mode            : E_OperatingMode  (* Mode to check
 *)
 
-IsHomingMode := (Mode = MODE_GO_HOME) OR
+FN_IsHomingMode := (Mode = MODE_GO_HOME) OR
                 (Mode = MODE_HOME_LIMIT) OR
                 (Mode = MODE_HOME_EOT);

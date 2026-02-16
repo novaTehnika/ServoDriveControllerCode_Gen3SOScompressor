@@ -1,5 +1,5 @@
 (* ============================================================================
-   IsOperationalMode - Check if Mode Requires Homing
+   FN_IsOperationalMode - Check if Mode Requires Homing
 
    Project: Gen3 SOS Compressor Servo Controller
    Controller: Yaskawa MP2600iec
@@ -16,7 +16,7 @@
        Mode            : E_OperatingMode  (* Mode to check
 *)
 
-IsOperationalMode := (Mode = MODE_BRAKE_HOLD) OR
+FN_IsOperationalMode := (Mode = MODE_BRAKE_HOLD) OR
                      (Mode = MODE_POSITION) OR
                      (Mode = MODE_VELOCITY) OR
                      (Mode = MODE_TORQUE);

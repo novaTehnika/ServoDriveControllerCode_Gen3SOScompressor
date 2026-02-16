@@ -1,5 +1,5 @@
 (* ============================================================================
-   FaultMatchesModeBits - Cross-Type Bit Comparison
+   FN_FaultMatchesModeBits - Cross-Type Bit Comparison
 
    Project: Gen3 SOS Compressor Servo Controller
    Controller: Yaskawa MP2600iec
@@ -21,4 +21,4 @@
 *)
 
 (* Both use 3-bit encoding 0-7, so we just compare integer values *)
-FaultMatchesModeBits := (FaultToInt(Fault) = ModeToInt(Mode));
+FN_FaultMatchesModeBits := (FaultToInt(Fault) = ModeToInt(Mode));
