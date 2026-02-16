@@ -100,7 +100,7 @@ FaultResetValid := FaultReset AND
                    (NOT MotionEnable) AND
                    InFaultState AND
                    (ActiveFaultCode <> FAULT_NONE) AND
-                   FaultMatchesModeBits(ActiveFaultCode, RequestedMode);
+                   FN_FaultMatchesModeBits(ActiveFaultCode, RequestedMode);
 
 (* --------------------------------------------------------------------------
    Mode Handshake State Machine
@@ -119,7 +119,7 @@ IF eState = HS_IDLE THEN
         IF ModeStable AND (RequestedMode <> MODE_IDLE) AND NOT MotionEnable THEN
             (* Set confirmation to match requested mode *)
             ConfirmedMode := RequestedMode;
-            ModeToBits(RequestedMode, ConfirmBit0, ConfirmBit1, ConfirmBit2);
+            FB_ModeToBits(RequestedMode, ConfirmBit0, ConfirmBit1, ConfirmBit2);
             eModeAtStart := RequestedMode;
             bModeStableAtStart := TRUE;
             HandshakeActive := TRUE;
@@ -128,7 +128,7 @@ IF eState = HS_IDLE THEN
         ELSIF ModeStable AND (RequestedMode = MODE_IDLE) THEN
             (* Idle mode - just confirm it *)
             ConfirmedMode := MODE_IDLE;
-            ModeToBits(MODE_IDLE, ConfirmBit0, ConfirmBit1, ConfirmBit2);
+            FB_ModeToBits(MODE_IDLE, ConfirmBit0, ConfirmBit1, ConfirmBit2);
         END_IF;
 
 ELSIF eState = HS_WAIT_MOTION_EN THEN
@@ -182,7 +182,7 @@ ELSIF eState = HS_TIMEOUT THEN
         HandshakeTimeout_Q := TRUE;
         HandshakeActive := FALSE;
         ConfirmedMode := MODE_IDLE;  (* Reset confirmed mode on failure *)
-        ModeToBits(MODE_IDLE, ConfirmBit0, ConfirmBit1, ConfirmBit2);
+        FB_ModeToBits(MODE_IDLE, ConfirmBit0, ConfirmBit1, ConfirmBit2);
         tTimeout(IN := FALSE);
 
         (* Exit timeout when motion enable drops - simpler and more reliable *)

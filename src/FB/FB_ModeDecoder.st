@@ -42,8 +42,8 @@ IF NOT Enable THEN
 END_IF;
 
 (* Decode mode from bits using centralized conversion function *)
-DecodedMode := BitsToMode(ModeBit0, ModeBit1, ModeBit2);
-nCurrentValue := ModeToInt(DecodedMode);
+DecodedMode := FN_BitsToMode(ModeBit0, ModeBit1, ModeBit2);
+nCurrentValue := FN_ModeToInt(DecodedMode);
 
 (* Update outputs *)
 ModeValue := nCurrentValue;

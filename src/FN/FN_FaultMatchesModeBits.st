@@ -21,4 +21,4 @@
 *)
 
 (* Both use 3-bit encoding 0-7, so we just compare integer values *)
-FN_FaultMatchesModeBits := (FaultToInt(Fault) = ModeToInt(Mode));
+FN_FaultMatchesModeBits := (FN_FaultToInt(Fault) = FN_ModeToInt(Mode));

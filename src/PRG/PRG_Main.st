@@ -326,7 +326,7 @@ ELSIF G_sysCurrentState = ST_IDLE THEN
             eTargetMode := G_sysRequestedMode;
 
             (* Check if this is an operational mode requiring homing *)
-            IF IsOperationalMode(eTargetMode) THEN
+            IF FN_IsOperationalMode(eTargetMode) THEN
                 (* Check homing requirements *)
                 IF G_flagAbsHomeRequired OR G_flagEOTHomeRequired THEN
                     (* Homing required but not satisfied - enter fault *)
@@ -337,7 +337,7 @@ ELSIF G_sysCurrentState = ST_IDLE THEN
                     G_sysCurrentState := ST_DRIVE_ENABLE;
                 END_IF;
 
-            ELSIF IsHomingMode(eTargetMode) THEN
+            ELSIF FN_IsHomingMode(eTargetMode) THEN
                 (* Homing modes - check ordering requirements *)
                 IF (eTargetMode = MODE_HOME_EOT) AND G_flagAbsHomeRequired THEN
                     (* EOT homing requires limit switch homing first if encoder invalid *)
@@ -447,7 +447,7 @@ ELSIF G_sysCurrentState = ST_BRAKE_HOLD THEN
             eTargetMode := G_sysRequestedMode;
 
             (* Check homing requirements for operational modes *)
-            IF IsOperationalMode(eTargetMode) AND
+            IF FN_IsOperationalMode(eTargetMode) AND
                (G_flagAbsHomeRequired OR G_flagEOTHomeRequired) THEN
                 G_sysActiveFault := FAULT_HOMING_REQ;
                 G_sysCurrentState := ST_FAULT;
@@ -798,7 +798,7 @@ ELSIF G_sysCurrentState = ST_HOLD_POSITION THEN
             eTargetMode := G_sysRequestedMode;
 
             (* Check homing requirements for operational modes *)
-            IF IsOperationalMode(eTargetMode) AND
+            IF FN_IsOperationalMode(eTargetMode) AND
                (G_flagAbsHomeRequired OR G_flagEOTHomeRequired) THEN
                 G_sysActiveFault := FAULT_HOMING_REQ;
                 G_sysCurrentState := ST_FAULT;
