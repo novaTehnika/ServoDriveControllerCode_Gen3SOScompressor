@@ -54,6 +54,7 @@
        rTrigFaultReset     : R_TRIG           (* Rising edge on fault reset
        eModeAtStart        : E_OperatingMode  (* Mode when handshake started
        bModeStableAtStart  : BOOL             (* Capture mode stability at handshake start
+       fbModeToBits        : FB_ModeToBits    (* Mode to bits converter
      VAR CONSTANT:
        HS_IDLE             : INT := 0         (* Idle, no handshake active
        HS_WAIT_MOTION_EN   : INT := 1         (* Waiting for motion enable
@@ -119,7 +120,10 @@ IF eState = HS_IDLE THEN
         IF ModeStable AND (RequestedMode <> MODE_IDLE) AND NOT MotionEnable THEN
             (* Set confirmation to match requested mode *)
             ConfirmedMode := RequestedMode;
-            FB_ModeToBits(RequestedMode, ConfirmBit0, ConfirmBit1, ConfirmBit2);
+            fbModeToBits(Mode := RequestedMode);
+            ConfirmBit0 := fbModeToBits.Bit0;
+            ConfirmBit1 := fbModeToBits.Bit1;
+            ConfirmBit2 := fbModeToBits.Bit2;
             eModeAtStart := RequestedMode;
             bModeStableAtStart := TRUE;
             HandshakeActive := TRUE;
@@ -128,7 +132,10 @@ IF eState = HS_IDLE THEN
         ELSIF ModeStable AND (RequestedMode = MODE_IDLE) THEN
             (* Idle mode - just confirm it *)
             ConfirmedMode := MODE_IDLE;
-            FB_ModeToBits(MODE_IDLE, ConfirmBit0, ConfirmBit1, ConfirmBit2);
+            fbModeToBits(Mode := MODE_IDLE);
+            ConfirmBit0 := fbModeToBits.Bit0;
+            ConfirmBit1 := fbModeToBits.Bit1;
+            ConfirmBit2 := fbModeToBits.Bit2;
         END_IF;
 
 ELSIF eState = HS_WAIT_MOTION_EN THEN
@@ -182,7 +189,10 @@ ELSIF eState = HS_TIMEOUT THEN
         HandshakeTimeout_Q := TRUE;
         HandshakeActive := FALSE;
         ConfirmedMode := MODE_IDLE;  (* Reset confirmed mode on failure *)
-        FB_ModeToBits(MODE_IDLE, ConfirmBit0, ConfirmBit1, ConfirmBit2);
+        fbModeToBits(Mode := MODE_IDLE);
+        ConfirmBit0 := fbModeToBits.Bit0;
+        ConfirmBit1 := fbModeToBits.Bit1;
+        ConfirmBit2 := fbModeToBits.Bit2;
         tTimeout(IN := FALSE);
 
         (* Exit timeout when motion enable drops - simpler and more reliable *)
