@@ -45,6 +45,8 @@
        rTemp               : LREAL
        rMedianResult       : LREAL
        nSize               : INT
+      nIdx1, nIdx2        : INT              (* Index variables for array access
+      nMedianIdx          : INT              (* Median middle index
    ============================================================================ *)
 
 (* ============================================================================
@@ -104,16 +106,20 @@ END_FOR;
 (* Simple bubble sort (efficient for small arrays) *)
 FOR i := 0 TO nSize - 2 DO
     FOR j := 0 TO nSize - 2 - i DO
-        IF aSortBuffer[j] > aSortBuffer[j + 1] THEN
-            rTemp := aSortBuffer[j];
-            aSortBuffer[j] := aSortBuffer[j + 1];
-            aSortBuffer[j + 1] := rTemp;
+        (* Pre-calculate indices for array access *)
+        nIdx1 := j;
+        nIdx2 := j + 1;
+        IF aSortBuffer[nIdx1] > aSortBuffer[nIdx2] THEN
+            rTemp := aSortBuffer[nIdx1];
+            aSortBuffer[nIdx1] := aSortBuffer[nIdx2];
+            aSortBuffer[nIdx2] := rTemp;
         END_IF;
     END_FOR;
 END_FOR;
 
 (* Get median value (middle element) *)
-rMedianResult := aSortBuffer[nSize / 2];
+nMedianIdx := nSize / 2;
+rMedianResult := aSortBuffer[nMedianIdx];
 
 (* --------------------------------------------------------------------------
    Stage 2: Low-Pass Filter (First-Order IIR)
