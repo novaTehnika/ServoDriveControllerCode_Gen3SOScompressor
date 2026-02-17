@@ -42,7 +42,7 @@ The codebase follows a set of naming conventions to improve readability and main
 | `e` | `ENUM` | `eTargetState` | An enumeration value. |
 | `st` | `STRUCT` | `stCurrentLimits` | A structure instance. |
 | `fb` | Function Block | `fbHandshake` | An instance of a Function Block. |
-| `rTrig` | `R_TRIG` | `rTrigFaultReset` | A rising-edge trigger. |
+| `rTrig` | `R_TRIG` | `rTrigMotionEnable` | A rising-edge trigger. |
 | `fTrig` | `F_TRIG` | `fTrigMotionEnable` | A falling-edge trigger. |
 
 ### Global Variable Prefixes
@@ -161,7 +161,7 @@ Let's say you want to add `FAULT_NEW_CONDITION` with a value of `5` (currently `
 
 1.  **Define Enum:** In `src/DUT/DataTypes.st`, add the new fault to `E_FaultCode`. Note that ordinal position matters for bit encoding.
 
-2.  **Update Conversions:** In the individual function files under `src/FN/`, add the new fault to `FN_FaultToInt.st` and `FN_FaultToBits.st`.
+2.  **Update Conversions:** In the individual function files under `src/FN/`, add the new fault to `FN_FaultToInt.st`, `FN_FaultToBits.st`, and `FN_BitsToFaultCode.st`.
 
 3.  **Update Master Docs:** Add the new fault to the tables in `docs/master/FaultCodeReference.md` and other relevant guides.
 

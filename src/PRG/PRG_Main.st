@@ -32,6 +32,7 @@
        fbFilterAnalog      : FB_AnalogInputFilter
        fbModeDecoder       : FB_ModeDecoder
        fbHandshake         : FB_HandshakeManager
+       fbFaultReset        : FB_FaultResetHandler
        fbOutputMux         : FB_OutputMux
        fbAnalogProc        : FB_AnalogProcessor
        fbPosOutput         : FB_PositionOutput
@@ -57,7 +58,6 @@
        tDriveReadyTimer    : TON
        tHandshakeTimer     : TON
        (* Edge triggers
-       rTrigFaultReset     : R_TRIG
        rTrigMotionEnable   : R_TRIG
        fTrigMotionEnable   : F_TRIG
        (* Local variables
@@ -97,7 +97,6 @@ IF bFirstScan THEN
 
     (* Initialize outputs to safe state *)
     G_doBrakeDisengage := FALSE;      (* Brake engaged *)
-    G_doFaultActive := FALSE;
     G_doPerformanceStatus := FALSE;
     G_doHomingComplete := FALSE;
     G_doInMotion := FALSE;
@@ -171,9 +170,6 @@ G_sysRequestedMode := fbModeDecoder.DecodedMode;
 rTrigMotionEnable(CLK := bFilteredMotionEnable);
 fTrigMotionEnable(CLK := bFilteredMotionEnable);
 
-(* Edge detection on filtered fault reset *)
-rTrigFaultReset(CLK := bFilteredFaultReset);
-
 (* Read actual position, velocity, torque from drive *)
 fbReadActualPos(Axis := G_sysAxis, Enable := TRUE);
 fbReadActualVel(Axis := G_sysAxis, Enable := TRUE);
@@ -241,7 +237,6 @@ IF G_sysCurrentState = ST_INIT THEN
         IF bEnterState THEN
             (* Ensure safe output state *)
             G_doBrakeDisengage := FALSE;
-            G_doFaultActive := FALSE;
             fbPower(Axis := G_sysAxis, Enable := FALSE);
         END_IF;
 
@@ -316,8 +311,6 @@ ELSIF G_sysCurrentState = ST_IDLE THEN
             RequestedMode := G_sysRequestedMode,
             ModeStable := fbModeDecoder.ModeStable,
             MotionEnable := bFilteredMotionEnable,
-            FaultReset := bFilteredFaultReset,
-            InFaultState := FALSE,
             HandshakeTimeout := G_cfgHandshakeTimeout
         );
 
@@ -437,8 +430,6 @@ ELSIF G_sysCurrentState = ST_BRAKE_HOLD THEN
             RequestedMode := G_sysRequestedMode,
             ModeStable := fbModeDecoder.ModeStable,
             MotionEnable := bFilteredMotionEnable,
-            FaultReset := bFilteredFaultReset,
-            InFaultState := FALSE,
             HandshakeTimeout := G_cfgHandshakeTimeout
         );
 
@@ -785,8 +776,6 @@ ELSIF G_sysCurrentState = ST_HOLD_POSITION THEN
             RequestedMode := G_sysRequestedMode,
             ModeStable := fbModeDecoder.ModeStable,
             MotionEnable := bFilteredMotionEnable,
-            FaultReset := bFilteredFaultReset,
-            InFaultState := FALSE,
             HandshakeTimeout := G_cfgHandshakeTimeout
         );
 
@@ -886,7 +875,6 @@ ELSIF G_sysCurrentState = ST_FAULT THEN
             fbDirectControl(Axis := G_sysAxis, Enable := FALSE);
 
             (* Signal fault *)
-            G_doFaultActive := TRUE;
             G_doInMotion := FALSE;
 
             (* Record fault information *)
@@ -901,29 +889,30 @@ ELSIF G_sysCurrentState = ST_FAULT THEN
         (* Continue halt until done *)
         fbStop(Axis := G_sysAxis, Execute := NOT fbStop.Done);
 
-        (* Update handshake for fault reset - requires master to mirror fault code *)
+        (* Disable mode handshake in fault state *)
+        fbHandshake(Enable := FALSE);
+
+        (* Update fault reset handler - requires master to mirror fault code *)
         (* NOTE: Uses filtered inputs for noise immunity *)
-        fbHandshake(
+        fbFaultReset(
             Enable := TRUE,
-            RequestedMode := G_sysRequestedMode,
-            ModeStable := fbModeDecoder.ModeStable,
-            MotionEnable := bFilteredMotionEnable,
             FaultReset := bFilteredFaultReset,
+            MotionEnable := bFilteredMotionEnable,
             InFaultState := TRUE,
+            BitsStable := fbModeDecoder.ModeStable,
             ActiveFaultCode := G_sysActiveFault,
-            HandshakeTimeout := G_cfgHandshakeTimeout
+            MasterFaultCode := FN_BitsToFaultCode(bFilteredModeBit0, bFilteredModeBit1, bFilteredModeBit2)
         );
 
         (* Timeout for slow recovery path *)
         tStateTimer(IN := TRUE, PT := G_cfgFaultIdleTimeout);
 
-        (* Check for fault reset handshake *)
-        IF fbHandshake.FaultResetValid THEN
+        (* Check for fault reset *)
+        IF fbFaultReset.FaultResetValid THEN
             (* FAST RECOVERY PATH: Master responded before timeout *)
             (* Clear fault and go directly to brake hold - drive stays enabled *)
             (* Skip MC_Reset - not needed for most faults *)
             G_sysActiveFault := FAULT_NONE;
-            G_doFaultActive := FALSE;
             fbStop(Axis := G_sysAxis, Execute := FALSE);
             G_sysCurrentState := ST_BRAKE_HOLD;
 
@@ -950,7 +939,6 @@ ELSIF G_sysCurrentState = ST_FAULT_RECOVERY THEN
         IF fbReset.Done THEN
             (* Reset complete - go to fault idle *)
             G_sysActiveFault := FAULT_NONE;
-            G_doFaultActive := FALSE;
             fbReset(Execute := FALSE);
             G_sysCurrentState := ST_FAULT_IDLE;
 
@@ -994,22 +982,23 @@ ELSIF G_sysCurrentState = ST_FAULT_IDLE THEN
             END_IF;
         END_IF;
 
-        (* Update handshake manager for fault reset *)
-        fbHandshake(
+        (* Disable mode handshake in fault idle state *)
+        fbHandshake(Enable := FALSE);
+
+        (* Update fault reset handler *)
+        fbFaultReset(
             Enable := TRUE,
-            RequestedMode := G_sysRequestedMode,
-            ModeStable := fbModeDecoder.ModeStable,
-            MotionEnable := bFilteredMotionEnable,
             FaultReset := bFilteredFaultReset,
+            MotionEnable := bFilteredMotionEnable,
             InFaultState := (G_sysActiveFault <> FAULT_NONE),
+            BitsStable := fbModeDecoder.ModeStable,
             ActiveFaultCode := G_sysLastFaultCode,
-            HandshakeTimeout := G_cfgHandshakeTimeout
+            MasterFaultCode := FN_BitsToFaultCode(bFilteredModeBit0, bFilteredModeBit1, bFilteredModeBit2)
         );
 
-        (* Check for fault reset handshake to return to normal idle *)
-        IF fbHandshake.FaultResetValid THEN
+        (* Check for fault reset to return to normal idle *)
+        IF fbFaultReset.FaultResetValid THEN
             (* Fault reset complete - return to normal idle *)
-            G_doFaultActive := FALSE;
             G_sysActiveFault := FAULT_NONE;
             G_sysCurrentState := ST_IDLE;
         END_IF;
@@ -1077,9 +1066,7 @@ fbOutputMux(
     Enable := TRUE,
     FaultActive := (G_sysCurrentState = ST_FAULT) OR (G_sysCurrentState = ST_FAULT_RECOVERY) OR (G_sysCurrentState = ST_FAULT_IDLE),
     FaultCode := G_sysActiveFault,
-    ModeConfirmBit0 := fbHandshake.ConfirmBit0,
-    ModeConfirmBit1 := fbHandshake.ConfirmBit1,
-    ModeConfirmBit2 := fbHandshake.ConfirmBit2
+    ConfirmedMode := fbHandshake.ConfirmedMode
 );
 
 G_doModeConfBit0 := fbOutputMux.DO0_Output;

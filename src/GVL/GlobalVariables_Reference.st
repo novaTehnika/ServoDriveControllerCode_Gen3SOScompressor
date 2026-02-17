@@ -416,16 +416,6 @@
 
 
      (* ========================================================================
-        HANDSHAKE STATUS
-        ======================================================================== *)
-
-     G_sysHandshakeValid       : BOOL := FALSE    (* Current handshake is valid *)
-     G_sysHandshakeComplete    : BOOL := FALSE    (* Handshake sequence complete *)
-     G_sysHandshakeTimeout     : BOOL := FALSE    (* Handshake timed out *)
-     G_sysFaultResetPending    : BOOL := FALSE    (* Fault reset handshake in progress *)
-
-
-     (* ========================================================================
         DIAGNOSTICS
         ======================================================================== *)
 

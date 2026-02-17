@@ -237,9 +237,9 @@
             +---------------------------+
             |                           |
     (Fast recovery:                (Slow recovery:
-     G_diFaultReset rising edge       G_cfgFaultIdleTimeout
+     G_diFaultReset HIGH              G_cfgFaultIdleTimeout
      + valid mirrored code          expires)
-     + G_diMotionEnable HIGH)              |
+     + G_diMotionEnable LOW)              |
             |                           v
             v                   +---------------+
     +---------------+           | ST_FAULT_IDLE |
@@ -249,7 +249,7 @@
     +---------------+           | - G_doFaultActive = HIGH
                                 +-------+-------+
                                         |
-                                (G_diFaultReset rising edge
+                                (G_diFaultReset HIGH
                                  + valid mirrored code
                                  + G_diMotionEnable LOW)
                                         |

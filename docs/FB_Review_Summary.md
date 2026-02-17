@@ -58,18 +58,36 @@ This document summarizes the agent reviews of all function blocks in src/FB/.
 ---
 
 ## FB_HandshakeManager.st
-**Status**: Fixed
+**Status**: Refactored
 
-### Findings:
+### Changes:
+- **Fault reset logic extracted** to `FB_FaultResetHandler` (separate single-responsibility FB)
+- **Mode-to-bits conversion removed** — `ConfirmBit0/1/2` outputs and `fbModeToBits` removed; `FB_OutputMux` now handles conversion internally
+- Stripped down to mode handshake only: `ConfirmedMode`, `HandshakeActive`, `HandshakeComplete`, `HandshakeTimeout_Q`
+
+### Previous Findings (resolved):
 1. **CRITICAL** *(FIXED)*: Timer not called in HS_WAIT_MOTION_EN state
-   - Timer started on transition INTO state but never called while IN state
-   - `tTimeout.Q` will never go TRUE because timer isn't being evaluated
-   - **Fix applied**: Timer is now called each scan in HS_WAIT_MOTION_EN state
-
 2. **LOW**: `eModeAtStart` persists across handshake cycles (cosmetic, no functional impact)
 
 ### Recommendations:
 - None remaining
+
+---
+
+## FB_FaultResetHandler.st
+**Status**: New (extracted from FB_HandshakeManager)
+
+### Description:
+Pure combinational check for fault reset validation. No state machine, no timers.
+Validates: FaultReset HIGH, MotionEnable LOW, InFaultState, BitsStable, and MasterFaultCode matches ActiveFaultCode.
+
+### Findings:
+- Clean single-responsibility implementation
+- Uses `FN_BitsToFaultCode` for type-correct fault code decoding (DI0-2 decoded as `E_FaultCode`, not `E_OperatingMode`)
+- `BitsStable` input guards against transient bit patterns during DI0-2 transitions
+
+### Recommendations:
+- None required
 
 ---
 
@@ -89,13 +107,16 @@ This document summarizes the agent reviews of all function blocks in src/FB/.
 ---
 
 ## FB_OutputMux.st
-**Status**: Production ready
+**Status**: Refactored
+
+### Changes:
+- **Input changed**: `ModeConfirmBit0/1/2 : BOOL` replaced with `ConfirmedMode : E_OperatingMode`
+- **Added internal conversion**: `fbModeToBits : FB_ModeToBits` — both mode and fault now use consistent enum-to-bits conversion internally
+- Both branches follow the same pattern: enum input → FB converter → bit outputs
 
 ### Findings:
-- No bugs found
 - Clean implementation with proper enable handling
-- Correct use of centralized FaultToBits conversion
-- Output multiplexing logic is correct
+- Consistent conversion pattern for both modes and faults via `FB_ModeToBits` and `FB_FaultToBits`
 
 ### Recommendations:
 - None required

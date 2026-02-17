@@ -9,7 +9,7 @@
    - Normal mode: DO0-DO2 = Mode confirmation bits
    - Fault mode:  DO0-DO2 = Fault code bits
 
-   Uses centralized conversion functions from FN_FaultToBits.
+   Uses centralized conversion via FB_FaultToBits and FB_ModeToBits.
 
    Fault Codes (3-bit):
    000 = No fault / cleared
@@ -26,9 +26,7 @@
        Enable              : BOOL             (* Enable the function block
        FaultActive         : BOOL             (* Fault state is active
        FaultCode           : E_FaultCode      (* Current fault code
-       ModeConfirmBit0     : BOOL             (* Mode confirmation bit 0
-       ModeConfirmBit1     : BOOL             (* Mode confirmation bit 1
-       ModeConfirmBit2     : BOOL             (* Mode confirmation bit 2
+       ConfirmedMode       : E_OperatingMode  (* Confirmed operating mode
      VAR_OUTPUT:
        DO0_Output          : BOOL             (* Output for DO0
        DO1_Output          : BOOL             (* Output for DO1
@@ -36,6 +34,7 @@
        FaultActiveOutput   : BOOL             (* Output for doFaultActive (DO5)
      VAR:
        fbFaultToBits       : FB_FaultToBits   (* Fault code to bits converter
+       fbModeToBits        : FB_ModeToBits    (* Mode to bits converter
    ============================================================================ *)
 
 (* ============================================================================
@@ -56,14 +55,14 @@ FaultActiveOutput := FaultActive;
 
 IF FaultActive THEN
     (* Fault mode: Output fault code on DO0-DO2 *)
-    (* Use centralized conversion function *)
     fbFaultToBits(Fault := FaultCode);
     DO0_Output := fbFaultToBits.Bit0;
     DO1_Output := fbFaultToBits.Bit1;
     DO2_Output := fbFaultToBits.Bit2;
 ELSE
     (* Normal mode: Output mode confirmation bits *)
-    DO0_Output := ModeConfirmBit0;
-    DO1_Output := ModeConfirmBit1;
-    DO2_Output := ModeConfirmBit2;
+    fbModeToBits(Mode := ConfirmedMode);
+    DO0_Output := fbModeToBits.Bit0;
+    DO1_Output := fbModeToBits.Bit1;
+    DO2_Output := fbModeToBits.Bit2;
 END_IF;

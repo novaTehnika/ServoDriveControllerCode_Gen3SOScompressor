@@ -5,9 +5,7 @@
    Controller: Yaskawa MP2600iec
 
    Description:
-   Manages the handshake protocol between master and slave for:
-   1. Mode entry handshake: 3-bit mode command/confirmation with timeout
-   2. Fault reset handshake: FaultReset HIGH + MotionEnable LOW + fault mirroring
+   Manages the mode entry handshake protocol between master and slave.
 
    Mode Entry Handshake Sequence:
    1. Master sets mode bits (DI0-2)
@@ -17,15 +15,6 @@
    5. Slave verifies mode bits still match -> handshake complete
    6. If timeout or mismatch -> handshake failed
 
-   Fault Reset Handshake (with fault code mirroring):
-   1. Slave is in fault state with doFaultActive = HIGH
-   2. Slave outputs fault code on DO0-DO2
-   3. Master reads fault code and sets DI0-DI2 to mirror it
-   4. Master sets diFaultReset HIGH while diMotionEnable = LOW
-   5. Slave verifies DI0-DI2 matches fault code (level-based, not edge)
-   6. FaultResetValid goes TRUE, caller clears fault
-   7. Master sees fault cleared, releases diFaultReset
-
    NOTE: All inputs should be pre-filtered/debounced by the caller.
 
    Variables (define in MWiec GUI):
@@ -34,27 +23,17 @@
        RequestedMode       : E_OperatingMode  (* Mode requested by master
        ModeStable          : BOOL             (* Mode inputs are stable
        MotionEnable        : BOOL             (* Motion enable from master - should be filtered
-       FaultReset          : BOOL             (* Fault reset signal from master - should be filtered
-       InFaultState        : BOOL             (* Currently in fault state
-       ActiveFaultCode     : E_FaultCode      (* Active fault code for mirroring check
        HandshakeTimeout    : TIME := T#500MS  (* Timeout for handshake
      VAR_OUTPUT:
        ConfirmedMode       : E_OperatingMode  (* Current confirmed mode (valid when HandshakeComplete)
        HandshakeActive     : BOOL             (* TRUE from handshake start until complete/timeout
        HandshakeComplete   : BOOL             (* TRUE when handshake succeeded
        HandshakeTimeout_Q  : BOOL             (* TRUE when timeout occurred
-       ConfirmBit0         : BOOL             (* DO0 value
-       ConfirmBit1         : BOOL             (* DO1 value
-       ConfirmBit2         : BOOL             (* DO2 value
-       FaultResetEdge      : BOOL             (* Fault reset rising edge detected (single scan pulse)
-       FaultResetValid     : BOOL             (* Fault reset conditions met (level-based)
      VAR:
        eState              : INT := 0         (* Handshake state - initialized to HS_IDLE
        tTimeout            : TON              (* Handshake timeout timer
-       rTrigFaultReset     : R_TRIG           (* Rising edge on fault reset
        eModeAtStart        : E_OperatingMode  (* Mode when handshake started
        bModeStableAtStart  : BOOL             (* Capture mode stability at handshake start
-       fbModeToBits        : FB_ModeToBits    (* Mode to bits converter
      VAR CONSTANT:
        HS_IDLE             : INT := 0         (* Idle, no handshake active
        HS_WAIT_MOTION_EN   : INT := 1         (* Waiting for motion enable
@@ -73,35 +52,10 @@ IF NOT Enable THEN
     HandshakeActive := FALSE;
     HandshakeComplete := FALSE;
     HandshakeTimeout_Q := FALSE;
-    ConfirmBit0 := FALSE;
-    ConfirmBit1 := FALSE;
-    ConfirmBit2 := FALSE;
-    FaultResetEdge := FALSE;
-    FaultResetValid := FALSE;
     eState := HS_IDLE;
     tTimeout(IN := FALSE);
     RETURN;
 END_IF;
-
-(* --------------------------------------------------------------------------
-   Fault Reset Handshake Detection (with fault code mirroring)
-   Uses LEVEL-based detection to avoid race conditions.
-   The caller should detect the rising edge of FaultResetValid if needed.
-   -------------------------------------------------------------------------- *)
-rTrigFaultReset(CLK := FaultReset);
-FaultResetEdge := rTrigFaultReset.Q;
-
-(* Fault reset is valid when ALL conditions are met (level-based):
-   - FaultReset is HIGH (level, not edge)
-   - MotionEnable is LOW
-   - We are in fault state
-   - Active fault code is not FAULT_NONE
-   - Master has mirrored the fault code on DI0-2 (RequestedMode matches ActiveFaultCode) *)
-FaultResetValid := FaultReset AND
-                   (NOT MotionEnable) AND
-                   InFaultState AND
-                   (ActiveFaultCode <> FAULT_NONE) AND
-                   FN_FaultMatchesModeBits(ActiveFaultCode, RequestedMode);
 
 (* --------------------------------------------------------------------------
    Mode Handshake State Machine
@@ -120,10 +74,6 @@ IF eState = HS_IDLE THEN
         IF ModeStable AND (RequestedMode <> MODE_IDLE) AND NOT MotionEnable THEN
             (* Set confirmation to match requested mode *)
             ConfirmedMode := RequestedMode;
-            fbModeToBits(Mode := RequestedMode);
-            ConfirmBit0 := fbModeToBits.Bit0;
-            ConfirmBit1 := fbModeToBits.Bit1;
-            ConfirmBit2 := fbModeToBits.Bit2;
             eModeAtStart := RequestedMode;
             bModeStableAtStart := TRUE;
             HandshakeActive := TRUE;
@@ -132,10 +82,6 @@ IF eState = HS_IDLE THEN
         ELSIF ModeStable AND (RequestedMode = MODE_IDLE) THEN
             (* Idle mode - just confirm it *)
             ConfirmedMode := MODE_IDLE;
-            fbModeToBits(Mode := MODE_IDLE);
-            ConfirmBit0 := fbModeToBits.Bit0;
-            ConfirmBit1 := fbModeToBits.Bit1;
-            ConfirmBit2 := fbModeToBits.Bit2;
         END_IF;
 
 ELSIF eState = HS_WAIT_MOTION_EN THEN
@@ -189,10 +135,6 @@ ELSIF eState = HS_TIMEOUT THEN
         HandshakeTimeout_Q := TRUE;
         HandshakeActive := FALSE;
         ConfirmedMode := MODE_IDLE;  (* Reset confirmed mode on failure *)
-        fbModeToBits(Mode := MODE_IDLE);
-        ConfirmBit0 := fbModeToBits.Bit0;
-        ConfirmBit1 := fbModeToBits.Bit1;
-        ConfirmBit2 := fbModeToBits.Bit2;
         tTimeout(IN := FALSE);
 
         (* Exit timeout when motion enable drops - simpler and more reliable *)

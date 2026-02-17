@@ -114,7 +114,8 @@ The main program orchestrates a number of critical function blocks.
 |---|---|---|
 | `fbFilter*` | `FB_Digital/AnalogInputFilter` | **Input Conditioning:** Provide clean, stable signals to the core logic. |
 | `fbModeDecoder`| `FB_ModeDecoder` | **Command Interpretation:** Converts the master's 3-bit command into a meaningful `E_OperatingMode` enum. |
-| `fbHandshake`| `FB_HandshakeManager`| **Synchronization:** Manages the entire mode change and fault reset protocol with the master. Essential for system stability. |
+| `fbHandshake`| `FB_HandshakeManager`| **Mode Synchronization:** Manages the mode entry handshake protocol with the master (confirmation, timeout, verification). |
+| `fbFaultReset`| `FB_FaultResetHandler`| **Fault Reset Validation:** Validates fault reset conditions — FaultReset HIGH, MotionEnable LOW, bits stable, and master fault code acknowledgement matches active fault. |
 | `fbAnalogProc`| `FB_AnalogProcessor`| **Command Scaling:** Translates the filtered analog input voltage into a physical setpoint (position, velocity, or torque). |
 | `fbReadActual*`| `MC_ReadActual*` | **Feedback:** The primary source of feedback from the drive, providing real-time position, velocity, and torque. |
 | `fbPower` | `MC_Power` | **Drive Control:** Enables and disables power to the servo drive. |
