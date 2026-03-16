@@ -359,7 +359,7 @@ ELSIF G_sysCurrentState = ST_DRIVE_ENABLE THEN
 
         (* Enable drive power and wait for ready *)
         fbPower(Axis := G_sysAxis, Enable := TRUE,
-                EnablePositive := TRUE, EnableNegative := TRUE);
+                Enable_Positive := TRUE, Enable_Negative := TRUE);
 
         (* Wait for drive ready with timeout *)
         tDriveReadyTimer(IN := TRUE, PT := G_cfgDriveReadyTimeout);
@@ -517,7 +517,7 @@ ELSIF G_sysCurrentState = ST_VELOCITY_CTRL THEN
         (* Execute velocity control *)
         fbDirectControl(Axis := G_sysAxis,
                         Enable := TRUE,
-                        Mode := 2,  (* Velocity mode *)
+                        ControlMode := 2,  (* Velocity mode *)
                         Velocity := G_sysCommandedVelocity,
                         Torque := stCurrentLimits.TorqueMax);
 
@@ -546,7 +546,7 @@ ELSIF G_sysCurrentState = ST_TORQUE_CTRL THEN
         (* Execute torque control *)
         fbDirectControl(Axis := G_sysAxis,
                         Enable := TRUE,
-                        Mode := 3,  (* Torque mode *)
+                        ControlMode := 3,  (* Torque mode *)
                         Velocity := stCurrentLimits.VelMax,  (* As limit *)
                         Torque := G_sysCommandedTorque);
 

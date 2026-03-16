@@ -132,7 +132,7 @@ ELSIF eState = ENC_CHECK_STATUS THEN
         (* Read status outputs *)
         IF fbAbsPosManager.Valid THEN
             (* Evaluate encoder health *)
-            EncoderValid := fbAbsPosManager.AbsolutePositionValid;
+            EncoderValid := fbAbsPosManager.PositionValid;
             BatteryOK := NOT fbAbsPosManager.BatteryAlarm;
             MultiTurnValid := NOT fbAbsPosManager.MultiTurnOverflow;
 

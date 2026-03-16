@@ -187,12 +187,12 @@ ELSIF eState = HE_FAST_APPROACH THEN
         fbDirectControl(
             Axis := Axis,
             Enable := TRUE,
-            Mode := 2,  (* Velocity mode *)
+            ControlMode := 2,  (* Velocity mode *)
             Velocity := FastVelocity,
             Torque := TorqueLimit
         );
 
-        InMotion := fbDirectControl.InOperation;
+        InMotion := fbDirectControl.Active;
 
         (* Switch to slow approach when near expected EOT *)
         IF ActualPosition >= (ExpectedEOTPosition - ApproachDistance) THEN
@@ -213,7 +213,7 @@ ELSIF eState = HE_SLOW_APPROACH THEN
         fbDirectControl(
             Axis := Axis,
             Enable := TRUE,
-            Mode := 2,  (* Velocity mode *)
+            ControlMode := 2,  (* Velocity mode *)
             Velocity := SlowVelocity,
             Torque := TorqueLimit
         );
@@ -242,7 +242,7 @@ ELSIF eState = HE_STALL_DETECT THEN
         fbDirectControl(
             Axis := Axis,
             Enable := TRUE,
-            Mode := 2,
+            ControlMode := 2,
             Velocity := SlowVelocity,
             Torque := TorqueLimit
         );

@@ -45,8 +45,8 @@
        rTemp               : LREAL
        rMedianResult       : LREAL
        nSize               : INT
-      nIdx1, nIdx2        : INT              (* Index variables for array access
-      nMedianIdx          : INT              (* Median middle index
+       nIdx1, nIdx2        : INT              (* Index variables for array access
+       nMedianIdx          : INT              (* Median middle index
    ============================================================================ *)
 
 (* ============================================================================
