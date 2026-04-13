@@ -20,6 +20,7 @@
 *)
 
 nValue := FN_FaultToInt(Fault);
-Bit0 := (INT_TO_BYTE(nValue) AND INT_TO_BYTE(1)) <> 0;
-Bit1 := (INT_TO_BYTE(nValue) AND INT_TO_BYTE(2)) <> 0;
-Bit2 := (INT_TO_BYTE(nValue) AND INT_TO_BYTE(4)) <> 0;
+byteValue := INT_TO_BYTE(nValue);
+Bit0 := (byteValue AND INT_TO_BYTE(1)) <> BYTE#0;
+Bit1 := (byteValue AND INT_TO_BYTE(2)) <> BYTE#0;
+Bit2 := (byteValue AND INT_TO_BYTE(4)) <> BYTE#0;
