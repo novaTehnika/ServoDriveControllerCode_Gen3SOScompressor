@@ -38,7 +38,6 @@
        CheckComplete       : BOOL             (* Startup check finished
        Busy                : BOOL             (* Check in progress
        Error               : BOOL             (* Error occurred during check
-       ErrorID             : DWORD            (* Error code if Error=TRUE
      VAR:
        fbAbsPosManager     : AbsolutePositionManager
        eState              : INT := 0         (* State machine
@@ -67,7 +66,6 @@ IF NOT Enable THEN
     CheckComplete := FALSE;
     Busy := FALSE;
     Error := FALSE;
-    ErrorID := 0;
     eState := ENC_IDLE;
     tCheckTimeout(IN := FALSE);
     fbAbsPosManager(Enable := FALSE);
@@ -91,7 +89,6 @@ IF eState = ENC_IDLE THEN
             bCheckTriggered := TRUE;
             Busy := TRUE;
             Error := FALSE;
-            ErrorID := 0;
             tCheckTimeout(IN := FALSE);
             eState := ENC_CHECK_INIT;
         END_IF;
@@ -113,11 +110,9 @@ ELSIF eState = ENC_CHECK_INIT THEN
             eState := ENC_CHECK_STATUS;
         ELSIF fbAbsPosManager.Error THEN
             Error := TRUE;
-            ErrorID := fbAbsPosManager.ErrorID;
             eState := ENC_ERROR;
         ELSIF tCheckTimeout.Q THEN
             Error := TRUE;
-            ErrorID := 16#8001;  (* Timeout error code *)
             eState := ENC_ERROR;
         END_IF;
 
@@ -144,12 +139,10 @@ ELSIF eState = ENC_CHECK_STATUS THEN
 
         ELSIF fbAbsPosManager.Error THEN
             Error := TRUE;
-            ErrorID := fbAbsPosManager.ErrorID;
             eState := ENC_ERROR;
 
         ELSIF tCheckTimeout.Q THEN
             Error := TRUE;
-            ErrorID := 16#8001;  (* Timeout error code *)
             eState := ENC_ERROR;
         END_IF;
 
@@ -192,7 +185,6 @@ ELSIF eState = ENC_ERROR THEN
         IF NOT CheckOnStartup THEN
             bCheckTriggered := FALSE;
             Error := FALSE;
-            ErrorID := 0;
             eState := ENC_IDLE;
         END_IF;
 

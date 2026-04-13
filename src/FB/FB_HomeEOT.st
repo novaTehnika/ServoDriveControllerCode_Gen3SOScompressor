@@ -55,7 +55,6 @@
        Done                : BOOL             (* Homing complete
        InMotion            : BOOL             (* Currently moving
        Error               : BOOL             (* Error occurred
-       ErrorID             : DWORD            (* Error code if Error=TRUE
        RequiresLimitHome   : BOOL             (* Must do limit switch homing first
        EOTPosition         : LREAL            (* Recorded encoder position at EOT stall
        EOTOffset           : LREAL            (* Calculated coordinate offset
@@ -79,9 +78,6 @@
        HE_DONE             : INT := 7
        HE_ABORTING         : INT := 8
        HE_ERROR            : INT := 9
-       ERR_TIMEOUT         : DWORD := 16#8011
-       ERR_DRIVE           : DWORD := 16#8012
-       ERR_LIMIT_REQ       : DWORD := 16#8013
    ============================================================================ *)
 
 (* ============================================================================
@@ -94,7 +90,6 @@ IF NOT Enable THEN
     Done := FALSE;
     InMotion := FALSE;
     Error := FALSE;
-    ErrorID := 0;
     RequiresLimitHome := FALSE;
     EOTPosition := 0.0;
     EOTOffset := 0.0;
@@ -126,7 +121,6 @@ IF tTimeout.Q THEN
     fbDirectControl(Enable := FALSE);
     fbStop(Execute := FALSE);
     Error := TRUE;
-    ErrorID := ERR_TIMEOUT;
     eState := HE_ERROR;
 END_IF;
 
@@ -141,7 +135,6 @@ IF eState = HE_IDLE THEN
         Done := FALSE;
         InMotion := FALSE;
         Error := FALSE;
-        ErrorID := 0;
         RequiresLimitHome := FALSE;
         EOTPosition := 0.0;
         EOTOffset := 0.0;
@@ -202,7 +195,6 @@ ELSIF eState = HE_FAST_APPROACH THEN
         ELSIF fbDirectControl.Error THEN
             fbDirectControl(Enable := FALSE);
             Error := TRUE;
-            ErrorID := ERR_DRIVE;
             eState := HE_ERROR;
         END_IF;
 
@@ -230,7 +222,6 @@ ELSIF eState = HE_SLOW_APPROACH THEN
         ELSIF fbDirectControl.Error THEN
             fbDirectControl(Enable := FALSE);
             Error := TRUE;
-            ErrorID := ERR_DRIVE;
             eState := HE_ERROR;
         END_IF;
 
@@ -344,7 +335,6 @@ ELSIF eState = HE_ERROR THEN
         (* Allow reset when Execute goes low *)
         IF NOT Execute THEN
             Error := FALSE;
-            ErrorID := 0;
             eState := HE_IDLE;
         END_IF;
 

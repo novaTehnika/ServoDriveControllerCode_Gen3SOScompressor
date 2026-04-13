@@ -37,7 +37,6 @@
        SoftLimitMax        : LREAL            (* Maximum allowed position (mm)
        DriveReady          : BOOL             (* Drive is ready for motion
        DriveFault          : BOOL             (* Drive has reported a fault
-       DriveErrorID        : DWORD            (* Drive error code if fault
        EncoderValid        : BOOL             (* Absolute encoder position valid
        EncoderBatteryOK    : BOOL             (* Encoder battery status OK
        CurrentState        : E_SystemState    (* Current state machine state

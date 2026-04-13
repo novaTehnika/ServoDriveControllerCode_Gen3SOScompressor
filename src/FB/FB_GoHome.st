@@ -41,7 +41,6 @@
        RedirectToHoming    : BOOL             (* Caller should switch to homing mode
        InMotion            : BOOL             (* Currently moving
        Error               : BOOL             (* Error occurred
-       ErrorID             : DWORD            (* Error code if Error=TRUE
      VAR:
        fbMoveAbsolute      : MC_MoveAbsolute
        fbStop              : MC_Stop
@@ -71,7 +70,6 @@ IF NOT Enable THEN
     RedirectToHoming := FALSE;
     InMotion := FALSE;
     Error := FALSE;
-    ErrorID := 0;
     eState := GOH_IDLE;
     fbMoveAbsolute(Execute := FALSE);
     fbStop(Execute := FALSE);
@@ -101,7 +99,6 @@ IF eState = GOH_IDLE THEN
         RedirectToHoming := FALSE;
         InMotion := FALSE;
         Error := FALSE;
-        ErrorID := 0;
 
         (* Reset function blocks *)
         fbMoveAbsolute(Execute := FALSE);
@@ -170,7 +167,6 @@ ELSIF eState = GOH_MOVING THEN
         ELSIF fbMoveAbsolute.Error THEN
             (* Move failed *)
             Error := TRUE;
-            ErrorID := fbMoveAbsolute.ErrorID;
             fbMoveAbsolute(Execute := FALSE);
             eState := GOH_ERROR;
 
@@ -230,7 +226,6 @@ ELSIF eState = GOH_ERROR THEN
         (* Allow reset when Execute goes low *)
         IF NOT Execute THEN
             Error := FALSE;
-            ErrorID := 0;
             eState := GOH_IDLE;
         END_IF;
 

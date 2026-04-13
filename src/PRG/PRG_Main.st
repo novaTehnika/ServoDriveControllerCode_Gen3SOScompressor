@@ -1036,7 +1036,6 @@ fbSafetyMonitor(
     SoftLimitMax := G_cfgPosSoftLimitMax,
     DriveReady := G_sysDriveReady,
     DriveFault := G_sysDriveFault,
-    DriveErrorID := 0,
     EncoderValid := G_sysEncoderValid,
     EncoderBatteryOK := G_sysEncoderBatteryOK,
     CurrentState := G_sysCurrentState,

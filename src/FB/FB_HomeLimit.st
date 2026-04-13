@@ -42,7 +42,6 @@
        Done                : BOOL             (* Homing complete
        InMotion            : BOOL             (* Currently moving
        Error               : BOOL             (* Error occurred
-       ErrorID             : DWORD            (* Error code if Error=TRUE
        ApproachingPositive : BOOL             (* Currently approaching from positive direction
      VAR:
        fbMoveVelocity      : MC_MoveVelocity
@@ -61,10 +60,6 @@
        HL_DONE             : INT := 5
        HL_ABORTING         : INT := 6
        HL_ERROR            : INT := 7
-       ERR_TIMEOUT         : DWORD := 16#8001
-       ERR_DRIVE           : DWORD := 16#8002
-       ERR_LIMIT_INVALID   : DWORD := 16#8003
-       ERR_SETPOS          : DWORD := 16#8004
    ============================================================================ *)
 
 (* ============================================================================
@@ -77,7 +72,6 @@ IF NOT Enable THEN
     Done := FALSE;
     InMotion := FALSE;
     Error := FALSE;
-    ErrorID := 0;
     ApproachingPositive := FALSE;
     eState := HL_IDLE;
     bApproachFromPositive := FALSE;
@@ -108,7 +102,6 @@ IF tTimeout.Q THEN
     fbStop(Execute := FALSE);
     fbSetPosition(Execute := FALSE);
     Error := TRUE;
-    ErrorID := ERR_TIMEOUT;
     eState := HL_ERROR;
 END_IF;
 
@@ -123,7 +116,6 @@ IF eState = HL_IDLE THEN
         Done := FALSE;
         InMotion := FALSE;
         Error := FALSE;
-        ErrorID := 0;
         ApproachingPositive := FALSE;
         bApproachFromPositive := FALSE;
 
@@ -183,14 +175,12 @@ ELSIF eState = HL_APPROACH THEN
                 (* Already approaching from positive and hit retract - fault *)
                 fbMoveVelocity(Execute := FALSE);
                 Error := TRUE;
-                ErrorID := ERR_LIMIT_INVALID;
                 eState := HL_ERROR;
             END_IF;
 
         ELSIF fbMoveVelocity.Error THEN
             fbMoveVelocity(Execute := FALSE);
             Error := TRUE;
-            ErrorID := ERR_DRIVE;
             eState := HL_ERROR;
         END_IF;
 
@@ -212,7 +202,6 @@ ELSIF eState = HL_DETECT THEN
         ELSIF fbStop.Error THEN
             fbStop(Execute := FALSE);
             Error := TRUE;
-            ErrorID := ERR_DRIVE;
             eState := HL_ERROR;
         END_IF;
 
@@ -237,7 +226,6 @@ ELSIF eState = HL_BACKOFF THEN
         ELSIF fbMoveVelocity.Error THEN
             fbMoveVelocity(Execute := FALSE);
             Error := TRUE;
-            ErrorID := ERR_DRIVE;
             eState := HL_ERROR;
         END_IF;
 
@@ -270,7 +258,6 @@ ELSIF eState = HL_SETREF THEN
             ELSIF fbSetPosition.Error THEN
                 fbSetPosition(Execute := FALSE);
                 Error := TRUE;
-                ErrorID := ERR_SETPOS;
                 eState := HL_ERROR;
             END_IF;
         END_IF;
@@ -322,7 +309,6 @@ ELSIF eState = HL_ERROR THEN
         (* Allow reset when Execute goes low *)
         IF NOT Execute THEN
             Error := FALSE;
-            ErrorID := 0;
             eState := HL_IDLE;
         END_IF;
 
