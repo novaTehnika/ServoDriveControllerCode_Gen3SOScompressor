@@ -75,11 +75,15 @@
        bFilteredFaultReset : BOOL
        nFilteredAnalog     : INT
        rAnalogFilterAlpha  : LREAL := 0.0
+       (* Global Variable Aliases
+       localAxis           : AXIS_REF;
    ============================================================================ *)
 
 (* ============================================================================
    MAIN PROGRAM BODY
    ============================================================================ *)
+
+localAxis := G_sysAxis;
 
 (* --------------------------------------------------------------------------
    First Scan Initialization
@@ -171,9 +175,9 @@ rTrigMotionEnable(CLK := bFilteredMotionEnable);
 fTrigMotionEnable(CLK := bFilteredMotionEnable);
 
 (* Read actual position, velocity, torque from drive *)
-fbReadActualPos(Axis := G_sysAxis, Enable := TRUE);
-fbReadActualVel(Axis := G_sysAxis, Enable := TRUE);
-fbReadActualTorque(Axis := G_sysAxis, Enable := TRUE);
+fbReadActualPos(Axis := localAxis, Enable := TRUE);
+fbReadActualVel(Axis := localAxis, Enable := TRUE);
+fbReadActualTorque(Axis := localAxis, Enable := TRUE);
 
 IF fbReadActualPos.Valid THEN
     G_sysActualPosition := fbReadActualPos.Position;
@@ -237,7 +241,7 @@ IF G_sysCurrentState = E_SystemState#ST_INIT THEN
         IF bEnterState THEN
             (* Ensure safe output state *)
             G_doBrakeDisengage := FALSE;
-            fbPower(Axis := G_sysAxis, Enable := FALSE);
+            fbPower(Axis := localAxis, Enable := FALSE);
         END_IF;
 
         (* Proceed to encoder check *)
@@ -253,7 +257,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_ENCODER_CHECK THEN
         (* Run encoder check *)
         fbEncoderManager(
             Enable := TRUE,
-            Axis := G_sysAxis,
+            Axis := localAxis,
             CheckOnStartup := TRUE
         );
 
@@ -298,7 +302,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_IDLE THEN
             G_doBrakeDisengage := FALSE;  (* Brake engaged *)
             G_sysDriveEnabled := FALSE;
             G_sysDriveReady := FALSE;
-            fbPower(Axis := G_sysAxis, Enable := FALSE);
+            fbPower(Axis := localAxis, Enable := FALSE);
             (* NOTE: G_sysConfirmedMode is used by fbHandshake to set DO0-2 output bits.
                It represents the mode the slave is confirming to the master. *)
             G_sysConfirmedMode := E_OperatingMode#MODE_IDLE;
@@ -358,7 +362,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_DRIVE_ENABLE THEN
         END_IF;
 
         (* Enable drive power and wait for ready *)
-        fbPower(Axis := G_sysAxis, Enable := TRUE,
+        fbPower(Axis := localAxis, Enable := TRUE,
                 Enable_Positive := TRUE, Enable_Negative := TRUE);
 
         (* Wait for drive ready with timeout *)
@@ -484,7 +488,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_POSITION_CTRL THEN
                                       stCurrentLimits.PosMax);
 
         (* Execute position control via Y_DirectControl *)
-        fbDirectControl(Axis := G_sysAxis,
+        fbDirectControl(Axis := localAxis,
                         Enable := TRUE,
                         ControlMode := 1,  (* Position mode *)
                         Position := G_sysCommandedPosition,
@@ -515,7 +519,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_VELOCITY_CTRL THEN
                                       stCurrentLimits.VelMax);
 
         (* Execute velocity control *)
-        fbDirectControl(Axis := G_sysAxis,
+        fbDirectControl(Axis := localAxis,
                         Enable := TRUE,
                         ControlMode := 2,  (* Velocity mode *)
                         Velocity := G_sysCommandedVelocity,
@@ -544,7 +548,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_TORQUE_CTRL THEN
                                     stCurrentLimits.TorqueMax);
 
         (* Execute torque control *)
-        fbDirectControl(Axis := G_sysAxis,
+        fbDirectControl(Axis := localAxis,
                         Enable := TRUE,
                         ControlMode := 3,  (* Torque mode *)
                         Velocity := stCurrentLimits.VelMax,  (* As limit *)
@@ -568,7 +572,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_GO_HOME THEN
         fbGoHome(
             Enable := TRUE,
             Execute := TRUE,
-            Axis := G_sysAxis,
+            Axis := localAxis,
             AbsHomeRequired := G_flagAbsHomeRequired,
             EOTHomeRequired := G_flagEOTHomeRequired,
             HomePosition := G_cfgGoHomePosition - G_posEOTOffset,
@@ -615,7 +619,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_HOME_LIMIT THEN
         fbHomeLimit(
             Enable := TRUE,
             Execute := TRUE,
-            Axis := G_sysAxis,
+            Axis := localAxis,
             ApproachVelocity := G_cfgHomeLimApproachVel,
             BackoffVelocity := G_cfgVelHomingSlow,
             SetPosition := G_cfgHomeLimSetPosition,
@@ -670,7 +674,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_HOME_EOT THEN
         fbHomeEOT(
             Enable := TRUE,
             Execute := TRUE,
-            Axis := G_sysAxis,
+            Axis := localAxis,
             AbsHomeRequired := G_flagAbsHomeRequired,
             FastVelocity := G_cfgHomeEOTFastVel,
             SlowVelocity := G_cfgHomeEOTSlowVel,
@@ -752,15 +756,15 @@ ELSIF G_sysCurrentState = E_SystemState#ST_HOLD_POSITION THEN
                If reversed, Y_DirectControl would release servo reference while still
                moving, potentially causing a drive fault. MC_Stop must take over
                position control BEFORE Y_DirectControl releases it. *)
-            fbStop(Axis := G_sysAxis, Execute := TRUE);
-            fbDirectControl(Axis := G_sysAxis, Enable := FALSE);
+            fbStop(Axis := localAxis, Execute := TRUE);
+            fbDirectControl(Axis := localAxis, Enable := FALSE);
             G_sysHalted := FALSE;
             tHandshakeTimer(IN := FALSE);
         END_IF;
 
         (* Wait for halt to complete *)
         IF NOT G_sysHalted THEN
-            fbStop(Axis := G_sysAxis, Execute := TRUE);
+            fbStop(Axis := localAxis, Execute := TRUE);
             IF fbStop.Done THEN
                 G_sysHalted := TRUE;
                 fbStop(Execute := FALSE);
@@ -827,7 +831,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_BRAKE_ENGAGE THEN
         IF bEnterState THEN
             G_doBrakeDisengage := FALSE;  (* Engage brake *)
             tBrakeTimer(IN := FALSE);
-            fbDirectControl(Axis := G_sysAxis, Enable := FALSE);
+            fbDirectControl(Axis := localAxis, Enable := FALSE);
         END_IF;
 
         (* Wait for brake engage delay *)
@@ -841,10 +845,10 @@ ELSIF G_sysCurrentState = E_SystemState#ST_BRAKE_ENGAGE THEN
 
 ELSIF G_sysCurrentState = E_SystemState#ST_DRIVE_DISABLE THEN
         IF bEnterState THEN
-            fbPower(Axis := G_sysAxis, Enable := FALSE);
+            fbPower(Axis := localAxis, Enable := FALSE);
         END_IF;
 
-        fbPower(Axis := G_sysAxis, Enable := FALSE);
+        fbPower(Axis := localAxis, Enable := FALSE);
 
         IF NOT fbPower.Status THEN
             G_sysDriveEnabled := FALSE;
@@ -871,8 +875,8 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT THEN
             (* G_doBrakeDisengage := FALSE;  -- REMOVED per design *)
 
             (* Stop motion (controlled deceleration via MC_Stop) *)
-            fbStop(Axis := G_sysAxis, Execute := TRUE);
-            fbDirectControl(Axis := G_sysAxis, Enable := FALSE);
+            fbStop(Axis := localAxis, Execute := TRUE);
+            fbDirectControl(Axis := localAxis, Enable := FALSE);
 
             (* Signal fault *)
             G_doInMotion := FALSE;
@@ -887,7 +891,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT THEN
         END_IF;
 
         (* Continue halt until done *)
-        fbStop(Axis := G_sysAxis, Execute := NOT fbStop.Done);
+        fbStop(Axis := localAxis, Execute := NOT fbStop.Done);
 
         (* Disable mode handshake in fault state *)
         fbHandshake(Enable := FALSE);
@@ -913,13 +917,13 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT THEN
             (* Clear fault and go directly to brake hold - drive stays enabled *)
             (* Skip MC_Reset - not needed for most faults *)
             G_sysActiveFault := E_FaultCode#FAULT_NONE;
-            fbStop(Axis := G_sysAxis, Execute := FALSE);
+            fbStop(Axis := localAxis, Execute := FALSE);
             G_sysCurrentState := E_SystemState#ST_BRAKE_HOLD;
 
         ELSIF tStateTimer.Q THEN
             (* SLOW RECOVERY PATH: Timeout reached *)
             (* Transition to fault-idle: disable drive, engage brake *)
-            fbStop(Axis := G_sysAxis, Execute := FALSE);
+            fbStop(Axis := localAxis, Execute := FALSE);
             G_sysCurrentState := E_SystemState#ST_FAULT_IDLE;
         END_IF;
 
@@ -930,11 +934,11 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_RECOVERY THEN
            Currently bypassed by fast recovery path in ST_FAULT
            ---------------------------------------------------------------- *)
         IF bEnterState THEN
-            fbReset(Axis := G_sysAxis, Execute := TRUE);
-            fbStop(Axis := G_sysAxis, Execute := FALSE);
+            fbReset(Axis := localAxis, Execute := TRUE);
+            fbStop(Axis := localAxis, Execute := FALSE);
         END_IF;
 
-        fbReset(Axis := G_sysAxis, Execute := TRUE);
+        fbReset(Axis := localAxis, Execute := TRUE);
 
         IF fbReset.Done THEN
             (* Reset complete - go to fault idle *)
@@ -966,7 +970,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_IDLE THEN
 
             (* Clear motion outputs *)
             G_doInMotion := FALSE;
-            fbStop(Axis := G_sysAxis, Execute := FALSE);
+            fbStop(Axis := localAxis, Execute := FALSE);
         END_IF;
 
         (* Wait for brake engage delay before disabling drive *)
@@ -976,7 +980,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_IDLE THEN
             G_sysBrakeEngaged := TRUE;
 
             (* Disable drive power *)
-            fbPower(Axis := G_sysAxis, Enable := FALSE);
+            fbPower(Axis := localAxis, Enable := FALSE);
             IF NOT fbPower.Status THEN
                 G_sysDriveEnabled := FALSE;
             END_IF;
