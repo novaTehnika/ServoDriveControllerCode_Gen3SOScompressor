@@ -20,6 +20,6 @@
 *)
 
 nValue := FN_ModeToInt(Mode);
-Bit0 := (nValue AND 1) <> 0;
-Bit1 := (nValue AND 2) <> 0; 
-Bit2 := (nValue AND 4) <> 0;
+Bit0 := (INT_TO_BYTE(nValue) AND INT_TO_BYTE(1)) <> 0;
+Bit1 := (INT_TO_BYTE(nValue) AND INT_TO_BYTE(2)) <> 0;
+Bit2 := (INT_TO_BYTE(nValue) AND INT_TO_BYTE(4)) <> 0;
