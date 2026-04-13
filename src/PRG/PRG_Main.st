@@ -179,10 +179,10 @@ IF fbReadActualPos.Valid THEN
     G_sysActualPosition := fbReadActualPos.Position;
 END_IF;
 IF fbReadActualVel.Valid THEN
-    G_sysActualVelocity := fbReadActualVel.Velocity;
+    G_sysActualVelocity := fbReadActualVel.ActualVelocity;
 END_IF;
 IF fbReadActualTorque.Valid THEN
-    G_sysActualTorque := fbReadActualTorque.Torque;
+    G_sysActualTorque := fbReadActualTorque.ActualTorque;
 END_IF;
 
 (* Update limit switch status from filtered inputs (PNP NC: FALSE = triggered) *)
@@ -486,7 +486,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_POSITION_CTRL THEN
         (* Execute position control via Y_DirectControl *)
         fbDirectControl(Axis := G_sysAxis,
                         Enable := TRUE,
-                        Mode := 1,  (* Position mode *)
+                        ControlMode := 1,  (* Position mode *)
                         Position := G_sysCommandedPosition,
                         Velocity := stCurrentLimits.VelMax,
                         Torque := stCurrentLimits.TorqueMax);
