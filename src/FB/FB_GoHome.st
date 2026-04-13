@@ -149,9 +149,9 @@ ELSIF eState = GOH_MOVING THEN
             Execute := TRUE,
             Position := HomePosition,
             Velocity := HomeVelocity,
-            Acceleration := 0.0,    (* Use axis default *)
-            Deceleration := 0.0,    (* Use axis default *)
-            Jerk := 0.0             (* Use axis default *)
+            Acceleration := LREAL#0.0,    (* Use axis default *)
+            Deceleration := LREAL#0.0,    (* Use axis default *)
+            Jerk := LREAL#0.0             (* Use axis default *)
         );
 
         InMotion := fbMoveAbsolute.Busy;

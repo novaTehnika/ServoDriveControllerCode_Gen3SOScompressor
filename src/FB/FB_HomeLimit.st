@@ -153,14 +153,14 @@ ELSIF eState = HL_APPROACH THEN
                 Axis := Axis,
                 Execute := TRUE,
                 Velocity := ApproachVelocity,
-                Direction := MC_Positive_Direction
+                Direction := MC_Direction#Positive_Direction
             );
         ELSE
             fbMoveVelocity(
                 Axis := Axis,
                 Execute := TRUE,
                 Velocity := ApproachVelocity,
-                Direction := MC_Negative_Direction
+                Direction := MC_Direction#Negative_Direction
             );
         END_IF;
 
@@ -224,7 +224,7 @@ ELSIF eState = HL_BACKOFF THEN
             Axis := Axis,
             Execute := TRUE,
             Velocity := BackoffVelocity,
-            Direction := MC_Positive_Direction
+            Direction := MC_Direction#Positive_Direction
         );
 
         InMotion := fbMoveVelocity.Busy;
