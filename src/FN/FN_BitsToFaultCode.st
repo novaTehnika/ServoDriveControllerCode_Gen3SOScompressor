@@ -28,21 +28,21 @@ IF Bit2 THEN nValue := nValue + 4; END_IF;
 
 (* Convert integer to fault code *)
 IF nValue = 0 THEN
-    FN_BitsToFaultCode := FAULT_NONE;
+    FN_BitsToFaultCode := E_FaultCode#FAULT_NONE;
 ELSIF nValue = 1 THEN
-    FN_BitsToFaultCode := FAULT_HANDSHAKE;
+    FN_BitsToFaultCode := E_FaultCode#FAULT_HANDSHAKE;
 ELSIF nValue = 2 THEN
-    FN_BitsToFaultCode := FAULT_DRIVE;
+    FN_BitsToFaultCode := E_FaultCode#FAULT_DRIVE;
 ELSIF nValue = 3 THEN
-    FN_BitsToFaultCode := FAULT_POSITION;
+    FN_BitsToFaultCode := E_FaultCode#FAULT_POSITION;
 ELSIF nValue = 4 THEN
-    FN_BitsToFaultCode := FAULT_HOMING_REQ;
+    FN_BitsToFaultCode := E_FaultCode#FAULT_HOMING_REQ;
 ELSIF nValue = 5 THEN
-    FN_BitsToFaultCode := FAULT_PISTON_EXIT;
+    FN_BitsToFaultCode := E_FaultCode#FAULT_PISTON_EXIT;
 ELSIF nValue = 6 THEN
-    FN_BitsToFaultCode := FAULT_LIMIT_SWITCH;
+    FN_BitsToFaultCode := E_FaultCode#FAULT_LIMIT_SWITCH;
 ELSIF nValue = 7 THEN
-    FN_BitsToFaultCode := FAULT_ENCODER;
+    FN_BitsToFaultCode := E_FaultCode#FAULT_ENCODER;
 ELSE
-    FN_BitsToFaultCode := FAULT_NONE;
+    FN_BitsToFaultCode := E_FaultCode#FAULT_NONE;
 END_IF;

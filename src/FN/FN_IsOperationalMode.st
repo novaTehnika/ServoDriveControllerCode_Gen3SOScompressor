@@ -16,7 +16,7 @@
        Mode            : E_OperatingMode  (* Mode to check
 *)
 
-FN_IsOperationalMode := (Mode = MODE_BRAKE_HOLD) OR
-                     (Mode = MODE_POSITION) OR
-                     (Mode = MODE_VELOCITY) OR
-                     (Mode = MODE_TORQUE);
+FN_IsOperationalMode := (Mode = E_OperatingMode#MODE_BRAKE_HOLD) OR
+                     (Mode = E_OperatingMode#MODE_POSITION) OR
+                     (Mode = E_OperatingMode#MODE_VELOCITY) OR
+                     (Mode = E_OperatingMode#MODE_TORQUE);

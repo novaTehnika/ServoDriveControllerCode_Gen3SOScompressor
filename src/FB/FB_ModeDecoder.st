@@ -33,7 +33,7 @@
 
 IF NOT Enable THEN
     (* Reset outputs when disabled *)
-    DecodedMode := MODE_IDLE;
+    DecodedMode := E_OperatingMode#MODE_IDLE;
     ModeValue := 0;
     ModeStable := FALSE;
     ModeChanged := FALSE;

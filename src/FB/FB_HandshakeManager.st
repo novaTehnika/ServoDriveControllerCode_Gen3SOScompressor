@@ -48,7 +48,7 @@
 
 IF NOT Enable THEN
     (* Reset all outputs when disabled *)
-    ConfirmedMode := MODE_IDLE;
+    ConfirmedMode := E_OperatingMode#MODE_IDLE;
     HandshakeActive := FALSE;
     HandshakeComplete := FALSE;
     HandshakeTimeout_Q := FALSE;
@@ -71,7 +71,7 @@ IF eState = HS_IDLE THEN
 
         (* Start handshake when mode is stable and different from idle
            (or when transitioning to a new mode) *)
-        IF ModeStable AND (RequestedMode <> MODE_IDLE) AND NOT MotionEnable THEN
+        IF ModeStable AND (RequestedMode <> E_OperatingMode#MODE_IDLE) AND NOT MotionEnable THEN
             (* Set confirmation to match requested mode *)
             ConfirmedMode := RequestedMode;
             eModeAtStart := RequestedMode;
@@ -79,9 +79,9 @@ IF eState = HS_IDLE THEN
             HandshakeActive := TRUE;
             eState := HS_WAIT_MOTION_EN;
             tTimeout(IN := TRUE, PT := HandshakeTimeout);
-        ELSIF ModeStable AND (RequestedMode = MODE_IDLE) THEN
+        ELSIF ModeStable AND (RequestedMode = E_OperatingMode#MODE_IDLE) THEN
             (* Idle mode - just confirm it *)
-            ConfirmedMode := MODE_IDLE;
+            ConfirmedMode := E_OperatingMode#MODE_IDLE;
         END_IF;
 
 ELSIF eState = HS_WAIT_MOTION_EN THEN
@@ -134,7 +134,7 @@ ELSIF eState = HS_TIMEOUT THEN
     (* HS_TIMEOUT - Handshake timed out or failed *)
         HandshakeTimeout_Q := TRUE;
         HandshakeActive := FALSE;
-        ConfirmedMode := MODE_IDLE;  (* Reset confirmed mode on failure *)
+        ConfirmedMode := E_OperatingMode#MODE_IDLE;  (* Reset confirmed mode on failure *)
         tTimeout(IN := FALSE);
 
         (* Exit timeout when motion enable drops - simpler and more reliable *)

@@ -50,6 +50,6 @@ END_IF;
 FaultResetValid := FaultReset AND
                    (NOT MotionEnable) AND
                    InFaultState AND
-                   (ActiveFaultCode <> FAULT_NONE) AND
+                   (ActiveFaultCode <> E_FaultCode#FAULT_NONE) AND
                    BitsStable AND
                    (MasterFaultCode = ActiveFaultCode);

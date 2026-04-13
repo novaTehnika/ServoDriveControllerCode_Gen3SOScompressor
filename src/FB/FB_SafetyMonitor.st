@@ -25,7 +25,7 @@
 
    Integration:
    - Called every scan after state machine, before output update
-   - FaultDetected triggers transition to ST_FAULT in PRG_Main
+   - FaultDetected triggers transition to E_SystemState#ST_FAULT in PRG_Main
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
@@ -67,14 +67,14 @@
 IF NOT Enable THEN
     (* Reset all outputs when disabled *)
     FaultDetected := FALSE;
-    FaultCode := FAULT_NONE;
+    FaultCode := E_FaultCode#FAULT_NONE;
     FaultLimitSwitch := FALSE;
     FaultPosition := FALSE;
     FaultDrive := FALSE;
     FaultEncoder := FALSE;
     FaultPistonExit := FALSE;
     bLatchedFault := FALSE;
-    eLatchedFaultCode := FAULT_NONE;
+    eLatchedFaultCode := E_FaultCode#FAULT_NONE;
     RETURN;
 END_IF;
 
@@ -83,31 +83,31 @@ END_IF;
    -------------------------------------------------------------------------- *)
 
 (* Check if in a motion state *)
-bInMotionState := (CurrentState = ST_POSITION_CTRL) OR
-                  (CurrentState = ST_VELOCITY_CTRL) OR
-                  (CurrentState = ST_TORQUE_CTRL) OR
-                  (CurrentState = ST_GO_HOME) OR
-                  (CurrentState = ST_HOLD_POSITION);
+bInMotionState := (CurrentState = E_SystemState#ST_POSITION_CTRL) OR
+                  (CurrentState = E_SystemState#ST_VELOCITY_CTRL) OR
+                  (CurrentState = E_SystemState#ST_TORQUE_CTRL) OR
+                  (CurrentState = E_SystemState#ST_GO_HOME) OR
+                  (CurrentState = E_SystemState#ST_HOLD_POSITION);
 
 (* Check if in a homing state *)
-bInHomingState := (CurrentState = ST_HOME_LIMIT) OR
-                  (CurrentState = ST_HOME_EOT) OR
-                  (CurrentState = ST_HOME_COMPLETE);
+bInHomingState := (CurrentState = E_SystemState#ST_HOME_LIMIT) OR
+                  (CurrentState = E_SystemState#ST_HOME_EOT) OR
+                  (CurrentState = E_SystemState#ST_HOME_COMPLETE);
 
 (* Check if already in fault state *)
-bInFaultState := (CurrentState = ST_FAULT) OR
-                 (CurrentState = ST_FAULT_RECOVERY) OR
-                 (CurrentState = ST_FAULT_IDLE);
+bInFaultState := (CurrentState = E_SystemState#ST_FAULT) OR
+                 (CurrentState = E_SystemState#ST_FAULT_RECOVERY) OR
+                 (CurrentState = E_SystemState#ST_FAULT_IDLE);
 
 (* --------------------------------------------------------------------------
    Reset fault latch when appropriate
    -------------------------------------------------------------------------- *)
 
 (* Clear fault latch when entering fault idle or returning to idle *)
-IF (CurrentState = ST_FAULT_IDLE) OR (CurrentState = ST_IDLE) THEN
+IF (CurrentState = E_SystemState#ST_FAULT_IDLE) OR (CurrentState = E_SystemState#ST_IDLE) THEN
     IF NOT FaultDetected THEN
         bLatchedFault := FALSE;
-        eLatchedFaultCode := FAULT_NONE;
+        eLatchedFaultCode := E_FaultCode#FAULT_NONE;
     END_IF;
 END_IF;
 
@@ -126,7 +126,7 @@ FaultDrive := DriveFault;
 (* Encoder is faulty if position invalid (but only check when relevant) *)
 (* Don't trigger during initialization (before check completes) or when
    AbsHomeRequired is set (system is aware and trying to resolve via homing) *)
-IF (CurrentState <> ST_INIT) AND (CurrentState <> ST_ENCODER_CHECK)
+IF (CurrentState <> E_SystemState#ST_INIT) AND (CurrentState <> E_SystemState#ST_ENCODER_CHECK)
    AND NOT AbsHomeRequired THEN
     FaultEncoder := NOT EncoderValid;
 ELSE
@@ -179,27 +179,27 @@ FaultPistonExit := ExitGuardTriggered;
 (* Priority order: Drive > Encoder > LimitSwitch > Position > PistonExit *)
 IF FaultDrive THEN
     FaultDetected := TRUE;
-    FaultCode := FAULT_DRIVE;
+    FaultCode := E_FaultCode#FAULT_DRIVE;
 
 ELSIF FaultEncoder THEN
     FaultDetected := TRUE;
-    FaultCode := FAULT_ENCODER;
+    FaultCode := E_FaultCode#FAULT_ENCODER;
 
 ELSIF FaultLimitSwitch THEN
     FaultDetected := TRUE;
-    FaultCode := FAULT_LIMIT_SWITCH;
+    FaultCode := E_FaultCode#FAULT_LIMIT_SWITCH;
 
 ELSIF FaultPosition THEN
     FaultDetected := TRUE;
-    FaultCode := FAULT_POSITION;
+    FaultCode := E_FaultCode#FAULT_POSITION;
 
 ELSIF FaultPistonExit THEN
     FaultDetected := TRUE;
-    FaultCode := FAULT_PISTON_EXIT;
+    FaultCode := E_FaultCode#FAULT_PISTON_EXIT;
 
 ELSE
     FaultDetected := FALSE;
-    FaultCode := FAULT_NONE;
+    FaultCode := E_FaultCode#FAULT_NONE;
 END_IF;
 
 (* --------------------------------------------------------------------------

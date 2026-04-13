@@ -28,21 +28,21 @@ IF Bit2 THEN nValue := nValue + 4; END_IF;
 
 (* Convert integer to mode *)
 IF nValue = 0 THEN
-    FN_BitsToMode := MODE_IDLE;
+    FN_BitsToMode := E_OperatingMode#MODE_IDLE;
 ELSIF nValue = 1 THEN
-    FN_BitsToMode := MODE_BRAKE_HOLD;
+    FN_BitsToMode := E_OperatingMode#MODE_BRAKE_HOLD;
 ELSIF nValue = 2 THEN
-    FN_BitsToMode := MODE_POSITION;
+    FN_BitsToMode := E_OperatingMode#MODE_POSITION;
 ELSIF nValue = 3 THEN
-    FN_BitsToMode := MODE_VELOCITY;
+    FN_BitsToMode := E_OperatingMode#MODE_VELOCITY;
 ELSIF nValue = 4 THEN
-    FN_BitsToMode := MODE_TORQUE;
+    FN_BitsToMode := E_OperatingMode#MODE_TORQUE;
 ELSIF nValue = 5 THEN
-    FN_BitsToMode := MODE_GO_HOME;
+    FN_BitsToMode := E_OperatingMode#MODE_GO_HOME;
 ELSIF nValue = 6 THEN
-    FN_BitsToMode := MODE_HOME_LIMIT;
+    FN_BitsToMode := E_OperatingMode#MODE_HOME_LIMIT;
 ELSIF nValue = 7 THEN
-    FN_BitsToMode := MODE_HOME_EOT;
+    FN_BitsToMode := E_OperatingMode#MODE_HOME_EOT;
 ELSE
-    FN_BitsToMode := MODE_IDLE;
+    FN_BitsToMode := E_OperatingMode#MODE_IDLE;
 END_IF;

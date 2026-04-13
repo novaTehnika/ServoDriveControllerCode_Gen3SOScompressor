@@ -15,21 +15,21 @@
        Fault           : E_FaultCode      (* Fault code to convert
 *)
 
-IF Fault = FAULT_NONE THEN
+IF Fault = E_FaultCode#FAULT_NONE THEN
     FN_FaultToInt := 0;
-ELSIF Fault = FAULT_HANDSHAKE THEN
+ELSIF Fault = E_FaultCode#FAULT_HANDSHAKE THEN
     FN_FaultToInt := 1;
-ELSIF Fault = FAULT_DRIVE THEN
+ELSIF Fault = E_FaultCode#FAULT_DRIVE THEN
     FN_FaultToInt := 2;
-ELSIF Fault = FAULT_POSITION THEN
+ELSIF Fault = E_FaultCode#FAULT_POSITION THEN
     FN_FaultToInt := 3;
-ELSIF Fault = FAULT_HOMING_REQ THEN
+ELSIF Fault = E_FaultCode#FAULT_HOMING_REQ THEN
     FN_FaultToInt := 4;
-ELSIF Fault = FAULT_PISTON_EXIT THEN
+ELSIF Fault = E_FaultCode#FAULT_PISTON_EXIT THEN
     FN_FaultToInt := 5;
-ELSIF Fault = FAULT_LIMIT_SWITCH THEN
+ELSIF Fault = E_FaultCode#FAULT_LIMIT_SWITCH THEN
     FN_FaultToInt := 6;
-ELSIF Fault = FAULT_ENCODER THEN
+ELSIF Fault = E_FaultCode#FAULT_ENCODER THEN
     FN_FaultToInt := 7;
 ELSE
     FN_FaultToInt := 0;

@@ -15,6 +15,6 @@
        Mode            : E_OperatingMode  (* Mode to check
 *)
 
-FN_IsHomingMode := (Mode = MODE_GO_HOME) OR
-                (Mode = MODE_HOME_LIMIT) OR
-                (Mode = MODE_HOME_EOT);
+FN_IsHomingMode := (Mode = E_OperatingMode#MODE_GO_HOME) OR
+                (Mode = E_OperatingMode#MODE_HOME_LIMIT) OR
+                (Mode = E_OperatingMode#MODE_HOME_EOT);
