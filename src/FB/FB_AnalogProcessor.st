@@ -64,12 +64,12 @@
    ============================================================================ *)
 
 IF NOT Enable THEN
-    ScaledPosition := 0.0;
-    ScaledVelocity := 0.0;
-    ScaledTorque := 0.0;
-    ActiveReference := 0.0;
-    NormalizedInput := 0.5;
-    InputVoltage := 0.0;
+    ScaledPosition := LREAL#0.0;
+    ScaledVelocity := LREAL#0.0;
+    ScaledTorque := LREAL#0.0;
+    ActiveReference := LREAL#0.0;
+    NormalizedInput := LREAL#0.5;
+    InputVoltage := LREAL#0.0;
     InStage1 := FALSE;
     InStage2 := FALSE;
     RETURN;
@@ -95,14 +95,14 @@ IF InputVoltage < Stage1VoltMax THEN
     InStage2 := FALSE;
 
     (* Calculate normalized position within stage 1 *)
-    IF (Stage1VoltMax - Stage1VoltMin) > 0.0 THEN
+    IF (Stage1VoltMax - Stage1VoltMin) > LREAL#0.0 THEN
         rStageNormalized := (InputVoltage - Stage1VoltMin) / (Stage1VoltMax - Stage1VoltMin);
     ELSE
-        rStageNormalized := 0.0;
+        rStageNormalized := LREAL#0.0;
     END_IF;
 
     (* Clamp to 0.0-1.0 range *)
-    rStageNormalized := LIMIT(0.0, rStageNormalized, 1.0);
+    rStageNormalized := LIMIT(LREAL#0.0, rStageNormalized, LREAL#1.0);
 
     (* Calculate position for stage 1 *)
     ScaledPosition := Stage1PosMin + (rStageNormalized * (Stage1PosMax - Stage1PosMin));
@@ -113,14 +113,14 @@ ELSE
     InStage2 := TRUE;
 
     (* Calculate normalized position within stage 2 *)
-    IF (Stage2VoltMax - Stage2VoltMin) > 0.0 THEN
+    IF (Stage2VoltMax - Stage2VoltMin) > LREAL#0.0 THEN
         rStageNormalized := (InputVoltage - Stage2VoltMin) / (Stage2VoltMax - Stage2VoltMin);
     ELSE
-        rStageNormalized := 0.0;
+        rStageNormalized := LREAL#0.0;
     END_IF;
 
     (* Clamp to 0.0-1.0 range *)
-    rStageNormalized := LIMIT(0.0, rStageNormalized, 1.0);
+    rStageNormalized := LIMIT(LREAL#0.0, rStageNormalized, LREAL#1.0);
 
     (* Calculate position for stage 2 *)
     ScaledPosition := Stage2PosMin + (rStageNormalized * (Stage2PosMax - Stage2PosMin));
@@ -137,5 +137,5 @@ ELSIF CurrentMode = E_OperatingMode#MODE_TORQUE THEN
     ActiveReference := ScaledTorque;
 
 ELSE
-    ActiveReference := 0.0;
+    ActiveReference := LREAL#0.0;
 END_IF;

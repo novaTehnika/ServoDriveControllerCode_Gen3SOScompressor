@@ -65,7 +65,7 @@ END_IF;
 RawReal := INT_TO_LREAL(RawInput);
 
 (* Clamp alpha to valid range *)
-rAlpha := LIMIT(0.0, Alpha, 1.0);
+rAlpha := LIMIT(LREAL#0.0, Alpha, LREAL#1.0);
 
 (* --------------------------------------------------------------------------
    Initialization
@@ -126,7 +126,7 @@ rMedianResult := aSortBuffer[nMedianIdx];
    -------------------------------------------------------------------------- *)
 
 (* Apply low-pass filter: y[n] = alpha * x[n] + (1-alpha) * y[n-1] *)
-rFilteredValue := (rAlpha * rMedianResult) + ((1.0 - rAlpha) * rFilteredValue);
+rFilteredValue := (rAlpha * rMedianResult) + ((LREAL#1.0 - rAlpha) * rFilteredValue);
 
 (* --------------------------------------------------------------------------
    Output
@@ -135,9 +135,9 @@ rFilteredValue := (rAlpha * rMedianResult) + ((1.0 - rAlpha) * rFilteredValue);
 FilteredReal := rFilteredValue;
 
 (* Convert back to INT with clamping *)
-IF rFilteredValue < -32768.0 THEN
+IF rFilteredValue < LREAL#-32768.0 THEN
     FilteredOutput := -32768;
-ELSIF rFilteredValue > 32767.0 THEN
+ELSIF rFilteredValue > LREAL#32767.0 THEN
     FilteredOutput := 32767;
 ELSE
     FilteredOutput := LREAL_TO_INT(rFilteredValue);

@@ -56,7 +56,7 @@
 
 IF NOT Enable THEN
     RawAnalogOutput := 0;
-    OutputVoltage := 0.0;
+    OutputVoltage := LREAL#0.0;
     InStage1 := FALSE;
     InStage2 := FALSE;
     RETURN;
@@ -69,14 +69,14 @@ IF ActualPosition <= Stage1PosMax THEN
     InStage2 := FALSE;
 
     (* Calculate normalized position within stage 1 *)
-    IF (Stage1PosMax - Stage1PosMin) > 0.0 THEN
+    IF (Stage1PosMax - Stage1PosMin) > LREAL#0.0 THEN
         rNormalized := (ActualPosition - Stage1PosMin) / (Stage1PosMax - Stage1PosMin);
     ELSE
-        rNormalized := 0.0;
+        rNormalized := LREAL#0.0;
     END_IF;
 
     (* Clamp to 0.0-1.0 range *)
-    rNormalized := LIMIT(0.0, rNormalized, 1.0);
+    rNormalized := LIMIT(LREAL#0.0, rNormalized, LREAL#1.0);
 
     (* Calculate voltage for stage 1 *)
     rVoltage := Stage1VoltMin + (rNormalized * (Stage1VoltMax - Stage1VoltMin));
@@ -87,14 +87,14 @@ ELSE
     InStage2 := TRUE;
 
     (* Calculate normalized position within stage 2 *)
-    IF (Stage2PosMax - Stage2PosMin) > 0.0 THEN
+    IF (Stage2PosMax - Stage2PosMin) > LREAL#0.0 THEN
         rNormalized := (ActualPosition - Stage2PosMin) / (Stage2PosMax - Stage2PosMin);
     ELSE
-        rNormalized := 0.0;
+        rNormalized := LREAL#0.0;
     END_IF;
 
     (* Clamp to 0.0-1.0 range *)
-    rNormalized := LIMIT(0.0, rNormalized, 1.0);
+    rNormalized := LIMIT(LREAL#0.0, rNormalized, LREAL#1.0);
 
     (* Calculate voltage for stage 2 *)
     rVoltage := Stage2VoltMin + (rNormalized * (Stage2VoltMax - Stage2VoltMin));

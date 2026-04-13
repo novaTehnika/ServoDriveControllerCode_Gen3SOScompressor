@@ -91,8 +91,8 @@ IF NOT Enable THEN
     InMotion := FALSE;
     Error := FALSE;
     RequiresLimitHome := FALSE;
-    EOTPosition := 0.0;
-    EOTOffset := 0.0;
+    EOTPosition := LREAL#0.0;
+    EOTOffset := LREAL#0.0;
     eState := HE_IDLE;
     fbDirectControl(Enable := FALSE);
     fbStop(Execute := FALSE);
@@ -136,8 +136,8 @@ IF eState = HE_IDLE THEN
         InMotion := FALSE;
         Error := FALSE;
         RequiresLimitHome := FALSE;
-        EOTPosition := 0.0;
-        EOTOffset := 0.0;
+        EOTPosition := LREAL#0.0;
+        EOTOffset := LREAL#0.0;
 
         (* Reset function blocks *)
         fbDirectControl(Enable := FALSE);

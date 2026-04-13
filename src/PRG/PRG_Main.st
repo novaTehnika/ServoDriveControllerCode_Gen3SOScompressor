@@ -105,11 +105,11 @@ IF bFirstScan THEN
        dt = 1ms (fixed task cycle time from MP2600iec hardware config)
        tau = G_cfgAnalogFilterTimeConst *)
     IF G_cfgAnalogFilterTimeConst > T#0MS THEN
-        rAnalogFilterAlpha := 0.001 / ((DINT_TO_LREAL(TIME_TO_DINT(G_cfgAnalogFilterTimeConst)) / 1000.0) + 0.001);
+        rAnalogFilterAlpha := LREAL#0.001 / ((DINT_TO_LREAL(TIME_TO_DINT(G_cfgAnalogFilterTimeConst)) / LREAL#1000.0) + LREAL#0.001);
     ELSE
-        rAnalogFilterAlpha := 1.0;  (* No filtering if time constant is zero *)
+        rAnalogFilterAlpha := LREAL#1.0;  (* No filtering if time constant is zero *)
     END_IF;
-    rAnalogFilterAlpha := LIMIT(0.0, rAnalogFilterAlpha, 1.0);
+    rAnalogFilterAlpha := LIMIT(LREAL#0.0, rAnalogFilterAlpha, LREAL#1.0);
 END_IF;
 
 
