@@ -5,9 +5,9 @@
    Controller: Yaskawa MP2600iec
 
    Description:
-   Validates absolute encoder status on startup using Yaskawa's
-   AbsolutePositionManager function block. Determines if homing is required
-   due to encoder battery failure or multi-turn data corruption.
+   Validates absolute encoder status on startup by commanding the
+   AbsolutePositionManager (running in the LD POU) via G_cmd/G_sta globals.
+   Determines if homing is required due to encoder data corruption.
 
    The Sigma-7 absolute encoder maintains position across power cycles via
    battery backup. If the battery fails or multi-turn data is corrupted,
@@ -15,20 +15,19 @@
 
    States:
    - IDLE: Waiting for check trigger
-   - CHECK_INIT: Initialize AbsolutePositionManager
-   - CHECK_STATUS: Query encoder status
+   - CHECK_INIT: Enable AbsolutePositionManager via G_cmdEncoderCheck
+   - CHECK_STATUS: Query encoder status via G_staEncoderCheck
    - COMPLETE: Check finished, outputs valid
    - ERROR: Error during check
 
    Integration:
-   - Called from ST_ENCODER_CHECK state in PRG_Main
-   - Sets AbsHomeRequired output if encoder invalid
-   - PRG_Main uses this to set flagAbsHomeRequired
+   - Called once per scan at end of PRG_Main
+   - Commands AbsolutePositionManager via CmdEncoderCheck output
+   - PRG_Main routes CmdEncoderCheck -> G_cmdEncoderCheck when active
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
        Enable              : BOOL             (* Enable the function block
-       Axis                : AXIS_REF         (* PLCopen axis reference
        CheckOnStartup      : BOOL             (* Trigger startup check
      VAR_OUTPUT:
        EncoderValid        : BOOL             (* Absolute position is valid
@@ -38,8 +37,8 @@
        CheckComplete       : BOOL             (* Startup check finished
        Busy                : BOOL             (* Check in progress
        Error               : BOOL             (* Error occurred during check
+       CmdEncoderCheck     : ST_CmdEncoderCheck  (* Command output for LD POU
      VAR:
-       fbAbsPosManager     : AbsolutePositionManager
        eState              : INT := 0         (* State machine
        rTrigCheck          : R_TRIG
        tCheckTimeout       : TON
@@ -58,7 +57,6 @@
    ============================================================================ *)
 
 IF NOT Enable THEN
-    (* Reset all outputs when disabled *)
     EncoderValid := FALSE;
     BatteryOK := FALSE;
     MultiTurnValid := FALSE;
@@ -68,7 +66,7 @@ IF NOT Enable THEN
     Error := FALSE;
     eState := ENC_IDLE;
     tCheckTimeout(IN := FALSE);
-    fbAbsPosManager(Enable := FALSE);
+    CmdEncoderCheck.Enable := FALSE;
     RETURN;
 END_IF;
 
@@ -84,6 +82,7 @@ IF eState = ENC_IDLE THEN
     (* ENC_IDLE - Waiting for check trigger *)
         Busy := FALSE;
         CheckComplete := FALSE;
+        CmdEncoderCheck.Enable := FALSE;
 
         IF rTrigCheck.Q OR (CheckOnStartup AND NOT bCheckTriggered) THEN
             bCheckTriggered := TRUE;
@@ -95,20 +94,14 @@ IF eState = ENC_IDLE THEN
 
 ELSIF eState = ENC_CHECK_INIT THEN
 
-    (* ENC_CHECK_INIT - Initialize AbsolutePositionManager *)
-        (* Start timeout timer *)
+    (* ENC_CHECK_INIT - Enable AbsolutePositionManager via command output *)
         tCheckTimeout(IN := TRUE, PT := CHECK_TIMEOUT);
 
-        (* Enable the AbsolutePositionManager *)
-        fbAbsPosManager(
-            Axis := Axis,
-            Enable := TRUE
-        );
+        CmdEncoderCheck.Enable := TRUE;
 
-        (* Wait for FB to initialize or check for immediate status *)
-        IF fbAbsPosManager.Valid THEN
+        IF G_staEncoderCheck.Valid THEN
             eState := ENC_CHECK_STATUS;
-        ELSIF fbAbsPosManager.Error THEN
+        ELSIF G_staEncoderCheck.Error THEN
             Error := TRUE;
             eState := ENC_ERROR;
         ELSIF tCheckTimeout.Q THEN
@@ -118,18 +111,12 @@ ELSIF eState = ENC_CHECK_INIT THEN
 
 ELSIF eState = ENC_CHECK_STATUS THEN
 
-    (* ENC_CHECK_STATUS - Query encoder status from AbsolutePositionManager *)
-        fbAbsPosManager(
-            Axis := Axis,
-            Enable := TRUE
-        );
+    (* ENC_CHECK_STATUS - Query encoder status from LD POU *)
+        CmdEncoderCheck.Enable := TRUE;
 
-        (* Read status outputs *)
-        IF fbAbsPosManager.Valid THEN
-            (* Evaluate encoder health *)
-            EncoderValid := fbAbsPosManager.PositionValid;
+        IF G_staEncoderCheck.Valid THEN
+            EncoderValid := G_staEncoderCheck.PositionValid;
 
-            (* Homing required if any issue detected *)
             AbsHomeRequired := NOT EncoderValid;
 
             CheckComplete := TRUE;
@@ -137,7 +124,7 @@ ELSIF eState = ENC_CHECK_STATUS THEN
             tCheckTimeout(IN := FALSE);
             eState := ENC_COMPLETE;
 
-        ELSIF fbAbsPosManager.Error THEN
+        ELSIF G_staEncoderCheck.Error THEN
             Error := TRUE;
             eState := ENC_ERROR;
 
@@ -151,14 +138,13 @@ ELSIF eState = ENC_COMPLETE THEN
     (* ENC_COMPLETE - Check complete - hold outputs until disabled or new check *)
         Busy := FALSE;
         CheckComplete := TRUE;
+        CmdEncoderCheck.Enable := FALSE;
 
-        (* Allow re-check if CheckOnStartup toggled *)
         IF NOT CheckOnStartup THEN
             bCheckTriggered := FALSE;
         END_IF;
 
         IF rTrigCheck.Q THEN
-            (* New check requested *)
             CheckComplete := FALSE;
             Busy := TRUE;
             tCheckTimeout(IN := FALSE);
@@ -171,17 +157,14 @@ ELSIF eState = ENC_ERROR THEN
         Busy := FALSE;
         CheckComplete := FALSE;
 
-        (* Assume encoder invalid on error - safe default *)
         EncoderValid := FALSE;
         BatteryOK := FALSE;
         MultiTurnValid := FALSE;
         AbsHomeRequired := TRUE;
 
-        (* Disable the AbsolutePositionManager *)
-        fbAbsPosManager(Enable := FALSE);
+        CmdEncoderCheck.Enable := FALSE;
         tCheckTimeout(IN := FALSE);
 
-        (* Allow retry if CheckOnStartup toggled *)
         IF NOT CheckOnStartup THEN
             bCheckTriggered := FALSE;
             Error := FALSE;

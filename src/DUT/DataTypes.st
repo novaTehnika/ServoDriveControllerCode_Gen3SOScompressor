@@ -195,4 +195,138 @@ TYPE
        ============================================================================ *)
     ARRAY5LREAL : ARRAY[0..4] OF LREAL;
 
+
+   (* ============================================================================
+      Command Structs (ST -> LD POU)
+
+      These structs carry commands from the Structured Text state machine to
+      the Ladder Logic POU that owns G_sysAxis and all built-in motion FBs.
+      Field names mirror the target built-in FB pin names for 1:1 mapping.
+      ============================================================================ *)
+
+   ST_CmdPower :
+   STRUCT
+      Enable          : BOOL;
+      EnablePositive   : BOOL;
+      EnableNegative   : BOOL;
+   END_STRUCT;
+
+   ST_CmdStop :
+   STRUCT
+      Execute         : BOOL;
+      Deceleration    : LREAL;
+   END_STRUCT;
+
+   ST_CmdReset :
+   STRUCT
+      Execute         : BOOL;
+   END_STRUCT;
+
+   ST_CmdMoveAbsolute :
+   STRUCT
+      Execute         : BOOL;
+      Position        : LREAL;
+      Velocity        : LREAL;
+      Acceleration    : LREAL;
+      Deceleration    : LREAL;
+      Direction       : INT;
+   END_STRUCT;
+
+   ST_CmdMoveVelocity :
+   STRUCT
+      Execute         : BOOL;
+      Velocity        : LREAL;
+      Acceleration    : LREAL;
+      Deceleration    : LREAL;
+      Direction       : INT;
+   END_STRUCT;
+
+   ST_CmdSetPosition :
+   STRUCT
+      Execute         : BOOL;
+      Position        : LREAL;
+      Relative        : BOOL;
+   END_STRUCT;
+
+   ST_CmdDirectControl :
+   STRUCT
+      Enable          : BOOL;
+      ControlMode     : INT;
+      Position        : LREAL;
+      Velocity        : LREAL;
+      Torque          : LREAL;
+   END_STRUCT;
+
+   ST_CmdEncoderCheck :
+   STRUCT
+      Enable          : BOOL;
+   END_STRUCT;
+
+
+   (* ============================================================================
+      Status Structs (LD POU -> ST)
+
+      These structs carry status from the Ladder Logic POU back to the
+      Structured Text state machine. Field names mirror the built-in FB
+      output pin names.
+      ============================================================================ *)
+
+   ST_StaPower :
+   STRUCT
+      Status          : BOOL;
+      Error           : BOOL;
+   END_STRUCT;
+
+   ST_StaStop :
+   STRUCT
+      Done            : BOOL;
+      Busy            : BOOL;
+      Error           : BOOL;
+   END_STRUCT;
+
+   ST_StaReset :
+   STRUCT
+      Done            : BOOL;
+      Busy            : BOOL;
+      Error           : BOOL;
+   END_STRUCT;
+
+   ST_StaMoveAbsolute :
+   STRUCT
+      Done            : BOOL;
+      Busy            : BOOL;
+      Active          : BOOL;
+      CommandAborted  : BOOL;
+      Error           : BOOL;
+   END_STRUCT;
+
+   ST_StaMoveVelocity :
+   STRUCT
+      InVelocity      : BOOL;
+      Busy            : BOOL;
+      Active          : BOOL;
+      CommandAborted  : BOOL;
+      Error           : BOOL;
+   END_STRUCT;
+
+   ST_StaSetPosition :
+   STRUCT
+      Done            : BOOL;
+      Busy            : BOOL;
+      Error           : BOOL;
+   END_STRUCT;
+
+   ST_StaDirectControl :
+   STRUCT
+      Active          : BOOL;
+      Error           : BOOL;
+   END_STRUCT;
+
+   ST_StaEncoderCheck :
+   STRUCT
+      Valid           : BOOL;
+      PositionValid   : BOOL;
+      Error           : BOOL;
+   END_STRUCT;
+
 END_TYPE

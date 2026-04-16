@@ -433,4 +433,44 @@
      G_sysEncoderBatteryOK     : BOOL := FALSE    (* Encoder battery status OK *)
    END_VAR
 
+
+   ============================================================================
+   5. COMMAND / STATUS INTERFACE (ST <-> LD POU)
+   ============================================================================
+
+   These structured globals connect the ST state machine (PRG_Main) to the
+   Ladder Logic POU that owns G_sysAxis and all built-in motion FBs.
+
+   Commands flow ST -> LD (written by PRG_Main, read by LD POU).
+   Status flows LD -> ST (written by LD POU, read by PRG_Main and custom FBs).
+
+   VAR_GLOBAL
+     (* ========================================================================
+        COMMAND STRUCTS (ST -> LD)
+        ======================================================================== *)
+
+     G_cmdPower            : ST_CmdPower
+     G_cmdStop             : ST_CmdStop
+     G_cmdReset            : ST_CmdReset
+     G_cmdMoveAbsolute     : ST_CmdMoveAbsolute
+     G_cmdMoveVelocity     : ST_CmdMoveVelocity
+     G_cmdSetPosition      : ST_CmdSetPosition
+     G_cmdDirectControl    : ST_CmdDirectControl
+     G_cmdEncoderCheck     : ST_CmdEncoderCheck
+
+
+     (* ========================================================================
+        STATUS STRUCTS (LD -> ST)
+        ======================================================================== *)
+
+     G_staPower            : ST_StaPower
+     G_staStop             : ST_StaStop
+     G_staReset            : ST_StaReset
+     G_staMoveAbsolute     : ST_StaMoveAbsolute
+     G_staMoveVelocity     : ST_StaMoveVelocity
+     G_staSetPosition      : ST_StaSetPosition
+     G_staDirectControl    : ST_StaDirectControl
+     G_staEncoderCheck     : ST_StaEncoderCheck
+   END_VAR
+
 *)

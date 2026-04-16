@@ -24,19 +24,15 @@
    This preserves the limit switch zero reference from Mode 110 while allowing
    the master to see the expected position value at EOT.
 
-   Uses Y_DirectControl:
-   - Mode 2 (velocity mode) with torque limiting for safe mechanical contact
-
    Integration:
-   - Called from ST_HOME_EOT state in PRG_Main
-   - RequiresLimitHome output signals need for Mode 110 first
-   - Abort input for motion enable drop handling
+   - Called once per scan at end of PRG_Main
+   - CmdDirectControl/CmdStop routed to G_cmd* by state machine when active
+   - Reads G_staDirectControl/G_staStop for status
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
        Enable              : BOOL             (* Enable the function block
        Execute             : BOOL             (* Start homing sequence
-       Axis                : AXIS_REF         (* PLCopen axis reference
        AbsHomeRequired     : BOOL             (* Limit switch homing required
        FastVelocity        : LREAL            (* Fast approach velocity (mm/s)
        SlowVelocity        : LREAL            (* Slow approach velocity (mm/s)
@@ -58,9 +54,9 @@
        RequiresLimitHome   : BOOL             (* Must do limit switch homing first
        EOTPosition         : LREAL            (* Recorded encoder position at EOT stall
        EOTOffset           : LREAL            (* Calculated coordinate offset
+       CmdDirectControl    : ST_CmdDirectControl  (* Command output for Y_DirectControl
+       CmdStop             : ST_CmdStop            (* Command output for MC_Stop
      VAR:
-       fbDirectControl     : Y_DirectControl
-       fbStop              : MC_Stop
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
        tTimeout            : TON
@@ -85,7 +81,6 @@
    ============================================================================ *)
 
 IF NOT Enable THEN
-    (* Reset all outputs when disabled *)
     Active := FALSE;
     Done := FALSE;
     InMotion := FALSE;
@@ -94,8 +89,8 @@ IF NOT Enable THEN
     EOTPosition := LREAL#0.0;
     EOTOffset := LREAL#0.0;
     eState := HE_IDLE;
-    fbDirectControl(Enable := FALSE);
-    fbStop(Execute := FALSE);
+    CmdDirectControl.Enable := FALSE;
+    CmdStop.Execute := FALSE;
     tTimeout(IN := FALSE);
     tStallConfirm(IN := FALSE);
     RETURN;
@@ -107,7 +102,7 @@ rTrigExecute(CLK := Execute);
 (* Handle abort in most states *)
 IF Abort AND (eState <> HE_IDLE) AND (eState <> HE_ERROR) AND
    (eState <> HE_DONE) AND (eState <> HE_REQUIRES_HOME) THEN
-    fbDirectControl(Enable := FALSE);
+    CmdDirectControl.Enable := FALSE;
     tTimeout(IN := FALSE);
     tStallConfirm(IN := FALSE);
     eState := HE_ABORTING;
@@ -118,8 +113,8 @@ tTimeout(IN := (eState >= HE_FAST_APPROACH) AND (eState <= HE_SETREF),
          PT := Timeout);
 
 IF tTimeout.Q THEN
-    fbDirectControl(Enable := FALSE);
-    fbStop(Execute := FALSE);
+    CmdDirectControl.Enable := FALSE;
+    CmdStop.Execute := FALSE;
     Error := TRUE;
     eState := HE_ERROR;
 END_IF;
@@ -139,9 +134,8 @@ IF eState = HE_IDLE THEN
         EOTPosition := LREAL#0.0;
         EOTOffset := LREAL#0.0;
 
-        (* Reset function blocks *)
-        fbDirectControl(Enable := FALSE);
-        fbStop(Execute := FALSE);
+        CmdDirectControl.Enable := FALSE;
+        CmdStop.Execute := FALSE;
         tTimeout(IN := FALSE);
         tStallConfirm(IN := FALSE);
 
@@ -155,11 +149,9 @@ ELSIF eState = HE_CHECK_REQ THEN
 
     (* HE_CHECK_REQ - Check if limit switch homing is required first *)
         IF AbsHomeRequired THEN
-            (* Must do limit switch homing before EOT homing *)
             RequiresLimitHome := TRUE;
             eState := HE_REQUIRES_HOME;
         ELSE
-            (* Requirements met - proceed to fast approach *)
             RequiresLimitHome := FALSE;
             eState := HE_FAST_APPROACH;
         END_IF;
@@ -168,32 +160,26 @@ ELSIF eState = HE_CHECK_REQ THEN
 ELSIF eState = HE_REQUIRES_HOME THEN
 
     (* HE_REQUIRES_HOME - Waiting for caller to handle the requirement *)
-        (* PRG_Main should transition to fault or Mode 110 *)
         Active := TRUE;
         RequiresLimitHome := TRUE;
-        (* Note: Caller should disable this FB and handle the error *)
 
 
 ELSIF eState = HE_FAST_APPROACH THEN
 
-    (* HE_FAST_APPROACH - Fast jog toward EOT (positive/extend direction) with torque limit *)
-        fbDirectControl(
-            Axis := Axis,
-            Enable := TRUE,
-            ControlMode := 2,  (* Velocity mode *)
-            Velocity := FastVelocity,
-            Torque := TorqueLimit
-        );
+    (* HE_FAST_APPROACH - Fast jog toward EOT with torque limit *)
+        CmdDirectControl.Enable := TRUE;
+        CmdDirectControl.ControlMode := 2;
+        CmdDirectControl.Velocity := FastVelocity;
+        CmdDirectControl.Torque := TorqueLimit;
 
-        InMotion := fbDirectControl.Active;
+        InMotion := G_staDirectControl.Active;
 
-        (* Switch to slow approach when near expected EOT *)
         IF ActualPosition >= (ExpectedEOTPosition - ApproachDistance) THEN
-            fbDirectControl(Enable := FALSE);
+            CmdDirectControl.Enable := FALSE;
             eState := HE_SLOW_APPROACH;
 
-        ELSIF fbDirectControl.Error THEN
-            fbDirectControl(Enable := FALSE);
+        ELSIF G_staDirectControl.Error THEN
+            CmdDirectControl.Enable := FALSE;
             Error := TRUE;
             eState := HE_ERROR;
         END_IF;
@@ -202,25 +188,20 @@ ELSIF eState = HE_FAST_APPROACH THEN
 ELSIF eState = HE_SLOW_APPROACH THEN
 
     (* HE_SLOW_APPROACH - Slow torque-limited approach to EOT *)
-        fbDirectControl(
-            Axis := Axis,
-            Enable := TRUE,
-            ControlMode := 2,  (* Velocity mode *)
-            Velocity := SlowVelocity,
-            Torque := TorqueLimit
-        );
+        CmdDirectControl.Enable := TRUE;
+        CmdDirectControl.ControlMode := 2;
+        CmdDirectControl.Velocity := SlowVelocity;
+        CmdDirectControl.Torque := TorqueLimit;
 
         InMotion := TRUE;
-        tStallConfirm(IN := FALSE);  (* Reset stall timer *)
+        tStallConfirm(IN := FALSE);
 
-        (* Detect stall: velocity near zero while torque at limit *)
         IF (ABS(ActualVelocity) < rVelocityThreshold) AND
            (ABS(ActualTorque) >= TorqueThreshold * rTorqueMultiplier) THEN
-            (* Stall condition detected - move to confirm *)
             eState := HE_STALL_DETECT;
 
-        ELSIF fbDirectControl.Error THEN
-            fbDirectControl(Enable := FALSE);
+        ELSIF G_staDirectControl.Error THEN
+            CmdDirectControl.Enable := FALSE;
             Error := TRUE;
             eState := HE_ERROR;
         END_IF;
@@ -229,30 +210,22 @@ ELSIF eState = HE_SLOW_APPROACH THEN
 ELSIF eState = HE_STALL_DETECT THEN
 
     (* HE_STALL_DETECT - Confirm stall condition for StallDetectTime *)
-        (* Continue pushing against EOT to confirm *)
-        fbDirectControl(
-            Axis := Axis,
-            Enable := TRUE,
-            ControlMode := 2,
-            Velocity := SlowVelocity,
-            Torque := TorqueLimit
-        );
+        CmdDirectControl.Enable := TRUE;
+        CmdDirectControl.ControlMode := 2;
+        CmdDirectControl.Velocity := SlowVelocity;
+        CmdDirectControl.Torque := TorqueLimit;
 
         InMotion := TRUE;
 
-        (* Timer for stall confirmation *)
         tStallConfirm(IN := TRUE, PT := StallDetectTime);
 
-        (* Check if still stalled *)
         IF (ABS(ActualVelocity) < rVelocityThreshold) AND
            (ABS(ActualTorque) >= TorqueThreshold * rTorqueMultiplier) THEN
             IF tStallConfirm.Q THEN
-                (* Stall confirmed - proceed to set reference *)
-                fbDirectControl(Enable := FALSE);
+                CmdDirectControl.Enable := FALSE;
                 eState := HE_SETREF;
             END_IF;
         ELSE
-            (* Not stalled anymore - go back to slow approach *)
             tStallConfirm(IN := FALSE);
             eState := HE_SLOW_APPROACH;
         END_IF;
@@ -263,23 +236,13 @@ ELSIF eState = HE_SETREF THEN
     (* HE_SETREF - Calculate EOT offset - DO NOT call MC_SetPosition
        This preserves the limit switch zero reference from Mode 110 *)
 
-        (* First stop to ensure fully stopped *)
-        fbStop(
-            Axis := Axis,
-            Execute := NOT fbStop.Done
-        );
+        CmdStop.Execute := NOT G_staStop.Done;
 
-        IF fbStop.Done THEN
-            fbStop(Execute := FALSE);
+        IF G_staStop.Done THEN
+            CmdStop.Execute := FALSE;
 
-            (* Record actual encoder position at EOT stall *)
             EOTPosition := ActualPosition;
 
-            (* Calculate offset for coordinate transformation *)
-            (* Master position = Slave position + offset *)
-            (* Example: If actual EOT is at encoder 295mm and expected is 300mm, *)
-            (*          offset = 300 - 295 = 5mm *)
-            (*          Master sees 300mm, slave is at 295mm *)
             EOTOffset := ExpectedEOTPosition - EOTPosition;
 
             InMotion := FALSE;
@@ -295,7 +258,6 @@ ELSIF eState = HE_DONE THEN
         Active := TRUE;
         InMotion := FALSE;
 
-        (* Reset when Execute goes low *)
         IF NOT Execute THEN
             Done := FALSE;
             eState := HE_IDLE;
@@ -305,21 +267,17 @@ ELSIF eState = HE_DONE THEN
 ELSIF eState = HE_ABORTING THEN
 
     (* HE_ABORTING - Stop motion *)
-        fbDirectControl(Enable := FALSE);
-        fbStop(
-            Axis := Axis,
-            Execute := TRUE
-        );
+        CmdDirectControl.Enable := FALSE;
+        CmdStop.Execute := TRUE;
 
-        IF fbStop.Done THEN
-            fbStop(Execute := FALSE);
+        IF G_staStop.Done THEN
+            CmdStop.Execute := FALSE;
             Active := FALSE;
             InMotion := FALSE;
             eState := HE_IDLE;
 
-        ELSIF fbStop.Error THEN
-            (* Stop failed - still try to go to idle *)
-            fbStop(Execute := FALSE);
+        ELSIF G_staStop.Error THEN
+            CmdStop.Execute := FALSE;
             eState := HE_ERROR;
         END_IF;
 
@@ -330,9 +288,8 @@ ELSIF eState = HE_ERROR THEN
         Active := FALSE;
         InMotion := FALSE;
         Done := FALSE;
-        fbDirectControl(Enable := FALSE);
+        CmdDirectControl.Enable := FALSE;
 
-        (* Allow reset when Execute goes low *)
         IF NOT Execute THEN
             Error := FALSE;
             eState := HE_IDLE;

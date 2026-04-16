@@ -11,7 +11,7 @@
 
    Behavior:
    - If AbsHomeRequired is TRUE: Set RedirectToHoming, PRG_Main switches to 110
-   - If requirements met: Execute MC_MoveAbsolute to HomePosition
+   - If requirements met: Command MC_MoveAbsolute via CmdMoveAbsolute output
    - After reaching position: Hold there until mode change
 
    Note: EOTHomeRequired does NOT block Go Home - the axis can still move
@@ -19,15 +19,14 @@
    AbsHomeRequired (encoder validity) blocks the move.
 
    Integration:
-   - Called from ST_GO_HOME state in PRG_Main
-   - RedirectToHoming signals PRG_Main to switch to ST_HOME_LIMIT
-   - Abort input for motion enable drop handling
+   - Called once per scan at end of PRG_Main
+   - CmdMoveAbsolute/CmdStop routed to G_cmd* by state machine when active
+   - Reads G_staMoveAbsolute/G_staStop for built-in FB status
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
        Enable              : BOOL             (* Enable the function block
        Execute             : BOOL             (* Start go home sequence
-       Axis                : AXIS_REF         (* PLCopen axis reference
        AbsHomeRequired     : BOOL             (* Encoder homing required (blocks Go Home)
        EOTHomeRequired     : BOOL             (* EOT homing required (does NOT block)
        HomePosition        : LREAL            (* Target home position (mm)
@@ -41,9 +40,9 @@
        RedirectToHoming    : BOOL             (* Caller should switch to homing mode
        InMotion            : BOOL             (* Currently moving
        Error               : BOOL             (* Error occurred
+       CmdMoveAbsolute     : ST_CmdMoveAbsolute  (* Command output for MC_MoveAbsolute
+       CmdStop             : ST_CmdStop           (* Command output for MC_Stop
      VAR:
-       fbMoveAbsolute      : MC_MoveAbsolute
-       fbStop              : MC_Stop
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
        rPosTolerance       : LREAL := 0.1     (* mm
@@ -62,7 +61,6 @@
    ============================================================================ *)
 
 IF NOT Enable THEN
-    (* Reset all outputs when disabled *)
     Active := FALSE;
     Done := FALSE;
     AtPosition := FALSE;
@@ -71,8 +69,8 @@ IF NOT Enable THEN
     InMotion := FALSE;
     Error := FALSE;
     eState := GOH_IDLE;
-    fbMoveAbsolute(Execute := FALSE);
-    fbStop(Execute := FALSE);
+    CmdMoveAbsolute.Execute := FALSE;
+    CmdStop.Execute := FALSE;
     RETURN;
 END_IF;
 
@@ -81,7 +79,7 @@ rTrigExecute(CLK := Execute);
 
 (* Handle abort in any state *)
 IF Abort AND (eState <> GOH_IDLE) AND (eState <> GOH_ERROR) AND (eState <> GOH_REDIRECT) THEN
-    fbMoveAbsolute(Execute := FALSE);
+    CmdMoveAbsolute.Execute := FALSE;
     eState := GOH_ABORTING;
 END_IF;
 
@@ -100,9 +98,8 @@ IF eState = GOH_IDLE THEN
         InMotion := FALSE;
         Error := FALSE;
 
-        (* Reset function blocks *)
-        fbMoveAbsolute(Execute := FALSE);
-        fbStop(Execute := FALSE);
+        CmdMoveAbsolute.Execute := FALSE;
+        CmdStop.Execute := FALSE;
 
         IF rTrigExecute.Q OR Execute THEN
             Active := TRUE;
@@ -115,13 +112,11 @@ ELSIF eState = GOH_CHECK_REQ THEN
     (* GOH_CHECK_REQ - Check homing requirements *)
 
         IF AbsHomeRequired THEN
-            (* Encoder homing required - cannot go home without valid position *)
             HomingRequired := TRUE;
             RedirectToHoming := TRUE;
             eState := GOH_REDIRECT;
 
         ELSE
-            (* Requirements met (or only EOT homing needed) - proceed with move *)
             HomingRequired := FALSE;
             RedirectToHoming := FALSE;
             eState := GOH_MOVING;
@@ -131,8 +126,6 @@ ELSIF eState = GOH_CHECK_REQ THEN
 ELSIF eState = GOH_REDIRECT THEN
 
     (* GOH_REDIRECT - Waiting for PRG_Main to handle redirect *)
-        (* Stay in this state - PRG_Main will transition to ST_HOME_LIMIT *)
-        (* This FB will be disabled when state changes *)
         Active := TRUE;
         HomingRequired := TRUE;
         RedirectToHoming := TRUE;
@@ -140,39 +133,29 @@ ELSIF eState = GOH_REDIRECT THEN
 
 ELSIF eState = GOH_MOVING THEN
 
-    (* GOH_MOVING - Execute move to home position *)
-        fbMoveAbsolute(
-            Axis := Axis,
-            Execute := TRUE,
-            Position := HomePosition,
-            Velocity := HomeVelocity,
-            Acceleration := LREAL#0.0,    (* Use axis default *)
-            Deceleration := LREAL#0.0,    (* Use axis default *)
-            Jerk := LREAL#0.0             (* Use axis default *)
-        );
+    (* GOH_MOVING - Command move to home position *)
+        CmdMoveAbsolute.Execute := TRUE;
+        CmdMoveAbsolute.Position := HomePosition;
+        CmdMoveAbsolute.Velocity := HomeVelocity;
+        CmdMoveAbsolute.Acceleration := LREAL#0.0;
+        CmdMoveAbsolute.Deceleration := LREAL#0.0;
 
-        InMotion := fbMoveAbsolute.Busy;
+        InMotion := G_staMoveAbsolute.Busy;
 
-        IF fbMoveAbsolute.Done THEN
-            (* Move complete - reset FB for next use
-               NOTE: Setting Execute := FALSE does NOT release position control.
-               Per PLCopen standard, axis remains in "Standstill" state with
-               active servo position holding. This is standard practice. *)
-            fbMoveAbsolute(Execute := FALSE);
+        IF G_staMoveAbsolute.Done THEN
+            CmdMoveAbsolute.Execute := FALSE;
             Done := TRUE;
             AtPosition := TRUE;
             InMotion := FALSE;
             eState := GOH_AT_POSITION;
 
-        ELSIF fbMoveAbsolute.Error THEN
-            (* Move failed *)
+        ELSIF G_staMoveAbsolute.Error THEN
             Error := TRUE;
-            fbMoveAbsolute(Execute := FALSE);
+            CmdMoveAbsolute.Execute := FALSE;
             eState := GOH_ERROR;
 
-        ELSIF fbMoveAbsolute.CommandAborted THEN
-            (* Move was aborted externally *)
-            fbMoveAbsolute(Execute := FALSE);
+        ELSIF G_staMoveAbsolute.CommandAborted THEN
+            CmdMoveAbsolute.Execute := FALSE;
             eState := GOH_ABORTING;
         END_IF;
 
@@ -185,10 +168,6 @@ ELSIF eState = GOH_AT_POSITION THEN
         InMotion := FALSE;
         Active := TRUE;
 
-        (* Check if still at position (could drift in some cases) *)
-        (* Note: In practice, the drive holds position in servo mode *)
-
-        (* If Execute goes low, we can reset for next time *)
         IF NOT Execute THEN
             Done := FALSE;
             eState := GOH_IDLE;
@@ -198,20 +177,16 @@ ELSIF eState = GOH_AT_POSITION THEN
 ELSIF eState = GOH_ABORTING THEN
 
     (* GOH_ABORTING - Stop motion *)
-        fbStop(
-            Axis := Axis,
-            Execute := TRUE
-        );
+        CmdStop.Execute := TRUE;
 
-        IF fbStop.Done THEN
-            fbStop(Execute := FALSE);
+        IF G_staStop.Done THEN
+            CmdStop.Execute := FALSE;
             Active := FALSE;
             InMotion := FALSE;
             eState := GOH_IDLE;
 
-        ELSIF fbStop.Error THEN
-            (* Stop failed - still try to go to idle *)
-            fbStop(Execute := FALSE);
+        ELSIF G_staStop.Error THEN
+            CmdStop.Execute := FALSE;
             eState := GOH_ERROR;
         END_IF;
 
@@ -223,7 +198,6 @@ ELSIF eState = GOH_ERROR THEN
         InMotion := FALSE;
         Done := FALSE;
 
-        (* Allow reset when Execute goes low *)
         IF NOT Execute THEN
             Error := FALSE;
             eState := GOH_IDLE;

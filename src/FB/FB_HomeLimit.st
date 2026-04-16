@@ -22,14 +22,14 @@
    - If retract limit triggers during positive approach, this is a fault
 
    Integration:
-   - Called from ST_HOME_LIMIT state in PRG_Main
-   - Abort input for motion enable drop handling
+   - Called once per scan at end of PRG_Main
+   - CmdMoveVelocity/CmdStop/CmdSetPosition routed to G_cmd* when active
+   - Reads G_staMoveVelocity/G_staStop/G_staSetPosition for status
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
        Enable              : BOOL             (* Enable the function block
        Execute             : BOOL             (* Start homing sequence
-       Axis                : AXIS_REF         (* PLCopen axis reference
        ApproachVelocity    : LREAL            (* Approach velocity (mm/s)
        BackoffVelocity     : LREAL            (* Backoff velocity (mm/s)
        SetPosition         : LREAL            (* Position to set at home switch (mm)
@@ -43,14 +43,15 @@
        InMotion            : BOOL             (* Currently moving
        Error               : BOOL             (* Error occurred
        ApproachingPositive : BOOL             (* Currently approaching from positive direction
+       CmdMoveVelocity     : ST_CmdMoveVelocity  (* Command output for MC_MoveVelocity
+       CmdStop             : ST_CmdStop           (* Command output for MC_Stop
+       CmdSetPosition      : ST_CmdSetPosition    (* Command output for MC_SetPosition
      VAR:
-       fbMoveVelocity      : MC_MoveVelocity
-       fbStop              : MC_Stop
-       fbSetPosition       : MC_SetPosition
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
        tTimeout            : TON
        bApproachFromPositive : BOOL := FALSE
+       bStopDoneLatched    : BOOL := FALSE
      VAR CONSTANT:
        HL_IDLE             : INT := 0
        HL_APPROACH         : INT := 1
@@ -67,7 +68,6 @@
    ============================================================================ *)
 
 IF NOT Enable THEN
-    (* Reset all outputs when disabled *)
     Active := FALSE;
     Done := FALSE;
     InMotion := FALSE;
@@ -75,9 +75,10 @@ IF NOT Enable THEN
     ApproachingPositive := FALSE;
     eState := HL_IDLE;
     bApproachFromPositive := FALSE;
-    fbMoveVelocity(Execute := FALSE);
-    fbStop(Execute := FALSE);
-    fbSetPosition(Execute := FALSE);
+    bStopDoneLatched := FALSE;
+    CmdMoveVelocity.Execute := FALSE;
+    CmdStop.Execute := FALSE;
+    CmdSetPosition.Execute := FALSE;
     tTimeout(IN := FALSE);
     RETURN;
 END_IF;
@@ -87,8 +88,8 @@ rTrigExecute(CLK := Execute);
 
 (* Handle abort in most states *)
 IF Abort AND (eState <> HL_IDLE) AND (eState <> HL_ERROR) AND (eState <> HL_DONE) THEN
-    fbMoveVelocity(Execute := FALSE);
-    fbSetPosition(Execute := FALSE);
+    CmdMoveVelocity.Execute := FALSE;
+    CmdSetPosition.Execute := FALSE;
     tTimeout(IN := FALSE);
     eState := HL_ABORTING;
 END_IF;
@@ -98,9 +99,9 @@ tTimeout(IN := (eState <> HL_IDLE) AND (eState <> HL_DONE) AND (eState <> HL_ERR
          PT := Timeout);
 
 IF tTimeout.Q THEN
-    fbMoveVelocity(Execute := FALSE);
-    fbStop(Execute := FALSE);
-    fbSetPosition(Execute := FALSE);
+    CmdMoveVelocity.Execute := FALSE;
+    CmdStop.Execute := FALSE;
+    CmdSetPosition.Execute := FALSE;
     Error := TRUE;
     eState := HL_ERROR;
 END_IF;
@@ -118,68 +119,54 @@ IF eState = HL_IDLE THEN
         Error := FALSE;
         ApproachingPositive := FALSE;
         bApproachFromPositive := FALSE;
+        bStopDoneLatched := FALSE;
 
-        (* Reset function blocks *)
-        fbMoveVelocity(Execute := FALSE);
-        fbStop(Execute := FALSE);
-        fbSetPosition(Execute := FALSE);
+        CmdMoveVelocity.Execute := FALSE;
+        CmdStop.Execute := FALSE;
+        CmdSetPosition.Execute := FALSE;
         tTimeout(IN := FALSE);
 
         IF rTrigExecute.Q OR Execute THEN
             Active := TRUE;
-            bApproachFromPositive := FALSE;  (* Start approaching from negative *)
+            bApproachFromPositive := FALSE;
             eState := HL_APPROACH;
         END_IF;
 
 
 ELSIF eState = HL_APPROACH THEN
 
-    (* HL_APPROACH - Move toward home limit switch
-       Direction depends on bApproachFromPositive:
-       - FALSE: Approach from negative direction (default)
-       - TRUE: Approach from positive direction (after over-travel) *)
+    (* HL_APPROACH - Move toward home limit switch *)
         ApproachingPositive := bApproachFromPositive;
 
+        CmdMoveVelocity.Execute := TRUE;
+        CmdMoveVelocity.Velocity := ApproachVelocity;
+        CmdMoveVelocity.Acceleration := LREAL#0.0;
+        CmdMoveVelocity.Deceleration := LREAL#0.0;
         IF bApproachFromPositive THEN
-            fbMoveVelocity(
-                Axis := Axis,
-                Execute := TRUE,
-                Velocity := ApproachVelocity,
-                Direction := MC_Direction#Positive_Direction
-            );
+            CmdMoveVelocity.Direction := 1;
         ELSE
-            fbMoveVelocity(
-                Axis := Axis,
-                Execute := TRUE,
-                Velocity := ApproachVelocity,
-                Direction := MC_Direction#Negative_Direction
-            );
+            CmdMoveVelocity.Direction := -1;
         END_IF;
 
-        InMotion := fbMoveVelocity.Busy;
+        InMotion := G_staMoveVelocity.Busy;
 
         IF LimitHomeActive THEN
-            (* Home limit switch triggered - stop and detect *)
-            fbMoveVelocity(Execute := FALSE);
+            CmdMoveVelocity.Execute := FALSE;
             eState := HL_DETECT;
 
         ELSIF LimitRetractActive THEN
-            (* Over-travel: Hit retract limit instead of home limit *)
             IF NOT bApproachFromPositive THEN
-                (* Was approaching from negative - reverse to positive direction *)
-                fbMoveVelocity(Execute := FALSE);
+                CmdMoveVelocity.Execute := FALSE;
                 bApproachFromPositive := TRUE;
-                (* Stay in HL_APPROACH, will re-enter with new direction next scan *)
 
             ELSE
-                (* Already approaching from positive and hit retract - fault *)
-                fbMoveVelocity(Execute := FALSE);
+                CmdMoveVelocity.Execute := FALSE;
                 Error := TRUE;
                 eState := HL_ERROR;
             END_IF;
 
-        ELSIF fbMoveVelocity.Error THEN
-            fbMoveVelocity(Execute := FALSE);
+        ELSIF G_staMoveVelocity.Error THEN
+            CmdMoveVelocity.Execute := FALSE;
             Error := TRUE;
             eState := HL_ERROR;
         END_IF;
@@ -188,19 +175,16 @@ ELSIF eState = HL_APPROACH THEN
 ELSIF eState = HL_DETECT THEN
 
     (* HL_DETECT - Stop motion after limit switch detected *)
-        fbStop(
-            Axis := Axis,
-            Execute := TRUE
-        );
+        CmdStop.Execute := TRUE;
 
-        InMotion := NOT fbStop.Done;
+        InMotion := NOT G_staStop.Done;
 
-        IF fbStop.Done THEN
-            fbStop(Execute := FALSE);
+        IF G_staStop.Done THEN
+            CmdStop.Execute := FALSE;
             eState := HL_BACKOFF;
 
-        ELSIF fbStop.Error THEN
-            fbStop(Execute := FALSE);
+        ELSIF G_staStop.Error THEN
+            CmdStop.Execute := FALSE;
             Error := TRUE;
             eState := HL_ERROR;
         END_IF;
@@ -209,22 +193,21 @@ ELSIF eState = HL_DETECT THEN
 ELSIF eState = HL_BACKOFF THEN
 
     (* HL_BACKOFF - Move away from limit switch at slow speed until switch clears *)
-        fbMoveVelocity(
-            Axis := Axis,
-            Execute := TRUE,
-            Velocity := BackoffVelocity,
-            Direction := MC_Direction#Positive_Direction
-        );
+        CmdMoveVelocity.Execute := TRUE;
+        CmdMoveVelocity.Velocity := BackoffVelocity;
+        CmdMoveVelocity.Acceleration := LREAL#0.0;
+        CmdMoveVelocity.Deceleration := LREAL#0.0;
+        CmdMoveVelocity.Direction := 1;
 
-        InMotion := fbMoveVelocity.Busy;
+        InMotion := G_staMoveVelocity.Busy;
 
         IF NOT LimitHomeActive THEN
-            (* Switch cleared - stop and set position *)
-            fbMoveVelocity(Execute := FALSE);
+            CmdMoveVelocity.Execute := FALSE;
+            bStopDoneLatched := FALSE;
             eState := HL_SETREF;
 
-        ELSIF fbMoveVelocity.Error THEN
-            fbMoveVelocity(Execute := FALSE);
+        ELSIF G_staMoveVelocity.Error THEN
+            CmdMoveVelocity.Execute := FALSE;
             Error := TRUE;
             eState := HL_ERROR;
         END_IF;
@@ -233,30 +216,26 @@ ELSIF eState = HL_BACKOFF THEN
 ELSIF eState = HL_SETREF THEN
 
     (* HL_SETREF - Set position reference at home switch edge location *)
-        (* First stop to ensure fully stopped *)
-        fbStop(
-            Axis := Axis,
-            Execute := NOT fbStop.Done
-        );
+        IF NOT bStopDoneLatched THEN
+            CmdStop.Execute := NOT G_staStop.Done;
 
-        IF fbStop.Done THEN
-            fbStop(Execute := FALSE);
+            IF G_staStop.Done THEN
+                CmdStop.Execute := FALSE;
+                bStopDoneLatched := TRUE;
+            END_IF;
+        ELSE
+            CmdSetPosition.Execute := TRUE;
+            CmdSetPosition.Position := SetPosition;
+            CmdSetPosition.Relative := FALSE;
 
-            (* Set this position as the home reference *)
-            fbSetPosition(
-                Axis := Axis,
-                Execute := TRUE,
-                Position := SetPosition
-            );
-
-            IF fbSetPosition.Done THEN
-                fbSetPosition(Execute := FALSE);
+            IF G_staSetPosition.Done THEN
+                CmdSetPosition.Execute := FALSE;
                 InMotion := FALSE;
                 Done := TRUE;
                 eState := HL_DONE;
 
-            ELSIF fbSetPosition.Error THEN
-                fbSetPosition(Execute := FALSE);
+            ELSIF G_staSetPosition.Error THEN
+                CmdSetPosition.Execute := FALSE;
                 Error := TRUE;
                 eState := HL_ERROR;
             END_IF;
@@ -271,7 +250,6 @@ ELSIF eState = HL_DONE THEN
         InMotion := FALSE;
         ApproachingPositive := FALSE;
 
-        (* Reset when Execute goes low *)
         IF NOT Execute THEN
             Done := FALSE;
             eState := HL_IDLE;
@@ -281,20 +259,16 @@ ELSIF eState = HL_DONE THEN
 ELSIF eState = HL_ABORTING THEN
 
     (* HL_ABORTING - Stop motion *)
-        fbStop(
-            Axis := Axis,
-            Execute := TRUE
-        );
+        CmdStop.Execute := TRUE;
 
-        IF fbStop.Done THEN
-            fbStop(Execute := FALSE);
+        IF G_staStop.Done THEN
+            CmdStop.Execute := FALSE;
             Active := FALSE;
             InMotion := FALSE;
             eState := HL_IDLE;
 
-        ELSIF fbStop.Error THEN
-            (* Stop failed - still try to go to idle *)
-            fbStop(Execute := FALSE);
+        ELSIF G_staStop.Error THEN
+            CmdStop.Execute := FALSE;
             eState := HL_ERROR;
         END_IF;
 
@@ -306,7 +280,6 @@ ELSIF eState = HL_ERROR THEN
         InMotion := FALSE;
         Done := FALSE;
 
-        (* Allow reset when Execute goes low *)
         IF NOT Execute THEN
             Error := FALSE;
             eState := HL_IDLE;
