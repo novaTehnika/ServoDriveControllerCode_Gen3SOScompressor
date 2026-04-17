@@ -19,7 +19,7 @@
    where the piston is inside the cylinder.
 
    Output:
-   - Raw INT: -32768 to +32767 corresponds to -10V to +10V
+   - Analog output: LREAL voltage (-10.0 to +10.0 V)
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
@@ -34,17 +34,14 @@
        Stage2VoltMin       : LREAL            (* Stage 2 voltage start (V)
        Stage2VoltMax       : LREAL            (* Stage 2 voltage end (V)
      VAR_OUTPUT:
-       RawAnalogOutput     : INT              (* Raw analog output value
+       RawAnalogOutput     : LREAL            (* Analog output voltage (-10.0 to +10.0 V)
        OutputVoltage       : LREAL            (* Calculated output voltage
        InStage1            : BOOL             (* Position is in stage 1 region
        InStage2            : BOOL             (* Position is in stage 2 region
      VAR:
        rVoltage            : LREAL            (* Calculated voltage
        rNormalized         : LREAL            (* Normalized position within stage
-       rRawValue           : LREAL            (* Raw value before conversion
      VAR CONSTANT:
-       RAW_MIN             : LREAL := -32768.0
-       RAW_MAX             : LREAL := 32767.0
        VOLT_MIN            : LREAL := -10.0
        VOLT_MAX            : LREAL := 10.0
        VOLT_RANGE          : LREAL := 20.0
@@ -55,7 +52,7 @@
    ============================================================================ *)
 
 IF NOT Enable THEN
-    RawAnalogOutput := 0;
+    RawAnalogOutput := LREAL#0.0;
     OutputVoltage := LREAL#0.0;
     InStage1 := FALSE;
     InStage2 := FALSE;
@@ -103,16 +100,4 @@ END_IF;
 (* Clamp voltage to valid range *)
 rVoltage := LIMIT(VOLT_MIN, rVoltage, VOLT_MAX);
 OutputVoltage := rVoltage;
-
-(* Convert voltage to raw output value *)
-(* Voltage -10V to +10V maps to raw -32768 to +32767 *)
-rRawValue := ((rVoltage - VOLT_MIN) / VOLT_RANGE) * (RAW_MAX - RAW_MIN) + RAW_MIN;
-
-(* Convert to integer with clamping *)
-IF rRawValue < RAW_MIN THEN
-    RawAnalogOutput := -32768;
-ELSIF rRawValue > RAW_MAX THEN
-    RawAnalogOutput := 32767;
-ELSE
-    RawAnalogOutput := LREAL_TO_INT(rRawValue);
-END_IF;
+RawAnalogOutput := rVoltage;
