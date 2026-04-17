@@ -78,11 +78,10 @@
 
      (* ========================================================================
         ANALOG INPUTS (1 Available)
-        Range: -10V to +10V mapped to INT -32768 to +32767
-        Resolution: 20V / 65536 = 0.305 mV/count
+        Range: -10V to +10V (LREAL, volts)
         ======================================================================== *)
 
-     G_aiReference         AT %IW0   : INT    (* Mode-dependent reference signal *)
+     G_aiReference         AT %IW0   : LREAL  (* Mode-dependent reference signal *)
                                              (* Position mode: position reference *)
                                              (* Velocity mode: velocity reference *)
                                              (* Torque mode: torque reference *)
@@ -90,10 +89,10 @@
 
      (* ========================================================================
         ANALOG OUTPUTS (1 Available)
-        Range: -10V to +10V mapped to INT -32768 to +32767
+        Range: -10V to +10V (LREAL, volts)
         ======================================================================== *)
 
-     G_aoPositionOutput    AT %QW0   : INT    (* Position output signal to master *)
+     G_aoPositionOutput    AT %QW0   : LREAL  (* Position output signal to master *)
                                              (* Uses two-stage scaling for resolution *)
    END_VAR
 

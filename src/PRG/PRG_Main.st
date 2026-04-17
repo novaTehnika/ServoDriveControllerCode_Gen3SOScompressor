@@ -70,7 +70,7 @@
        bFilteredLimitRetract : BOOL
        bFilteredLimitHome  : BOOL
        bFilteredFaultReset : BOOL
-       nFilteredAnalog     : INT
+       nFilteredAnalog     : LREAL
        rAnalogFilterAlpha  : LREAL := 0.0
        bFaultResetInFaultState : BOOL
        eFaultResetActiveCode   : E_FaultCode

@@ -9,7 +9,7 @@
    reference based on the current operating mode.
 
    Analog Input Scaling:
-   - Raw INT: -32768 to +32767 corresponds to -10V to +10V
+   - Analog input: LREAL voltage (-10.0 to +10.0 V)
    - Scaled to engineering units based on mode and configuration
 
    Position Mode uses two-stage mapping for consistency with position feedback:
@@ -24,7 +24,7 @@
    Variables (define in MWiec GUI):
      VAR_INPUT:
        Enable              : BOOL             (* Enable the processor
-       RawAnalogInput      : INT              (* Raw analog input value
+       RawAnalogInput      : LREAL            (* Analog input voltage (-10.0 to +10.0 V)
        CurrentMode         : E_OperatingMode  (* Current operating mode
        Stage1PosMin        : LREAL            (* Stage 1 position start (mm)
        Stage1PosMax        : LREAL            (* Stage 1 position end (mm) = transition pos
@@ -51,9 +51,6 @@
        rNormalized         : LREAL            (* Normalized value 0.0 to 1.0
        rStageNormalized    : LREAL            (* Normalized value within stage
      VAR CONSTANT:
-       RAW_MIN             : LREAL := -32768.0
-       RAW_MAX             : LREAL := 32767.0
-       RAW_RANGE           : LREAL := 65535.0
        VOLT_MIN            : LREAL := -10.0
        VOLT_MAX            : LREAL := 10.0
        VOLT_RANGE          : LREAL := 20.0
@@ -75,12 +72,10 @@ IF NOT Enable THEN
     RETURN;
 END_IF;
 
-(* Normalize raw input to 0.0-1.0 range *)
-rNormalized := (INT_TO_LREAL(RawAnalogInput) - RAW_MIN) / RAW_RANGE;
+(* Calculate normalized input and voltage directly from LREAL analog input *)
+InputVoltage := RawAnalogInput;
+rNormalized := (InputVoltage - VOLT_MIN) / VOLT_RANGE;
 NormalizedInput := rNormalized;
-
-(* Calculate input voltage *)
-InputVoltage := VOLT_MIN + (rNormalized * VOLT_RANGE);
 
 (* Scale velocity and torque (simple linear mapping) *)
 ScaledVelocity := VelMin + (rNormalized * (VelMax - VelMin));

@@ -27,11 +27,11 @@
    Variables (define in MWiec GUI):
      VAR_INPUT:
        Enable              : BOOL := TRUE     (* Enable filtering
-       RawInput            : LREAL            (* Raw analog input
+       RawInput            : LREAL            (* Raw analog input (volts, -10.0 to +10.0)
        Alpha               : LREAL            (* Low-pass filter coefficient (0.0-1.0)
        MedianFilterSize    : INT := 3         (* Median filter size: 3 or 5
      VAR_OUTPUT:
-       FilteredOutput      : INT              (* Filtered output value
+       FilteredOutput      : LREAL            (* Filtered output value (volts)
      VAR:
        aMedianBuffer       : ARRAY[0..4] OF LREAL  (* Median filter buffer
        nMedianIndex        : INT := 0
@@ -125,13 +125,4 @@ rFilteredValue := (rAlpha * rMedianResult) + ((LREAL#1.0 - rAlpha) * rFilteredVa
    Output
    -------------------------------------------------------------------------- *)
 
-FilteredReal := rFilteredValue;
-
-(* Convert back to INT with clamping *)
-IF rFilteredValue < LREAL#-32768.0 THEN
-    FilteredOutput := -32768;
-ELSIF rFilteredValue > LREAL#32767.0 THEN
-    FilteredOutput := 32767;
-ELSE
-    FilteredOutput := LREAL_TO_INT(rFilteredValue);
-END_IF;
+FilteredOutput := rFilteredValue;
