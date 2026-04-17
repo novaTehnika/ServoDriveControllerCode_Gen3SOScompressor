@@ -41,7 +41,7 @@
        InMotion            : BOOL             (* Currently moving
        Error               : BOOL             (* Error occurred
        CmdMoveAbsolute     : ST_CmdMoveAbsolute  (* Command output for MC_MoveAbsolute
-       CmdStop             : ST_CmdStop           (* Command output for MC_Stop
+       CmdStop             : ST_CmdStop          (* Command output for MC_Stop
      VAR:
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG

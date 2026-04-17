@@ -55,7 +55,7 @@
        EOTPosition         : LREAL            (* Recorded encoder position at EOT stall
        EOTOffset           : LREAL            (* Calculated coordinate offset
        CmdDirectControl    : ST_CmdDirectControl  (* Command output for Y_DirectControl
-       CmdStop             : ST_CmdStop            (* Command output for MC_Stop
+       CmdStop             : ST_CmdStop           (* Command output for MC_Stop
      VAR:
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG

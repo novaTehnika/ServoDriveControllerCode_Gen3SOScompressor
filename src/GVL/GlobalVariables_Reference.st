@@ -364,14 +364,6 @@
 
 
      (* ========================================================================
-        AXIS REFERENCE
-        PLCopen axis structure for motion control function blocks
-        ======================================================================== *)
-
-     G_sysAxis                 : AXIS_REF         (* PLCopen axis reference *)
-
-
-     (* ========================================================================
         MOTION FEEDBACK
         Current state of the servo motor/actuator
         ======================================================================== *)

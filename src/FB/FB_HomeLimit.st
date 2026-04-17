@@ -44,8 +44,8 @@
        Error               : BOOL             (* Error occurred
        ApproachingPositive : BOOL             (* Currently approaching from positive direction
        CmdMoveVelocity     : ST_CmdMoveVelocity  (* Command output for MC_MoveVelocity
-       CmdStop             : ST_CmdStop           (* Command output for MC_Stop
-       CmdEncMngr          : ST_CmdEncMngr         (* Command output for AbsolutePositionManager
+       CmdStop             : ST_CmdStop          (* Command output for MC_Stop
+       CmdEncMngr          : ST_CmdEncMngr       (* Command output for AbsolutePositionManager
      VAR:
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
