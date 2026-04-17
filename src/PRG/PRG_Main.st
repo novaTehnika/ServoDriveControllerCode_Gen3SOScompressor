@@ -162,7 +162,6 @@ ELSIF G_sysCurrentState = E_SystemState#ST_ENCODER_CHECK THEN
 
         IF fbEncoderManager.CheckComplete THEN
             G_sysEncoderValid := fbEncoderManager.EncoderValid;
-            G_sysEncoderBatteryOK := fbEncoderManager.BatteryOK;
 
             IF G_sysEncoderValid THEN
                 G_flagAbsHomeRequired := FALSE;
@@ -817,7 +816,8 @@ fbFaultReset(
 (* Encoder manager *)
 fbEncoderManager(
     Enable := (G_sysCurrentState = E_SystemState#ST_ENCODER_CHECK),
-    CheckOnStartup := TRUE
+    CheckOnStartup := TRUE,
+    StaEncMngr := G_staEncMngr
 );
 
 (* Go Home handler *)

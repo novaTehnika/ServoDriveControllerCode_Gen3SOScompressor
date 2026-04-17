@@ -6,7 +6,9 @@
 
    Description:
    Validates absolute encoder status on startup by commanding the
-   AbsolutePositionManager (running in the LD POU) via G_cmd/G_sta globals.
+   AbsolutePositionManager (running in the LD POU). Command is emitted via
+   the CmdEncMngr output; status is received via the StaEncMngr input.
+   Caller (PRG_Main) is responsible for routing to/from G_cmd/G_sta globals.
    Determines if homing is required due to encoder data corruption.
 
    The Sigma-7 absolute encoder maintains position across power cycles via
@@ -15,20 +17,22 @@
 
    States:
    - IDLE: Waiting for check trigger
-   - CHECK_INIT: Enable AbsolutePositionManager via G_cmdEncMngr
-   - CHECK_STATUS: Query encoder status via G_staEncMngr
+   - CHECK_INIT: Enable AbsolutePositionManager via CmdEncMngr output
+   - CHECK_STATUS: Query encoder status via StaEncMngr input
    - COMPLETE: Check finished, outputs valid
    - ERROR: Error during check
 
    Integration:
    - Called once per scan at end of PRG_Main
    - Commands AbsolutePositionManager via CmdEncMngr output
-   - PRG_Main routes CmdEncMngr -> G_cmdEncMngr when active
+   - Receives LD POU status via StaEncMngr input
+   - PRG_Main routes StaEncMngr <- G_staEncMngr and CmdEncMngr -> G_cmdEncMngr
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
        Enable              : BOOL             (* Enable the function block
        CheckOnStartup      : BOOL             (* Trigger startup check
+       StaEncMngr          : ST_StaEncMngr    (* Status from LD POU
      VAR_OUTPUT:
        EncoderValid        : BOOL             (* Absolute position is valid
        AbsHomeRequired     : BOOL             (* Homing required due to encoder issue
@@ -95,9 +99,9 @@ ELSIF eState = ENC_CHECK_INIT THEN
 
         CmdEncMngr.Enable := TRUE;
 
-        IF G_staEncMngr.Valid THEN
+        IF StaEncMngr.Valid THEN
             eState := ENC_CHECK_STATUS;
-        ELSIF G_staEncMngr.Error THEN
+        ELSIF StaEncMngr.Error THEN
             Error := TRUE;
             eState := ENC_ERROR;
         ELSIF tCheckTimeout.Q THEN
@@ -110,8 +114,8 @@ ELSIF eState = ENC_CHECK_STATUS THEN
     (* ENC_CHECK_STATUS - Query encoder status from LD POU *)
         CmdEncMngr.Enable := TRUE;
 
-        IF G_staEncMngr.Valid THEN
-            EncoderValid := G_staEncMngr.PositionValid;
+        IF StaEncMngr.Valid THEN
+            EncoderValid := StaEncMngr.PositionValid;
 
             AbsHomeRequired := NOT EncoderValid;
 
@@ -120,7 +124,7 @@ ELSIF eState = ENC_CHECK_STATUS THEN
             tCheckTimeout(IN := FALSE);
             eState := ENC_COMPLETE;
 
-        ELSIF G_staEncMngr.Error THEN
+        ELSIF StaEncMngr.Error THEN
             Error := TRUE;
             eState := ENC_ERROR;
 
