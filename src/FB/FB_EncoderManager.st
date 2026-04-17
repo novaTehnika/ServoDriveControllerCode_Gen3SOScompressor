@@ -37,7 +37,7 @@
        CheckComplete       : BOOL             (* Startup check finished
        Busy                : BOOL             (* Check in progress
        Error               : BOOL             (* Error occurred during check
-       CmdEncMngr     : ST_CmdEncMngr  (* Command output for LD POU
+       CmdEncMngr          : ST_CmdEncMngr    (* Command output for LD POU
      VAR:
        eState              : INT := 0         (* State machine
        rTrigCheck          : R_TRIG
