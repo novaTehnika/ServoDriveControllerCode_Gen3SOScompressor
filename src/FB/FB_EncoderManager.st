@@ -31,8 +31,6 @@
        CheckOnStartup      : BOOL             (* Trigger startup check
      VAR_OUTPUT:
        EncoderValid        : BOOL             (* Absolute position is valid
-       BatteryOK           : BOOL             (* Encoder battery status OK
-       MultiTurnValid      : BOOL             (* Multi-turn counter data valid
        AbsHomeRequired     : BOOL             (* Homing required due to encoder issue
        CheckComplete       : BOOL             (* Startup check finished
        Busy                : BOOL             (* Check in progress
@@ -58,8 +56,6 @@
 
 IF NOT Enable THEN
     EncoderValid := FALSE;
-    BatteryOK := FALSE;
-    MultiTurnValid := FALSE;
     AbsHomeRequired := FALSE;
     CheckComplete := FALSE;
     Busy := FALSE;
@@ -158,8 +154,6 @@ ELSIF eState = ENC_ERROR THEN
         CheckComplete := FALSE;
 
         EncoderValid := FALSE;
-        BatteryOK := FALSE;
-        MultiTurnValid := FALSE;
         AbsHomeRequired := TRUE;
 
         CmdEncMngr.Enable := FALSE;
