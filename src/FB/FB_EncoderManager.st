@@ -15,15 +15,15 @@
 
    States:
    - IDLE: Waiting for check trigger
-   - CHECK_INIT: Enable AbsolutePositionManager via G_cmdEncoderCheck
-   - CHECK_STATUS: Query encoder status via G_staEncoderCheck
+   - CHECK_INIT: Enable AbsolutePositionManager via G_cmdEncMngr
+   - CHECK_STATUS: Query encoder status via G_staEncMngr
    - COMPLETE: Check finished, outputs valid
    - ERROR: Error during check
 
    Integration:
    - Called once per scan at end of PRG_Main
-   - Commands AbsolutePositionManager via CmdEncoderCheck output
-   - PRG_Main routes CmdEncoderCheck -> G_cmdEncoderCheck when active
+   - Commands AbsolutePositionManager via CmdEncMngr output
+   - PRG_Main routes CmdEncMngr -> G_cmdEncMngr when active
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
@@ -37,7 +37,7 @@
        CheckComplete       : BOOL             (* Startup check finished
        Busy                : BOOL             (* Check in progress
        Error               : BOOL             (* Error occurred during check
-       CmdEncoderCheck     : ST_CmdEncoderCheck  (* Command output for LD POU
+       CmdEncMngr     : ST_CmdEncMngr  (* Command output for LD POU
      VAR:
        eState              : INT := 0         (* State machine
        rTrigCheck          : R_TRIG
@@ -66,7 +66,7 @@ IF NOT Enable THEN
     Error := FALSE;
     eState := ENC_IDLE;
     tCheckTimeout(IN := FALSE);
-    CmdEncoderCheck.Enable := FALSE;
+    CmdEncMngr.Enable := FALSE;
     RETURN;
 END_IF;
 
@@ -82,7 +82,7 @@ IF eState = ENC_IDLE THEN
     (* ENC_IDLE - Waiting for check trigger *)
         Busy := FALSE;
         CheckComplete := FALSE;
-        CmdEncoderCheck.Enable := FALSE;
+        CmdEncMngr.Enable := FALSE;
 
         IF rTrigCheck.Q OR (CheckOnStartup AND NOT bCheckTriggered) THEN
             bCheckTriggered := TRUE;
@@ -97,11 +97,11 @@ ELSIF eState = ENC_CHECK_INIT THEN
     (* ENC_CHECK_INIT - Enable AbsolutePositionManager via command output *)
         tCheckTimeout(IN := TRUE, PT := CHECK_TIMEOUT);
 
-        CmdEncoderCheck.Enable := TRUE;
+        CmdEncMngr.Enable := TRUE;
 
-        IF G_staEncoderCheck.Valid THEN
+        IF G_staEncMngr.Valid THEN
             eState := ENC_CHECK_STATUS;
-        ELSIF G_staEncoderCheck.Error THEN
+        ELSIF G_staEncMngr.Error THEN
             Error := TRUE;
             eState := ENC_ERROR;
         ELSIF tCheckTimeout.Q THEN
@@ -112,10 +112,10 @@ ELSIF eState = ENC_CHECK_INIT THEN
 ELSIF eState = ENC_CHECK_STATUS THEN
 
     (* ENC_CHECK_STATUS - Query encoder status from LD POU *)
-        CmdEncoderCheck.Enable := TRUE;
+        CmdEncMngr.Enable := TRUE;
 
-        IF G_staEncoderCheck.Valid THEN
-            EncoderValid := G_staEncoderCheck.PositionValid;
+        IF G_staEncMngr.Valid THEN
+            EncoderValid := G_staEncMngr.PositionValid;
 
             AbsHomeRequired := NOT EncoderValid;
 
@@ -124,7 +124,7 @@ ELSIF eState = ENC_CHECK_STATUS THEN
             tCheckTimeout(IN := FALSE);
             eState := ENC_COMPLETE;
 
-        ELSIF G_staEncoderCheck.Error THEN
+        ELSIF G_staEncMngr.Error THEN
             Error := TRUE;
             eState := ENC_ERROR;
 
@@ -138,7 +138,7 @@ ELSIF eState = ENC_COMPLETE THEN
     (* ENC_COMPLETE - Check complete - hold outputs until disabled or new check *)
         Busy := FALSE;
         CheckComplete := TRUE;
-        CmdEncoderCheck.Enable := FALSE;
+        CmdEncMngr.Enable := FALSE;
 
         IF NOT CheckOnStartup THEN
             bCheckTriggered := FALSE;
@@ -162,7 +162,7 @@ ELSIF eState = ENC_ERROR THEN
         MultiTurnValid := FALSE;
         AbsHomeRequired := TRUE;
 
-        CmdEncoderCheck.Enable := FALSE;
+        CmdEncMngr.Enable := FALSE;
         tCheckTimeout(IN := FALSE);
 
         IF NOT CheckOnStartup THEN

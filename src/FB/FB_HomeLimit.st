@@ -23,8 +23,8 @@
 
    Integration:
    - Called once per scan at end of PRG_Main
-   - CmdMoveVelocity/CmdStop/CmdSetPosition routed to G_cmd* when active
-   - Reads G_staMoveVelocity/G_staStop/G_staSetPosition for status
+   - CmdMoveVelocity/CmdStop/CmdEncMngr routed to G_cmd* by PRG_Main
+   - Reads G_staMoveVelocity/G_staStop/G_staEncMngr for status
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
@@ -45,7 +45,7 @@
        ApproachingPositive : BOOL             (* Currently approaching from positive direction
        CmdMoveVelocity     : ST_CmdMoveVelocity  (* Command output for MC_MoveVelocity
        CmdStop             : ST_CmdStop           (* Command output for MC_Stop
-       CmdSetPosition      : ST_CmdSetPosition    (* Command output for MC_SetPosition
+       CmdEncMngr          : ST_CmdEncMngr         (* Command output for AbsolutePositionManager
      VAR:
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
@@ -78,7 +78,7 @@ IF NOT Enable THEN
     bStopDoneLatched := FALSE;
     CmdMoveVelocity.Execute := FALSE;
     CmdStop.Execute := FALSE;
-    CmdSetPosition.Execute := FALSE;
+    CmdEncMngr.SetPosition := FALSE;
     tTimeout(IN := FALSE);
     RETURN;
 END_IF;
@@ -89,7 +89,7 @@ rTrigExecute(CLK := Execute);
 (* Handle abort in most states *)
 IF Abort AND (eState <> HL_IDLE) AND (eState <> HL_ERROR) AND (eState <> HL_DONE) THEN
     CmdMoveVelocity.Execute := FALSE;
-    CmdSetPosition.Execute := FALSE;
+    CmdEncMngr.SetPosition := FALSE;
     tTimeout(IN := FALSE);
     eState := HL_ABORTING;
 END_IF;
@@ -101,7 +101,7 @@ tTimeout(IN := (eState <> HL_IDLE) AND (eState <> HL_DONE) AND (eState <> HL_ERR
 IF tTimeout.Q THEN
     CmdMoveVelocity.Execute := FALSE;
     CmdStop.Execute := FALSE;
-    CmdSetPosition.Execute := FALSE;
+    CmdEncMngr.SetPosition := FALSE;
     Error := TRUE;
     eState := HL_ERROR;
 END_IF;
@@ -123,7 +123,7 @@ IF eState = HL_IDLE THEN
 
         CmdMoveVelocity.Execute := FALSE;
         CmdStop.Execute := FALSE;
-        CmdSetPosition.Execute := FALSE;
+        CmdEncMngr.SetPosition := FALSE;
         tTimeout(IN := FALSE);
 
         IF rTrigExecute.Q OR Execute THEN
@@ -224,18 +224,18 @@ ELSIF eState = HL_SETREF THEN
                 bStopDoneLatched := TRUE;
             END_IF;
         ELSE
-            CmdSetPosition.Execute := TRUE;
-            CmdSetPosition.Position := SetPosition;
-            CmdSetPosition.Relative := FALSE;
+            CmdEncMngr.Enable := TRUE;
+            CmdEncMngr.SetPosition := TRUE;
+            CmdEncMngr.Position := SetPosition;
 
-            IF G_staSetPosition.Done THEN
-                CmdSetPosition.Execute := FALSE;
+            IF G_staEncMngr.SetPositionDone THEN
+                CmdEncMngr.SetPosition := FALSE;
                 InMotion := FALSE;
                 Done := TRUE;
                 eState := HL_DONE;
 
-            ELSIF G_staSetPosition.Error THEN
-                CmdSetPosition.Execute := FALSE;
+            ELSIF G_staEncMngr.Error THEN
+                CmdEncMngr.SetPosition := FALSE;
                 Error := TRUE;
                 eState := HL_ERROR;
             END_IF;

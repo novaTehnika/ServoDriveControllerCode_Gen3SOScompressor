@@ -10,8 +10,8 @@
    the handshake protocol with the master controller.
 
    All built-in motion FBs (MC_Power, MC_Stop, MC_Reset, MC_MoveAbsolute,
-   MC_MoveVelocity, MC_SetPosition, MC_ReadActual*, Y_DirectControl,
-   AbsolutePositionManager) are instantiated in the LD POU and communicate
+   MC_MoveVelocity, MC_ReadActual*, Y_DirectControl, AbsolutePositionManager)
+   are instantiated in the LD POU and communicate
    via G_cmd*/G_sta* structured globals.
 
    Every user-defined FB is called exactly once at the end of this file.
@@ -665,15 +665,15 @@ G_cmdMoveVelocity.Velocity := LREAL#0.0;
 G_cmdMoveVelocity.Acceleration := LREAL#0.0;
 G_cmdMoveVelocity.Deceleration := LREAL#0.0;
 G_cmdMoveVelocity.Direction := 0;
-G_cmdSetPosition.Execute := FALSE;
-G_cmdSetPosition.Position := LREAL#0.0;
-G_cmdSetPosition.Relative := FALSE;
 G_cmdDirectControl.Enable := FALSE;
 G_cmdDirectControl.ControlMode := 0;
 G_cmdDirectControl.Position := LREAL#0.0;
 G_cmdDirectControl.Velocity := LREAL#0.0;
 G_cmdDirectControl.Torque := LREAL#0.0;
-G_cmdEncoderCheck.Enable := FALSE;
+G_cmdEncMngr.Enable := FALSE;
+G_cmdEncMngr.SetPosition := FALSE;
+G_cmdEncMngr.Position := LREAL#0.0;
+G_cmdEncMngr.ResetEncoder := FALSE;
 
 (* MC_Power: enable for all drive-active states *)
 IF (G_sysCurrentState = E_SystemState#ST_DRIVE_ENABLE) OR
@@ -924,7 +924,7 @@ fbPosOutput(
    -------------------------------------------------------------------------- *)
 
 IF G_sysCurrentState = E_SystemState#ST_ENCODER_CHECK THEN
-    G_cmdEncoderCheck := fbEncoderManager.CmdEncoderCheck;
+    G_cmdEncMngr := fbEncoderManager.CmdEncMngr;
 
 ELSIF G_sysCurrentState = E_SystemState#ST_GO_HOME THEN
     G_cmdMoveAbsolute := fbGoHome.CmdMoveAbsolute;
@@ -933,7 +933,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_GO_HOME THEN
 ELSIF G_sysCurrentState = E_SystemState#ST_HOME_LIMIT THEN
     G_cmdMoveVelocity := fbHomeLimit.CmdMoveVelocity;
     G_cmdStop := fbHomeLimit.CmdStop;
-    G_cmdSetPosition := fbHomeLimit.CmdSetPosition;
+    G_cmdEncMngr := fbHomeLimit.CmdEncMngr;
 
 ELSIF G_sysCurrentState = E_SystemState#ST_HOME_EOT THEN
     G_cmdDirectControl := fbHomeEOT.CmdDirectControl;

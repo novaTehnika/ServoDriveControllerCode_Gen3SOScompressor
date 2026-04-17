@@ -241,13 +241,6 @@ TYPE
       Direction       : INT;
    END_STRUCT;
 
-   ST_CmdSetPosition :
-   STRUCT
-      Execute         : BOOL;
-      Position        : LREAL;
-      Relative        : BOOL;
-   END_STRUCT;
-
    ST_CmdDirectControl :
    STRUCT
       Enable          : BOOL;
@@ -257,9 +250,12 @@ TYPE
       Torque          : LREAL;
    END_STRUCT;
 
-   ST_CmdEncoderCheck :
+   ST_CmdEncMngr :
    STRUCT
       Enable          : BOOL;
+      SetPosition     : BOOL;
+      Position        : LREAL;
+      ResetEncoder    : BOOL;
    END_STRUCT;
 
 
@@ -309,23 +305,20 @@ TYPE
       Error           : BOOL;
    END_STRUCT;
 
-   ST_StaSetPosition :
-   STRUCT
-      Done            : BOOL;
-      Busy            : BOOL;
-      Error           : BOOL;
-   END_STRUCT;
-
    ST_StaDirectControl :
    STRUCT
       Active          : BOOL;
       Error           : BOOL;
    END_STRUCT;
 
-   ST_StaEncoderCheck :
+   ST_StaEncMngr :
    STRUCT
       Valid           : BOOL;
+      SetPositionDone : BOOL;
       PositionValid   : BOOL;
+      ResetDone       : BOOL;
+      EncoderAlarmID  : UINT;
+      ControllerAlarmID : UDINT;
       Error           : BOOL;
    END_STRUCT;
 

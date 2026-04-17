@@ -454,9 +454,8 @@
      G_cmdReset            : ST_CmdReset
      G_cmdMoveAbsolute     : ST_CmdMoveAbsolute
      G_cmdMoveVelocity     : ST_CmdMoveVelocity
-     G_cmdSetPosition      : ST_CmdSetPosition
      G_cmdDirectControl    : ST_CmdDirectControl
-     G_cmdEncoderCheck     : ST_CmdEncoderCheck
+     G_cmdEncMngr     : ST_CmdEncMngr
 
 
      (* ========================================================================
@@ -468,9 +467,8 @@
      G_staReset            : ST_StaReset
      G_staMoveAbsolute     : ST_StaMoveAbsolute
      G_staMoveVelocity     : ST_StaMoveVelocity
-     G_staSetPosition      : ST_StaSetPosition
      G_staDirectControl    : ST_StaDirectControl
-     G_staEncoderCheck     : ST_StaEncoderCheck
+     G_staEncMngr     : ST_StaEncMngr
    END_VAR
 
 *)
