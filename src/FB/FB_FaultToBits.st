@@ -17,6 +17,7 @@
        Bit2            : BOOL             (* MSB
      VAR:
        nValue          : INT              (* Integer fault value
+	   byteValue       : BYTE             (* Byte fault value
 *)
 
 nValue := FN_FaultToInt(Fault);
