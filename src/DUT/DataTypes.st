@@ -190,12 +190,6 @@ TYPE
       Direction       : INT;      (* Homing direction: 1 = positive, -1 = negative *)
    END_STRUCT;
 
-    (* ============================================================================
-       ARRAY5LREAL - Array of 5 LREALs
-       ============================================================================ *)
-    ARRAY5LREAL : ARRAY[0..4] OF LREAL;
-
-
    (* ============================================================================
       Command Structs (ST -> LD POU)
 
@@ -321,5 +315,10 @@ TYPE
       ControllerAlarmID : UDINT;
       Error           : BOOL;
    END_STRUCT;
+
+    (* ============================================================================
+       ARRAY5LREAL - Array of 5 LREALs
+       ============================================================================ *)
+    ARRAY5LREAL : ARRAY[0..4] OF LREAL;
 
 END_TYPE
