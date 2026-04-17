@@ -843,7 +843,10 @@ fbHomeLimit(
     Timeout := G_cfgHomingTimeout,
     LimitHomeActive := G_sysLimitHomeActive,
     LimitRetractActive := G_sysLimitRetractActive,
-    Abort := fTrigMotionEnable.Q
+    Abort := fTrigMotionEnable.Q,
+    StaMoveVelocity := G_staMoveVelocity,
+    StaStop := G_staStop,
+    StaEncMngr := G_staEncMngr
 );
 
 (* Home to End-of-Travel handler *)

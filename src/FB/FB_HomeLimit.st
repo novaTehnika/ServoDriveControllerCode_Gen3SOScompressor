@@ -24,19 +24,23 @@
    Integration:
    - Called once per scan at end of PRG_Main
    - CmdMoveVelocity/CmdStop/CmdEncMngr routed to G_cmd* by PRG_Main
-   - Reads G_staMoveVelocity/G_staStop/G_staEncMngr for status
+   - Receives built-in FB status via StaMoveVelocity/StaStop/StaEncMngr inputs
+   - PRG_Main routes G_staMoveVelocity/G_staStop/G_staEncMngr into these inputs
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable the function block
-       Execute             : BOOL             (* Start homing sequence
-       ApproachVelocity    : LREAL            (* Approach velocity (mm/s)
-       BackoffVelocity     : LREAL            (* Backoff velocity (mm/s)
-       SetPosition         : LREAL            (* Position to set at home switch (mm)
-       Timeout             : TIME             (* Overall sequence timeout
-       LimitHomeActive     : BOOL             (* Home limit switch is triggered
-       LimitRetractActive  : BOOL             (* Retract limit switch is triggered
-       Abort               : BOOL             (* Abort the sequence
+       Enable              : BOOL                 (* Enable the function block
+       Execute             : BOOL                 (* Start homing sequence
+       ApproachVelocity    : LREAL                (* Approach velocity (mm/s)
+       BackoffVelocity     : LREAL                (* Backoff velocity (mm/s)
+       SetPosition         : LREAL                (* Position to set at home switch (mm)
+       Timeout             : TIME                 (* Overall sequence timeout
+       LimitHomeActive     : BOOL                 (* Home limit switch is triggered
+       LimitRetractActive  : BOOL                 (* Retract limit switch is triggered
+       Abort               : BOOL                 (* Abort the sequence
+       StaMoveVelocity     : ST_StaMoveVelocity   (* Status from MC_MoveVelocity
+       StaStop             : ST_StaStop           (* Status from MC_Stop
+       StaEncMngr          : ST_StaEncMngr        (* Status from AbsolutePositionManager
      VAR_OUTPUT:
        Active              : BOOL             (* Sequence is running
        Done                : BOOL             (* Homing complete
@@ -148,7 +152,7 @@ ELSIF eState = HL_APPROACH THEN
             CmdMoveVelocity.Direction := -1;
         END_IF;
 
-        InMotion := G_staMoveVelocity.Busy;
+        InMotion := StaMoveVelocity.Busy;
 
         IF LimitHomeActive THEN
             CmdMoveVelocity.Execute := FALSE;
@@ -165,7 +169,7 @@ ELSIF eState = HL_APPROACH THEN
                 eState := HL_ERROR;
             END_IF;
 
-        ELSIF G_staMoveVelocity.Error THEN
+        ELSIF StaMoveVelocity.Error THEN
             CmdMoveVelocity.Execute := FALSE;
             Error := TRUE;
             eState := HL_ERROR;
@@ -177,13 +181,13 @@ ELSIF eState = HL_DETECT THEN
     (* HL_DETECT - Stop motion after limit switch detected *)
         CmdStop.Execute := TRUE;
 
-        InMotion := NOT G_staStop.Done;
+        InMotion := NOT StaStop.Done;
 
-        IF G_staStop.Done THEN
+        IF StaStop.Done THEN
             CmdStop.Execute := FALSE;
             eState := HL_BACKOFF;
 
-        ELSIF G_staStop.Error THEN
+        ELSIF StaStop.Error THEN
             CmdStop.Execute := FALSE;
             Error := TRUE;
             eState := HL_ERROR;
@@ -199,14 +203,14 @@ ELSIF eState = HL_BACKOFF THEN
         CmdMoveVelocity.Deceleration := LREAL#0.0;
         CmdMoveVelocity.Direction := 1;
 
-        InMotion := G_staMoveVelocity.Busy;
+        InMotion := StaMoveVelocity.Busy;
 
         IF NOT LimitHomeActive THEN
             CmdMoveVelocity.Execute := FALSE;
             bStopDoneLatched := FALSE;
             eState := HL_SETREF;
 
-        ELSIF G_staMoveVelocity.Error THEN
+        ELSIF StaMoveVelocity.Error THEN
             CmdMoveVelocity.Execute := FALSE;
             Error := TRUE;
             eState := HL_ERROR;
@@ -217,9 +221,9 @@ ELSIF eState = HL_SETREF THEN
 
     (* HL_SETREF - Set position reference at home switch edge location *)
         IF NOT bStopDoneLatched THEN
-            CmdStop.Execute := NOT G_staStop.Done;
+            CmdStop.Execute := NOT StaStop.Done;
 
-            IF G_staStop.Done THEN
+            IF StaStop.Done THEN
                 CmdStop.Execute := FALSE;
                 bStopDoneLatched := TRUE;
             END_IF;
@@ -228,13 +232,13 @@ ELSIF eState = HL_SETREF THEN
             CmdEncMngr.SetPosition := TRUE;
             CmdEncMngr.Position := SetPosition;
 
-            IF G_staEncMngr.SetPositionDone THEN
+            IF StaEncMngr.SetPositionDone THEN
                 CmdEncMngr.SetPosition := FALSE;
                 InMotion := FALSE;
                 Done := TRUE;
                 eState := HL_DONE;
 
-            ELSIF G_staEncMngr.Error THEN
+            ELSIF StaEncMngr.Error THEN
                 CmdEncMngr.SetPosition := FALSE;
                 Error := TRUE;
                 eState := HL_ERROR;
@@ -261,13 +265,13 @@ ELSIF eState = HL_ABORTING THEN
     (* HL_ABORTING - Stop motion *)
         CmdStop.Execute := TRUE;
 
-        IF G_staStop.Done THEN
+        IF StaStop.Done THEN
             CmdStop.Execute := FALSE;
             Active := FALSE;
             InMotion := FALSE;
             eState := HL_IDLE;
 
-        ELSIF G_staStop.Error THEN
+        ELSIF StaStop.Error THEN
             CmdStop.Execute := FALSE;
             eState := HL_ERROR;
         END_IF;
