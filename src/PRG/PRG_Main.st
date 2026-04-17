@@ -828,7 +828,9 @@ fbGoHome(
     EOTHomeRequired := G_flagEOTHomeRequired,
     HomePosition := G_cfgGoHomePosition - G_posEOTOffset,
     HomeVelocity := G_cfgGoHomeVelocity,
-    Abort := fTrigMotionEnable.Q
+    Abort := fTrigMotionEnable.Q,
+    StaMoveAbsolute := G_staMoveAbsolute,
+    StaStop := G_staStop
 );
 
 (* Home to Limit Switch handler *)

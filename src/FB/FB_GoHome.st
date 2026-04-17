@@ -21,17 +21,20 @@
    Integration:
    - Called once per scan at end of PRG_Main
    - CmdMoveAbsolute/CmdStop routed to G_cmd* by state machine when active
-   - Reads G_staMoveAbsolute/G_staStop for built-in FB status
+   - Receives built-in FB status via StaMoveAbsolute/StaStop inputs
+   - PRG_Main routes G_staMoveAbsolute/G_staStop into these inputs
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable the function block
-       Execute             : BOOL             (* Start go home sequence
-       AbsHomeRequired     : BOOL             (* Encoder homing required (blocks Go Home)
-       EOTHomeRequired     : BOOL             (* EOT homing required (does NOT block)
-       HomePosition        : LREAL            (* Target home position (mm)
-       HomeVelocity        : LREAL            (* Movement velocity (mm/s)
-       Abort               : BOOL             (* Abort the move
+       Enable              : BOOL                  (* Enable the function block
+       Execute             : BOOL                  (* Start go home sequence
+       AbsHomeRequired     : BOOL                  (* Encoder homing required (blocks Go Home)
+       EOTHomeRequired     : BOOL                  (* EOT homing required (does NOT block)
+       HomePosition        : LREAL                 (* Target home position (mm)
+       HomeVelocity        : LREAL                 (* Movement velocity (mm/s)
+       Abort               : BOOL                  (* Abort the move
+       StaMoveAbsolute     : ST_StaMoveAbsolute    (* Status from MC_MoveAbsolute
+       StaStop             : ST_StaStop            (* Status from MC_Stop
      VAR_OUTPUT:
        Active              : BOOL             (* Sequence is running
        Done                : BOOL             (* At home position
@@ -140,21 +143,21 @@ ELSIF eState = GOH_MOVING THEN
         CmdMoveAbsolute.Acceleration := LREAL#0.0;
         CmdMoveAbsolute.Deceleration := LREAL#0.0;
 
-        InMotion := G_staMoveAbsolute.Busy;
+        InMotion := StaMoveAbsolute.Busy;
 
-        IF G_staMoveAbsolute.Done THEN
+        IF StaMoveAbsolute.Done THEN
             CmdMoveAbsolute.Execute := FALSE;
             Done := TRUE;
             AtPosition := TRUE;
             InMotion := FALSE;
             eState := GOH_AT_POSITION;
 
-        ELSIF G_staMoveAbsolute.Error THEN
+        ELSIF StaMoveAbsolute.Error THEN
             Error := TRUE;
             CmdMoveAbsolute.Execute := FALSE;
             eState := GOH_ERROR;
 
-        ELSIF G_staMoveAbsolute.CommandAborted THEN
+        ELSIF StaMoveAbsolute.CommandAborted THEN
             CmdMoveAbsolute.Execute := FALSE;
             eState := GOH_ABORTING;
         END_IF;
@@ -179,13 +182,13 @@ ELSIF eState = GOH_ABORTING THEN
     (* GOH_ABORTING - Stop motion *)
         CmdStop.Execute := TRUE;
 
-        IF G_staStop.Done THEN
+        IF StaStop.Done THEN
             CmdStop.Execute := FALSE;
             Active := FALSE;
             InMotion := FALSE;
             eState := GOH_IDLE;
 
-        ELSIF G_staStop.Error THEN
+        ELSIF StaStop.Error THEN
             CmdStop.Execute := FALSE;
             eState := GOH_ERROR;
         END_IF;
