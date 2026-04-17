@@ -27,25 +27,28 @@
    Integration:
    - Called once per scan at end of PRG_Main
    - CmdDirectControl/CmdStop routed to G_cmd* by state machine when active
-   - Reads G_staDirectControl/G_staStop for status
+   - Receives built-in FB status via StaDirectControl/StaStop inputs
+   - PRG_Main routes G_staDirectControl/G_staStop into these inputs
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL             (* Enable the function block
-       Execute             : BOOL             (* Start homing sequence
-       AbsHomeRequired     : BOOL             (* Limit switch homing required
-       FastVelocity        : LREAL            (* Fast approach velocity (mm/s)
-       SlowVelocity        : LREAL            (* Slow approach velocity (mm/s)
-       TorqueLimit         : LREAL            (* Torque limit during approach (%)
-       TorqueThreshold     : LREAL            (* Torque threshold for stall detection (%)
-       ApproachDistance    : LREAL            (* Distance before EOT to switch to slow (mm)
-       ExpectedEOTPosition : LREAL            (* Expected position at EOT (mm)
-       StallDetectTime     : TIME             (* Time to confirm stall condition
-       Timeout             : TIME             (* Overall sequence timeout
-       ActualPosition      : LREAL            (* Current position (mm)
-       ActualVelocity      : LREAL            (* Current velocity (mm/s)
-       ActualTorque        : LREAL            (* Current torque (% of rated)
-       Abort               : BOOL             (* Abort the sequence
+       Enable              : BOOL                 (* Enable the function block
+       Execute             : BOOL                 (* Start homing sequence
+       AbsHomeRequired     : BOOL                 (* Limit switch homing required
+       FastVelocity        : LREAL                (* Fast approach velocity (mm/s)
+       SlowVelocity        : LREAL                (* Slow approach velocity (mm/s)
+       TorqueLimit         : LREAL                (* Torque limit during approach (%)
+       TorqueThreshold     : LREAL                (* Torque threshold for stall detection (%)
+       ApproachDistance    : LREAL                (* Distance before EOT to switch to slow (mm)
+       ExpectedEOTPosition : LREAL                (* Expected position at EOT (mm)
+       StallDetectTime     : TIME                 (* Time to confirm stall condition
+       Timeout             : TIME                 (* Overall sequence timeout
+       ActualPosition      : LREAL                (* Current position (mm)
+       ActualVelocity      : LREAL                (* Current velocity (mm/s)
+       ActualTorque        : LREAL                (* Current torque (% of rated)
+       Abort               : BOOL                 (* Abort the sequence
+       StaDirectControl    : ST_StaDirectControl  (* Status from Y_DirectControl
+       StaStop             : ST_StaStop           (* Status from MC_Stop
      VAR_OUTPUT:
        Active              : BOOL             (* Sequence is running
        Done                : BOOL             (* Homing complete
@@ -172,13 +175,13 @@ ELSIF eState = HE_FAST_APPROACH THEN
         CmdDirectControl.Velocity := FastVelocity;
         CmdDirectControl.Torque := TorqueLimit;
 
-        InMotion := G_staDirectControl.Active;
+        InMotion := StaDirectControl.Active;
 
         IF ActualPosition >= (ExpectedEOTPosition - ApproachDistance) THEN
             CmdDirectControl.Enable := FALSE;
             eState := HE_SLOW_APPROACH;
 
-        ELSIF G_staDirectControl.Error THEN
+        ELSIF StaDirectControl.Error THEN
             CmdDirectControl.Enable := FALSE;
             Error := TRUE;
             eState := HE_ERROR;
@@ -200,7 +203,7 @@ ELSIF eState = HE_SLOW_APPROACH THEN
            (ABS(ActualTorque) >= TorqueThreshold * rTorqueMultiplier) THEN
             eState := HE_STALL_DETECT;
 
-        ELSIF G_staDirectControl.Error THEN
+        ELSIF StaDirectControl.Error THEN
             CmdDirectControl.Enable := FALSE;
             Error := TRUE;
             eState := HE_ERROR;
@@ -236,9 +239,9 @@ ELSIF eState = HE_SETREF THEN
     (* HE_SETREF - Calculate EOT offset - DO NOT call MC_SetPosition
        This preserves the limit switch zero reference from Mode 110 *)
 
-        CmdStop.Execute := NOT G_staStop.Done;
+        CmdStop.Execute := NOT StaStop.Done;
 
-        IF G_staStop.Done THEN
+        IF StaStop.Done THEN
             CmdStop.Execute := FALSE;
 
             EOTPosition := ActualPosition;
@@ -270,13 +273,13 @@ ELSIF eState = HE_ABORTING THEN
         CmdDirectControl.Enable := FALSE;
         CmdStop.Execute := TRUE;
 
-        IF G_staStop.Done THEN
+        IF StaStop.Done THEN
             CmdStop.Execute := FALSE;
             Active := FALSE;
             InMotion := FALSE;
             eState := HE_IDLE;
 
-        ELSIF G_staStop.Error THEN
+        ELSIF StaStop.Error THEN
             CmdStop.Execute := FALSE;
             eState := HE_ERROR;
         END_IF;

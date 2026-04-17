@@ -862,7 +862,9 @@ fbHomeEOT(
     ActualPosition := G_sysActualPosition,
     ActualVelocity := G_sysActualVelocity,
     ActualTorque := G_sysActualTorque,
-    Abort := fTrigMotionEnable.Q
+    Abort := fTrigMotionEnable.Q,
+    StaDirectControl := G_staDirectControl,
+    StaStop := G_staStop
 );
 
 (* Safety monitors *)
