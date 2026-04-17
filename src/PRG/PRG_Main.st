@@ -579,7 +579,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT THEN
             G_doInMotion := FALSE;
 
             G_sysLastFaultCode := G_sysActiveFault;
-            G_sysFaultCount := G_sysFaultCount + 1;
+            G_sysFaultCount := G_sysFaultCount + UDINT#1;
 
             tStateTimer(IN := FALSE);
         END_IF;
@@ -972,4 +972,4 @@ G_doFaultActive := fbOutputMux.FaultActiveOutput;
 
 G_aoPositionOutput := fbPosOutput.RawAnalogOutput;
 
-G_sysCycleCount := G_sysCycleCount + 1;
+G_sysCycleCount := G_sysCycleCount + UDINT#1;
