@@ -19,11 +19,27 @@ The MotionWorks IEC project is organized into several key folders, following sta
 
 | Folder | Name | Purpose |
 |--------|------|---------|
-| `src/PRG/` | Programs | Contains the main program entry point, `PRG_Main.st`, which houses the core state machine. |
+| `src/PRG/` | Programs | Contains the main program entry point, `PRG_Main.st` (Structured Text), which houses the core state machine. A separate Ladder Diagram POU owns `G_sysAxis` and every built-in motion FB (`MC_Power`, `MC_Stop`, `MC_Reset`, `MC_MoveAbsolute`, `MC_MoveVelocity`, `MC_ReadActual*`, `Y_DirectControl`, `AbsolutePositionManager`). |
 | `src/FB/` | Function Blocks | Contains reusable modules of encapsulated logic (e.g., `FB_HandshakeManager`, `FB_HomeEOT`). This is where most of the application logic resides. |
 | `src/FN/` | Functions | Contains standalone conversion and utility functions (e.g., `FN_BitsToMode`, `FN_IsOperationalMode`). |
-| `src/GVL/` | Global Variable Lists | Contains a single comment-only reference file (`GlobalVariables_Reference.st`). Variables are defined in the MWiec GUI; this file documents their names, types, and defaults. |
-| `src/DUT/` | Data Unit Types | Contains all custom data structures (`STRUCT`) and enumerations (`ENUM`) in a single `DataTypes.st` file. |
+| `src/GVL/` | Global Variable Lists | Contains a single comment-only reference file (`GlobalVariables_Reference.st`). Variables are defined in the MWiec GUI; this file documents their names, types, and defaults. It also documents the `G_cmd*` / `G_sta*` structured globals used to connect ST and LD POUs. |
+| `src/DUT/` | Data Unit Types | Contains all custom data structures (`STRUCT`) and enumerations (`ENUM`) in a single `DataTypes.st` file, including the `ST_Cmd*` / `ST_Sta*` structs that shape the ST↔LD command/status interface. |
+
+### ST ↔ LD POU Interface
+
+Because `G_sysAxis` and the built-in motion FBs live in the LD POU, `PRG_Main` never calls `MC_Power`, `MC_Stop`, `Y_DirectControl`, etc. directly. Instead it writes command fields into the `G_cmd*` structured globals and reads state from the matching `G_sta*` globals each scan:
+
+| ST writes (command) | LD owns (FB instance) | LD writes back (status) |
+|---------------------|------------------------|--------------------------|
+| `G_cmdPower` | `MC_Power` | `G_staPower` |
+| `G_cmdStop` | `MC_Stop` | `G_staStop` |
+| `G_cmdReset` | `MC_Reset` | `G_staReset` |
+| `G_cmdMoveAbsolute` | `MC_MoveAbsolute` | `G_staMoveAbsolute` |
+| `G_cmdMoveVelocity` | `MC_MoveVelocity` | `G_staMoveVelocity` |
+| `G_cmdDirectControl` | `Y_DirectControl` | `G_staDirectControl` |
+| `G_cmdEncMngr` | `AbsolutePositionManager` | `G_staEncMngr` |
+
+Custom FBs that need to command or observe a built-in motion FB (`FB_HomeLimit`, `FB_HomeEOT`, `FB_GoHome`, `FB_EncoderManager`) follow the same pattern at the FB level: they emit `Cmd*` `VAR_OUTPUT` structs and receive `Sta*` `VAR_INPUT` structs. `PRG_Main` wires those to the matching globals — see §4 below.
 
 ---
 
@@ -109,8 +125,8 @@ The core logic resides in a state machine within `PRG_Main.st`. Understanding th
 - **Initialization (`ST_INIT`, `ST_ENCODER_CHECK`, `ST_REQUIRE_ABS_HOME`)**: Runs once on startup. Checks encoder validity and sets homing flags.
 - **Idle (`ST_IDLE`)**: The default safe state. The drive is disabled, and the brake is engaged. It waits here for a valid handshake from the master.
 - **Activation (`ST_DRIVE_ENABLE`, `ST_BRAKE_RELEASE`)**: A transitional sequence to power on the drive and release the brake before entering an operational mode.
-- **Operational States (`ST_POSITION_CTRL`, `ST_VELOCITY_CTRL`, etc.)**: The active motion or control states. Each state runs its specific logic (e.g., calling `Y_DirectControl`) and checks for a `G_diMotionEnable` drop to exit.
-- **Homing States (`ST_HOME_LIMIT`, `ST_HOME_EOT`)**: These states execute the encapsulated logic within the `FB_HomeLimit` and `FB_HomeEOT` function blocks.
+- **Operational States (`ST_POSITION_CTRL`, `ST_VELOCITY_CTRL`, etc.)**: The active motion or control states. Each state writes setpoints into `G_cmdDirectControl` (read by the LD POU's `Y_DirectControl` instance each scan) and checks for a `G_diMotionEnable` drop to exit.
+- **Homing States (`ST_HOME_LIMIT`, `ST_HOME_EOT`)**: These states execute the encapsulated logic inside `FB_HomeLimit` and `FB_HomeEOT`. Each FB emits `Cmd*` `VAR_OUTPUT` structs (`CmdMoveVelocity`, `CmdStop`, `CmdEncMngr`, `CmdDirectControl`, `CmdMoveAbsolute`) which `PRG_Main` copies into the matching `G_cmd*` globals so the LD POU's motion FBs act on them; status comes back through `G_sta*` globals wired into the FBs' `Sta*` `VAR_INPUT` structs. Deprecated homing sub-state enum members (`ST_HOME_LIM_*`, `ST_HOME_EOT_*`) still exist in `E_SystemState` but are unused by the live state machine.
 - **Transition (`ST_HOLD_POSITION`)**: A critical intermediate state entered when `G_diMotionEnable` drops. It brings the axis to a controlled halt (`MC_Stop`) and waits for a new mode handshake from the master.
 - **Deactivation (`ST_BRAKE_ENGAGE`, `ST_DRIVE_DISABLE`)**: A transitional sequence to engage the brake and disable the drive before returning to `ST_IDLE`.
 - **Fault Handling (`ST_FAULT`, `ST_FAULT_IDLE`)**:

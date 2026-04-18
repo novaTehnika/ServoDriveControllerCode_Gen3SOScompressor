@@ -96,7 +96,7 @@ These parameters define the behavior of the three homing modes.
 | `G_cfgHomeEOTFastVel` | 50.0 | mm/s | The velocity for the initial fast approach toward the hard stop. |
 | `G_cfgHomeEOTSlowVel` | 5.0 | mm/s | The final, slow velocity for the torque-limited contact with the hard stop. |
 | `G_cfgHomeEOTApproachDist`| 20.0 | mm | The distance from the expected EOT position at which the axis will switch from fast to slow velocity. |
-| `G_cfgHomeEOTTorqueThresh`| 50.0 | % | The torque level that must be reached (as a percentage of `G_cfgTorqueHomingLimit`) to detect a stall. **Tuning:** This is a critical parameter. Set it high enough to avoid false stall from friction, but low enough to reliably detect contact with the hard stop. |
+| `G_cfgHomeEOTTorqueThresh`| 50.0 | % | The torque level (as % of motor rated torque) used to detect stall during EOT homing. The actual detection threshold is `0.9 * G_cfgHomeEOTTorqueThresh` (i.e. 45% by default; see [Stall_Detection_Calculation](../Stall_Detection_Calculation.md)). **Tuning:** Set it high enough to avoid false stalls from friction, but low enough to reliably detect contact with the hard stop. |
 | `G_cfgHomeEOTSetPosition`| 300.0 | mm | The "ideal" master coordinate position at the EOT. The slave calculates an offset so that the master sees this position value when the slave is at the physical EOT. |
 
 ### Mode 101: Go Home

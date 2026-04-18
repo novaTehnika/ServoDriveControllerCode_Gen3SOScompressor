@@ -59,8 +59,8 @@ This plan does **not** cover the testing of the Simulink master controller softw
 -   **Procedure:**
     -   Test each digital output from the master and verify the correct digital input is seen by the slave.
     -   Test each digital output from the slave and verify the correct digital input is seen by the master.
-    -   Test analog output from the master with specific voltages (-10V, 0V, +10V) and verify the raw values seen by the slave.
-    -   Command the slave to output specific analog voltages and verify the values seen by the master.
+    -   Test analog output from the master with specific voltages (-10V, 0V, +10V) and verify the `LREAL` voltage value seen by the slave on `G_aiReference` matches the applied input.
+    -   Command the slave to output specific analog voltages via `G_aoPositionOutput` (`LREAL`) and verify the values seen by the master.
 -   **Acceptance Criteria:** All signals must match their expected values within the tolerances specified in `IOReference.md`.
 
 ### 3.2 Handshake Protocol Testing

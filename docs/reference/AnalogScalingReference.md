@@ -7,10 +7,12 @@
 
 ## 1. Overview
 
-| Signal | Direction | Range | Purpose |
-|--------|-----------|-------|---------|
-| AI0 (Reference) | Master → Slave | -10V to +10V | Mode-dependent command |
-| AO0 (Position) | Slave → Master | -10V to +10V | Position feedback |
+| Signal | Address | Type | Direction | Range | Purpose |
+|--------|---------|------|-----------|-------|---------|
+| AI0 (`G_aiReference`) | `%IW0` | `LREAL` | Master → Slave | -10V to +10V | Mode-dependent command |
+| AO0 (`G_aoPositionOutput`) | `%QW0` | `LREAL` | Slave → Master | -10V to +10V | Position feedback |
+
+**Signal representation.** MotionWorksIEC presents both analog channels to the ST application as `LREAL` voltage values directly (e.g. `-10.0` to `+10.0`). The slave-side code does **not** convert a raw INT DAC code — all scaling math below operates on the `LREAL` voltage. The 16-bit resolution figures in §4 describe the NI DAQ and MP2600iec DAC hardware, not the ST variable type.
 
 ---
 
@@ -20,29 +22,40 @@
 
 **Physical Range**: 0 to 305 mm
 **Voltage Range**: -10V to +10V
-**Mapping**: Linear
+**Mapping**: **Two-stage piecewise linear** (matches the feedback mapping in §3 so that commanding 0V means the same physical position whether the signal is a command or feedback).
 
 ```
-                Position (mm)
-            0      152.5     305
-            |--------|--------|
-            |        |        |
-         -10V       0V      +10V
+              Position (mm)
+          0        200         305
+          |---------|-----------|
+          Stage 1   |   Stage 2
+          |---------|-----------|
+        -10V       +5V        +10V
                 Voltage
 ```
 
 #### Formulas
 
+`FB_AnalogProcessor` applies the inverse of the feedback mapping (see §3):
+
 **Voltage to Position (Slave Receives)**:
 ```
-position_mm = (voltage + 10) / 20 * 305
-position_mm = (voltage + 10) * 15.25
+IF voltage < +5V THEN                     (* Stage 1 *)
+    position_mm = 0 + (voltage - (-10)) / (5 - (-10)) * (200 - 0)
+    position_mm = (voltage + 10) * 13.333
+ELSE                                      (* Stage 2 *)
+    position_mm = 200 + (voltage - 5) / (10 - 5) * (305 - 200)
+    position_mm = (voltage - 5) * 21 + 200
+END_IF
 ```
 
-**Position to Voltage (Master Sends)**:
+**Position to Voltage (Master Sends)** — mirror of the slave decode:
 ```
-voltage = (position_mm / 305) * 20 - 10
-voltage = position_mm * 0.0656 - 10
+IF position_mm <= 200 THEN                (* Stage 1 *)
+    voltage = -10 + (position_mm / 200) * 15
+ELSE                                      (* Stage 2 *)
+    voltage = 5 + ((position_mm - 200) / 105) * 5
+END_IF
 ```
 
 #### Example Values
@@ -50,16 +63,17 @@ voltage = position_mm * 0.0656 - 10
 | Voltage | Position |
 |---------|----------|
 | -10.00V | 0.0 mm |
-| -5.00V | 76.25 mm |
-| 0.00V | 152.5 mm |
-| +5.00V | 228.75 mm |
+| -5.00V | 66.67 mm |
+| 0.00V | 133.33 mm |
+| +5.00V | 200.0 mm (stage boundary) |
+| +7.50V | 252.5 mm |
 | +10.00V | 305.0 mm |
 
 #### Sensitivity
 
 ```
-Sensitivity = 305 mm / 20V = 15.25 mm/V
-Resolution = 15.25 mm / 65536 = 0.00023 mm/LSB (16-bit)
+Stage 1 sensitivity = 200 mm / 15 V = 13.33 mm/V  (higher resolution — in-cylinder region)
+Stage 2 sensitivity = 105 mm / 5 V  = 21.0 mm/V   (lower resolution — out-of-cylinder region)
 ```
 
 ---
@@ -358,26 +372,26 @@ Stage 2:
 ### Analog Input Filter (Slave Side)
 
 ```
-Filter Type: First-order low-pass
-Time Constant: cfgAnalogFilterTC (default: 10 ms)
-Cutoff Frequency: ~16 Hz
+Filter Type: Median (size 3 or 5) feeding a first-order IIR low-pass
+Time Constant: G_cfgAnalogFilterTimeConst (default: T#50MS)
+Cutoff Frequency: ~3.2 Hz (at 50 ms time constant)
 ```
 
-Transfer function:
+Transfer function of the low-pass stage:
 ```
 H(s) = 1 / (τs + 1)
-τ = 0.010 s
+τ = 0.050 s  (default)
 ```
 
 ### Effect on Step Response
 
 | Filter TC | 10% Rise | 90% Rise | Settling (2%) |
 |-----------|----------|----------|---------------|
-| 10 ms | 1.1 ms | 23 ms | 40 ms |
-| 5 ms | 0.5 ms | 12 ms | 20 ms |
+| 50 ms (default) | 5.3 ms | 115 ms | 200 ms |
 | 20 ms | 2.1 ms | 46 ms | 80 ms |
+| 10 ms | 1.1 ms | 23 ms | 40 ms |
 
-**Recommendation**: Keep filter TC at 10ms for good noise rejection while maintaining responsive control.
+**Recommendation**: The default 50 ms is tuned for the master's typical reference bandwidth; reduce only if command tracking lag becomes limiting.
 
 ---
 
@@ -385,14 +399,21 @@ H(s) = 1 / (τs + 1)
 
 ### Master Position Command (Simulink)
 
+The command uses the same two-stage mapping as the feedback, so that a given position maps to the same voltage in either direction.
+
 ```matlab
-% Position reference generator
+% Position reference generator (two-stage)
 function voltage = position_to_voltage(position_mm)
     % Clamp to valid range
     position_mm = max(0, min(305, position_mm));
 
-    % Linear mapping
-    voltage = (position_mm / 305) * 20 - 10;
+    if position_mm <= 200
+        % Stage 1: 0-200mm -> -10V..+5V
+        voltage = (position_mm / 200) * 15 - 10;
+    else
+        % Stage 2: 200-305mm -> +5V..+10V
+        voltage = ((position_mm - 200) / 105) * 5 + 5;
+    end
 end
 ```
 
@@ -432,15 +453,16 @@ end
 
 ## 8. Quick Reference Tables
 
-### Position Mode Scaling
+### Position Mode Scaling (two-stage, both directions)
 
 | Direction | From | To | Formula |
 |-----------|------|----|---------|
-| Master → Slave | mm | V | `V = pos/305*20 - 10` |
+| Master → Slave (Stage 1) | mm | V | `V = pos*0.075 - 10` |
+| Master → Slave (Stage 2) | mm | V | `V = (pos-200)*0.0476 + 5` |
 | Slave → Master (Stage 1) | mm | V | `V = pos*0.075 - 10` |
 | Slave → Master (Stage 2) | mm | V | `V = (pos-200)*0.0476 + 5` |
-| Master Decode (Stage 1) | V | mm | `pos = (V+10)*13.333` |
-| Master Decode (Stage 2) | V | mm | `pos = (V-5)*21 + 200` |
+| Decode (Stage 1) | V | mm | `pos = (V+10)*13.333` |
+| Decode (Stage 2) | V | mm | `pos = (V-5)*21 + 200` |
 
 ### Velocity Mode Scaling
 

@@ -1,120 +1,68 @@
-# MC_SetPosition Function Block Verification
+# Position Reference Setting — Current Implementation
 
 ## Purpose
-This document verifies the MC_SetPosition function block usage in PRG_Main.st against Yaskawa MotionWorksIEC and PLCopen specifications.
+This document describes how the absolute position reference is established during homing. It supersedes an earlier verification document that reviewed direct use of PLCopen `MC_SetPosition` from `PRG_Main`.
 
-## Verification Date
-2025-12-29
+## Summary of the Change
 
-## Sources Consulted
+`MC_SetPosition` is **no longer called from `PRG_Main`**. Position reference setting now flows through `AbsolutePositionManager`, which is instantiated in the Ladder Diagram POU and commanded through the `G_cmdEncMngr` / `G_staEncMngr` globals.
 
-### Primary Sources
-- [Yaskawa MotionWorks IEC User Manual - MC_SetPosition (Page 154)](https://www.manualsdir.com/manuals/802015/yaskawa-motionworks-iec.html?page=154)
-- [PLCopen Plus Function Blocks for Motion Control (YEA-SIA-IEC-3)](https://www.yaskawa.com/downloads/search-index/details?showType=details&docnum=YEA-SIA-IEC-3)
-- [Beckhoff MC_SetPosition Reference](https://infosys.beckhoff.com/content/1033/tcplclib_tc2_mc2/70052491.html)
+The two homing modes set position differently:
 
-### Additional References
-- [PLCopen Motion Control Function Block Reference](https://infosys.beckhoff.com/content/1033/tcplclib_tc2_mc2/70043531.html)
+- **Mode 110 (Home to Limit Switch)** — `FB_HomeLimit` drives `CmdEncMngr.SetPosition := TRUE` with the target absolute position (`G_cfgHomeLimSetPosition`, default `0.0 mm`). `PRG_Main` copies this command output into `G_cmdEncMngr`; the LD POU's `AbsolutePositionManager` performs the actual position-reference write and reports back via `G_staEncMngr.SetPositionDone`.
+- **Mode 111 (Home to End-of-Travel)** — `FB_HomeEOT` **does not set position**. Instead, once stall is confirmed it records the encoder position (`EOTPosition := ActualPosition`) and computes a master/slave coordinate offset (`EOTOffset := ExpectedEOTPosition - EOTPosition`). This preserves the encoder zero reference established by Mode 110.
 
----
+## Data Flow
 
-## MC_SetPosition Interface Specification
-
-### VAR_IN_OUT
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| Axis | AXIS_REF | Logical axis reference from Hardware Configuration |
-
-### VAR_INPUT
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| Execute | BOOL | Rising edge triggers the function | FALSE |
-| Position | LREAL | Target position value in user units | 0.0 |
-| Mode | BOOL | FALSE = ABSOLUTE (default), TRUE = RELATIVE | FALSE |
-
-### VAR_OUTPUT
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| Done | BOOL | TRUE when position change completed successfully |
-| Busy | BOOL | TRUE while function block is executing |
-| Error | BOOL | TRUE if error occurred |
-| ErrorID | UDINT/DWORD | Error identification number |
-
----
-
-## Current Implementation Analysis
-
-### Code Locations
-- **ST_HOME_LIM_SETREF** (PRG_Main.st lines 764-768):
-```st
-fbSetPosition(
-    Axis := G_sysAxis,
-    Execute := TRUE,
-    Position := G_cfgHomeLimSetPosition
-);
+```
+FB_HomeLimit (ST, HL_SETREF state)
+     │
+     │  CmdEncMngr.Enable := TRUE
+     │  CmdEncMngr.SetPosition := TRUE
+     │  CmdEncMngr.Position := SetPosition   (= G_cfgHomeLimSetPosition)
+     ▼
+PRG_Main routes fbHomeLimit.CmdEncMngr -> G_cmdEncMngr
+     ▼
+Ladder Diagram POU
+     AbsolutePositionManager instance
+     (reads G_cmdEncMngr, writes G_staEncMngr)
+     ▼
+G_staEncMngr.SetPositionDone  -> back into FB_HomeLimit.StaEncMngr
+     │
+     └─► FB_HomeLimit transitions HL_SETREF -> HL_DONE
 ```
 
-- **ST_HOME_EOT_SETREF** (PRG_Main.st lines 954-958):
-```st
-fbSetPosition(
-    Axis := G_sysAxis,
-    Execute := TRUE,
-    Position := G_cfgHomeEOTSetPosition
-);
-```
+## Why AbsolutePositionManager instead of `MC_SetPosition`
 
-### Assessment
+`AbsolutePositionManager` is the Yaskawa-provided block for the Sigma-7 absolute encoder. It:
 
-**Mode Parameter Omission**: The implementation does not explicitly specify the `Mode` parameter.
+1. Validates multi-turn / battery-backed encoder state (`Valid`, `PositionValid` outputs).
+2. Writes the position reference at the home location.
+3. Reports operation status through `SetPositionDone` and `Error`.
 
-**Impact**: **NONE - Implementation is CORRECT**
+Using it consolidates "encoder validity check" and "set position reference" behind a single block, which is a better fit for the Sigma-7 absolute encoder workflow than PLCopen `MC_SetPosition`.
 
-The Mode parameter defaults to FALSE (ABSOLUTE mode), which is the correct behavior for homing operations:
-- After homing to limit switch (Mode 110), we set absolute position to 0.0mm
-- After homing to EOT (Mode 111), we set absolute position to 300.0mm
-- Both operations require ABSOLUTE mode to establish the position reference
+## Coordinate System After Homing
 
-### Conclusion
-The current implementation is **functionally correct**. The omission of the Mode parameter is acceptable because:
-1. The default value (FALSE = ABSOLUTE) is the intended behavior
-2. PLCopen function blocks are designed with sensible defaults
-3. The implementation follows standard PLCopen patterns
+| Situation                        | Encoder zero   | Master sees                             |
+|----------------------------------|----------------|------------------------------------------|
+| After Mode 110 only              | At home switch | Master position = encoder position       |
+| After Mode 110 then Mode 111     | At home switch | Master position = encoder position + `G_posEOTOffset` |
 
----
+`G_posEOTOffset` is applied in `FB_PositionOutput` when generating the analog feedback (AO0) and when translating master position commands in position-control mode.
 
-## Recommendation
+## Where the Logic Lives
 
-For improved code clarity and maintainability, consider explicitly specifying the Mode parameter:
-
-```st
-fbSetPosition(
-    Axis := G_sysAxis,
-    Execute := TRUE,
-    Position := G_cfgHomeLimSetPosition,
-    Mode := FALSE  (* ABSOLUTE - set position reference *)
-);
-```
-
-This is an optional enhancement for documentation purposes, not a required fix.
-
----
-
-## PLCopen Function Block Behavior Notes
-
-### Output State Rules
-- Done, Busy, Error, and CommandAborted are mutually exclusive
-- Only one of these outputs can be TRUE at a time
-- Busy is SET on rising edge of Execute
-- Busy is RESET when Done, Error, or CommandAborted becomes TRUE
-
-### Error Handling
-- Error and ErrorID are reset with falling edge of Execute
-- Function block errors do not require explicit reset
-- The falling edge of Execute does not stop execution
-
----
+| Concern                         | Location (current)                         |
+|---------------------------------|--------------------------------------------|
+| Position reference write        | `AbsolutePositionManager` in the LD POU    |
+| Command emission (Mode 110)     | `FB_HomeLimit.st`, state `HL_SETREF`       |
+| Status receipt                  | `FB_HomeLimit` input `StaEncMngr`          |
+| ST ↔ LD bridge                  | `G_cmdEncMngr`, `G_staEncMngr`             |
+| EOT offset calculation          | `FB_HomeEOT.st`, state `HE_SETREF`         |
 
 ## Document History
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0 | 2025-12-29 | Claude Code | Initial verification |
+| Version | Date       | Changes |
+|---------|------------|---------|
+| 1.0     | 2025-12-29 | Initial verification (MC_SetPosition direct call) |
+| 2.0     | 2026-04-17 | Rewritten — position reference now set via `AbsolutePositionManager` / `G_cmdEncMngr`; `MC_SetPosition` no longer used from `PRG_Main` |

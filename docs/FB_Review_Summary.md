@@ -1,7 +1,13 @@
 # Function Block Review Summary
-## Date: 2025-12-29
+## Original Review Date: 2025-12-29
 
-This document summarizes the agent reviews of all function blocks in src/FB/.
+This document summarizes the agent reviews of the function blocks in `src/FB/`.
+
+> **Architecture update**
+>
+> Since the original review, the codebase was refactored so that all built-in motion FBs (`MC_Power`, `MC_Stop`, `MC_Reset`, `MC_MoveAbsolute`, `MC_MoveVelocity`, `MC_ReadActual*`, `Y_DirectControl`, `AbsolutePositionManager`) live in a Ladder Diagram POU. Custom ST function blocks that previously instantiated built-in FBs internally (`FB_HomeLimit`, `FB_HomeEOT`, `FB_GoHome`, `FB_EncoderManager`) were converted to receive status via `VAR_INPUT` (`StaMoveVelocity`, `StaStop`, `StaDirectControl`, `StaMoveAbsolute`, `StaEncMngr`) and emit commands via `VAR_OUTPUT` (`CmdMoveVelocity`, `CmdStop`, `CmdDirectControl`, `CmdMoveAbsolute`, `CmdEncMngr`). `PRG_Main` wires these to the corresponding `G_cmd*`/`G_sta*` structured globals.
+>
+> The FB-by-FB findings below still apply to the logic contained in each FB, but their instantiation footprint no longer includes internal built-in FB calls.
 
 ---
 

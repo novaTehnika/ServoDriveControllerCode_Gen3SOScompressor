@@ -15,16 +15,20 @@ This document clarifies the torque threshold calculation used for stall detectio
 ## Implementation Details
 
 ### Location
-- **PRG_Main.st**: ST_HOME_EOT_SLOW (lines 880-881) and ST_HOME_EOT_DETECT (lines 922-923)
+- **FB_HomeEOT.st**: `HE_SLOW_APPROACH` state (condition trigger) and `HE_STALL_DETECT` state (timed confirmation). `PRG_Main` routes `G_sysActualVelocity` / `G_sysActualTorque` into the FB via the `ActualVelocity` and `ActualTorque` VAR_INPUTs.
 
-### Code
+### Code (from FB_HomeEOT.st)
 ```st
-(* Stall detection condition *)
-IF (ABS(G_sysActualVelocity) < 0.5) AND
-   (ABS(G_sysActualTorque) >= G_cfgHomeEOTTorqueThresh * 0.9) THEN
-    (* Stall detected - proceed to confirmation *)
+(* Stall condition: velocity near zero AND torque at threshold.
+   rVelocityThreshold := 0.5 and rTorqueMultiplier := 0.9 are FB-internal constants. *)
+IF (ABS(ActualVelocity) < rVelocityThreshold) AND
+   (ABS(ActualTorque) >= TorqueThreshold * rTorqueMultiplier) THEN
+    (* HE_SLOW_APPROACH: proceed to HE_STALL_DETECT              *)
+    (* HE_STALL_DETECT:  if also tStallConfirm.Q, proceed to HE_SETREF *)
 END_IF
 ```
+
+`TorqueThreshold` is wired from `G_cfgHomeEOTTorqueThresh`, so the runtime detection threshold is still `G_cfgHomeEOTTorqueThresh * 0.9`.
 
 ---
 
@@ -88,9 +92,10 @@ The specification phrase "torque >= 90% threshold" could be interpreted two ways
 ## Stall Detection State Diagram
 
 ```
-ST_HOME_EOT_SLOW
+HE_SLOW_APPROACH (FB_HomeEOT internal state)
     |
     | Commanding: 5 mm/s with 60% torque limit
+    | (via CmdDirectControl -> G_cmdDirectControl -> LD POU Y_DirectControl)
     |
     v
 [Contact with EOT]
@@ -103,9 +108,9 @@ ST_HOME_EOT_SLOW
     | Stall condition met
     |
     v
-ST_HOME_EOT_DETECT
+HE_STALL_DETECT
     |
-    | Start 200ms timer
+    | Start 200ms tStallConfirm timer
     |
     v
 [Condition persists for 200ms?]
@@ -114,9 +119,12 @@ ST_HOME_EOT_DETECT
   NO  YES
   |    |
   v    v
-RETRY  ST_HOME_EOT_SETREF
-       (Homing complete)
+back to  HE_SETREF
+HE_SLOW   (calculate EOTOffset, then HE_DONE)
+APPROACH
 ```
+
+Note: The homing sub-state names `ST_HOME_EOT_SLOW` / `ST_HOME_EOT_DETECT` / `ST_HOME_EOT_SETREF` still exist in `E_SystemState` but are marked DEPRECATED. The live logic runs inside `FB_HomeEOT` under a single `ST_HOME_EOT` state in `PRG_Main`.
 
 ---
 

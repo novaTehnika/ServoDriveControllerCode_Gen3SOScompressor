@@ -119,18 +119,18 @@ Configure the axis scaling in MotionWorksIEC:
 ## 5. Analog I/O Configuration
 
 ### 5.1 Analog Input
-| Pin | Address | Range | Signal |
-|-----|---------|-------|--------|
-| AI0 | %IW0 | -10V to +10V | G_aiReference |
+| Pin | Address | Range | Type | Signal |
+|-----|---------|-------|------|--------|
+| AI0 | %IW0 | -10V to +10V | LREAL | G_aiReference |
 
-**Scaling**: INT -32768 to +32767 = -10V to +10V
+**Scaling**: MotionWorksIEC presents the analog input as an `LREAL` in volts directly (e.g. `-10.0` to `+10.0`). The application code reads and processes the signal as volts; no raw-to-voltage conversion is required in ST.
 
 ### 5.2 Analog Output
-| Pin | Address | Range | Signal |
-|-----|---------|-------|--------|
-| AO0 | %QW0 | -10V to +10V | aoPositionFeedback |
+| Pin | Address | Range | Type | Signal |
+|-----|---------|-------|------|--------|
+| AO0 | %QW0 | -10V to +10V | LREAL | G_aoPositionOutput |
 
-**Scaling**: INT -32768 to +32767 = -10V to +10V
+**Scaling**: The analog output is written as an `LREAL` in volts. `FB_PositionOutput` produces the voltage directly from the two-stage position mapping; see [AnalogScalingReference](./reference/AnalogScalingReference.md).
 
 ---
 

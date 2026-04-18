@@ -97,6 +97,6 @@ For the homing modes, the pin will communicate when it has completed it's routin
 Finally, a digital output pin will be used to communicate when the controller enters an error or fault state.
 
 ## Implementation
-The program for the MP2600 iec will implement a state machine for the basic modes of operation given in the section Functionality, error or fault states, transition states, and sub-states.
-The MC_DirectControl function block will be used to communicate reference commands and control modes to the servo drive.
-The structure of the code shall follow best practices for IEC compliant Structured Text.
+The program for the MP2600 iec implements a state machine for the basic modes of operation given in the section Functionality, error or fault states, and transition states.
+The state machine lives in `PRG_Main` (Structured Text). Built-in motion function blocks (`MC_Power`, `MC_Stop`, `MC_Reset`, `MC_MoveAbsolute`, `MC_MoveVelocity`, `MC_ReadActual*`, `Y_DirectControl`, and `AbsolutePositionManager`) are instantiated in a Ladder Diagram POU and exchange data with `PRG_Main` through structured globals (`G_cmd*` for commands, `G_sta*` for status). `Y_DirectControl` is used to communicate reference commands and control modes to the servo drive during the motion/torque operating modes.
+The structure of the code follows best practices for IEC 61131-3 compliant Structured Text, with custom logic encapsulated in function blocks under `src/FB/`.

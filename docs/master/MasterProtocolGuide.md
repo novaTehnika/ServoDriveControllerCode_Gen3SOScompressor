@@ -273,16 +273,16 @@ FAULT_PERSISTENT:
 
 ### Analog Output (Master to Slave): Reference Command
 
-**Signal**: AI0 on slave (from master's AO)
-**Range**: -10V to +10V
+**Signal**: AI0 on slave (`G_aiReference`, `AT %IW0 : LREAL`), driven by the master's AO.
+**Range**: -10V to +10V (presented in ST as an `LREAL` volt value directly — no raw INT scaling).
 
 | Mode | Scaling | Formula |
 |------|---------|---------|
-| Position | -10V to +10V = 0 to 305mm | `voltage = (position / 305) * 20 - 10` |
-| Velocity | -10V to +10V = -100 to +100 mm/s | `voltage = velocity / 10` |
-| Torque | -10V to +10V = -100% to +100% | `voltage = torque_percent / 10` |
+| Position (two-stage) | 0–200 mm ↔ -10V..+5V, 200–305 mm ↔ +5V..+10V | Stage 1: `V = pos*0.075 - 10`; Stage 2: `V = (pos-200)*0.0476 + 5` |
+| Velocity | -10V..+10V = -100..+100 mm/s | `voltage = velocity / 10` |
+| Torque | -10V..+10V = -100%..+100% | `voltage = torque_percent / 10` |
 
-**Note**: Position uses two-stage mapping in slave. See AnalogScalingReference.md for details.
+**Note**: Position command uses the same two-stage mapping as position feedback — sending the voltage that corresponds to a given position in feedback will command that same position. See [AnalogScalingReference](../reference/AnalogScalingReference.md) for the full formulas and derivation.
 
 ### Analog Input (Slave to Master): Position Feedback
 

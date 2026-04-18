@@ -31,7 +31,9 @@ Establish the coordinate system zero reference using the physical home limit swi
 
 > **Note on Implementation**
 >
-> The sequence of steps described below is encapsulated within the `FB_HomeLimit` function block. The sub-state names (e.g., `ST_HOME_LIM_APPROACH`) were previously states in `E_SystemState` but have been removed; the logic now lives entirely within `FB_HomeLimit`, which is called from the single `ST_HOME_LIMIT` state in `PRG_Main`. The step labels below (e.g., `HL_APPROACH`) are the FB's internal constants.
+> The sequence of steps described below is encapsulated within the `FB_HomeLimit` function block. `PRG_Main` runs a single `ST_HOME_LIMIT` state that enables the FB each scan; the deprecated sub-state enum members (`ST_HOME_LIM_APPROACH` / `DETECT` / `BACKOFF` / `SETREF`) still exist in `E_SystemState` but are not used by the live state machine. The step labels below (`HL_APPROACH`, etc.) are `FB_HomeLimit`'s internal `INT` constants.
+>
+> **Command/status routing.** `FB_HomeLimit` does not instantiate any built-in motion FBs. It emits `CmdMoveVelocity`, `CmdStop`, and `CmdEncMngr` `VAR_OUTPUT` structs which `PRG_Main` copies into `G_cmdMoveVelocity` / `G_cmdStop` / `G_cmdEncMngr`; the LD POU's `MC_MoveVelocity`, `MC_Stop`, and `AbsolutePositionManager` act on those and report back through `G_sta*` globals wired into the FB's `Sta*` `VAR_INPUT` structs.
 
 ### Sequence Steps
 
@@ -39,9 +41,14 @@ Establish the coordinate system zero reference using the physical home limit swi
 Step 1: APPROACH
 +------------------------------------------+
 | Step: HL_APPROACH                        |
-| Action: MC_MoveVelocity (negative dir)   |
-| Velocity: ApproachVelocity (FB input)    |
-|           (default: -20 mm/s)            |
+| Action: CmdMoveVelocity.Execute := TRUE  |
+|         -> G_cmdMoveVelocity -> LD POU   |
+|         -> MC_MoveVelocity (toward sw)   |
+| Velocity: ApproachVelocity FB input      |
+|           (= G_cfgHomeLimApproachVel)    |
+|           (default: 50 mm/s)             |
+| Over-travel: if LimitRetractActive trips |
+|   FB reverses approach direction         |
 | Exit: LimitHomeActive = TRUE             |
 +------------------------------------------+
         |
@@ -49,18 +56,21 @@ Step 1: APPROACH
 Step 2: DETECT
 +------------------------------------------+
 | Step: HL_DETECT                          |
-| Action: MC_Stop (controlled stop)        |
+| Action: CmdStop.Execute := TRUE          |
+|         -> G_cmdStop -> MC_Stop          |
 | Verify: LimitHomeActive still TRUE       |
-| Exit: Motion stopped                     |
+| Exit: StaStop.Done                       |
 +------------------------------------------+
         |
         v
 Step 3: BACKOFF
 +------------------------------------------+
 | Step: HL_BACKOFF                         |
-| Action: MC_MoveVelocity (positive dir)   |
-| Velocity: BackoffVelocity (FB input)     |
-|           (default: +5 mm/s)             |
+| Action: CmdMoveVelocity.Execute := TRUE  |
+|         (opposite direction at slow vel) |
+| Velocity: BackoffVelocity FB input       |
+|           (= G_cfgVelHomingSlow)         |
+|           (default: 5 mm/s)              |
 | Exit: LimitHomeActive = FALSE            |
 +------------------------------------------+
         |
@@ -68,11 +78,16 @@ Step 3: BACKOFF
 Step 4: SET REFERENCE
 +------------------------------------------+
 | Step: HL_SETREF                          |
-| Action: MC_SetPosition                   |
-| Position: G_cfgHomeLimSetPosition          |
-|           (default: 0.0 mm)              |
-| Clear: G_flagAbsHomeRequired = FALSE       |
-| Exit: MC_SetPosition.Done                |
+| Action: CmdEncMngr.Enable := TRUE        |
+|         CmdEncMngr.SetPosition := TRUE   |
+|         CmdEncMngr.Position :=           |
+|           G_cfgHomeLimSetPosition (0.0)  |
+|         -> G_cmdEncMngr -> LD POU        |
+|         -> AbsolutePositionManager       |
+|         writes the encoder reference     |
+| Exit: StaEncMngr.SetPositionDone         |
+| PRG_Main clears G_flagAbsHomeRequired    |
+| after FB reports Done                    |
 +------------------------------------------+
         |
         v
@@ -80,7 +95,7 @@ Step 5: COMPLETE
 +------------------------------------------+
 | State: ST_HOME_COMPLETE                  |
 | Action: Hold position                    |
-| Output: G_doHomingComplete = TRUE          |
+| Output: G_doHomingComplete = TRUE        |
 | Exit: New mode commanded                 |
 +------------------------------------------+
 ```
@@ -126,7 +141,9 @@ Calibrate the cylinder end-of-travel position by detecting mechanical stall. Thi
 
 > **Note on Implementation**
 >
-> The sequence of steps described below is encapsulated within the `FB_HomeEOT` function block. The sub-state names (e.g., `ST_HOME_EOT_FAST`) were previously states in `E_SystemState` but have been removed; the logic now lives entirely within `FB_HomeEOT`, which is called from the single `ST_HOME_EOT` state in `PRG_Main`. The step labels below (e.g., `HE_FAST_APPROACH`) are the FB's internal constants.
+> The sequence below is encapsulated within the `FB_HomeEOT` function block. `PRG_Main` runs a single `ST_HOME_EOT` state; the deprecated sub-state enum members (`ST_HOME_EOT_FAST` / `SLOW` / `DETECT` / `SETREF`) still exist in `E_SystemState` but are unused by the live state machine. The labels below (`HE_FAST_APPROACH`, etc.) are the FB's internal `INT` constants.
+>
+> **Command/status routing.** `FB_HomeEOT` emits `CmdMoveVelocity`, `CmdDirectControl`, and `CmdStop` `VAR_OUTPUT` structs, which `PRG_Main` copies into the matching `G_cmd*` globals so the LD POU's `MC_MoveVelocity`, `Y_DirectControl`, and `MC_Stop` instances act on them. Status flows back via `G_sta*` globals wired into `FB_HomeEOT.Sta*` inputs. Unlike Mode 110, this FB **does not** command `AbsolutePositionManager` — the encoder reference established by Mode 110 is preserved; Mode 111 only calculates a master/slave coordinate offset.
 
 ### Sequence Steps
 
@@ -134,46 +151,62 @@ Calibrate the cylinder end-of-travel position by detecting mechanical stall. Thi
 Step 1: FAST APPROACH
 +------------------------------------------+
 | Step: HE_FAST_APPROACH                   |
-| Action: MC_MoveVelocity (positive dir)   |
-| Velocity: cfgHomeEOTFastVelocity         |
+| Action: CmdMoveVelocity -> MC_MoveVelocity|
+| Velocity: FastVelocity FB input          |
+|           (= G_cfgHomeEOTFastVel)        |
 |           (default: +50 mm/s)            |
-| Exit: Position near expected EOT         |
-|       (cfgHomeEOTSlowStartPos)           |
+| Exit: Position within ApproachDist of    |
+|       expected EOT                       |
+|       (G_cfgHomeEOTApproachDist = 20 mm) |
 +------------------------------------------+
         |
         v
 Step 2: SLOW APPROACH
 +------------------------------------------+
 | Step: HE_SLOW_APPROACH                   |
-| Action: Y_DirectControl (velocity mode)  |
-| Velocity: cfgHomeEOTSlowVelocity         |
-|           (default: +10 mm/s)            |
-| Torque Limit: cfgHomeEOTTorqueLimit      |
-|               (default: 30%)             |
-| Exit: Velocity drops below threshold     |
+| Action: CmdDirectControl                 |
+|         -> G_cmdDirectControl            |
+|         -> Y_DirectControl (velocity +   |
+|            torque-limit mode)            |
+| Velocity: SlowVelocity FB input          |
+|           (= G_cfgHomeEOTSlowVel)        |
+|           (default: +5 mm/s)             |
+| Torque Limit: G_cfgTorqueHomingLimit     |
+|               (default: 60%)             |
+| Exit: |vel| < 0.5 mm/s AND               |
+|       |torque| >= 0.9 * TorqueThreshold  |
+|       (TorqueThreshold =                 |
+|        G_cfgHomeEOTTorqueThresh = 50%,   |
+|        effective detection at 45% rated) |
 +------------------------------------------+
         |
         v
 Step 3: STALL DETECT
 +------------------------------------------+
 | Step: HE_STALL_DETECT                    |
-| Condition 1: |velocity| < 0.5 mm/s       |
-| Condition 2: |torque| >= 90% of limit    |
-| Duration: 200 ms continuous              |
-| Action: Confirm mechanical stop          |
-| Exit: Stall confirmed                    |
+| Condition 1: |ActualVelocity| < 0.5 mm/s |
+|              (rVelocityThreshold)        |
+| Condition 2: |ActualTorque| >=           |
+|              0.9 * TorqueThreshold       |
+|              (rTorqueMultiplier = 0.9)   |
+| Duration: G_cfgStallDetectTime (200 ms)  |
+| Exit: Conditions held for duration       |
 +------------------------------------------+
         |
         v
-Step 4: SET REFERENCE
+Step 4: SET REFERENCE (offset only)
 +------------------------------------------+
 | Step: HE_SETREF                          |
-| Action: Calculate EOTOffset              |
-|   EOTOffset := ExpectedEOTPos - ActualPos|
-| Position: G_cfgHomeEOTSetPosition          |
-|           (default: 305.0 mm)            |
-| Note: PRG_Main clears G_flagEOTHomeRequired|
-|       after FB reports Done              |
+| Action: Record EOTPosition from          |
+|         ActualPosition input, then       |
+|   EOTOffset := ExpectedEOTPosition       |
+|                - EOTPosition             |
+|   where ExpectedEOTPosition =            |
+|     G_cfgHomeEOTSetPosition (300 mm)     |
+| Note: No AbsolutePositionManager call —  |
+|       encoder zero from Mode 110 kept.   |
+| PRG_Main writes offset to G_posEOTOffset |
+| and clears G_flagEOTHomeRequired         |
 +------------------------------------------+
         |
         v
@@ -189,21 +222,22 @@ Step 5: COMPLETE
 ### Stall Detection Algorithm
 
 ```
-STALL DETECTION CRITERIA:
-  - Actual velocity magnitude < cfgHomeEOTStallVelocity (0.5 mm/s)
-  - Actual torque magnitude >= cfgHomeEOTStallTorquePercent (90%) of limit
-  - Both conditions met for cfgHomeEOTStallTime (200 ms)
+STALL DETECTION CRITERIA (from FB_HomeEOT):
+  - |ActualVelocity| < rVelocityThreshold         (= 0.5 mm/s, FB constant)
+  - |ActualTorque|   >= TorqueThreshold * 0.9     (TorqueThreshold input =
+                                                   G_cfgHomeEOTTorqueThresh = 50%,
+                                                   detection fires at 45% rated)
+  - Both held for G_cfgStallDetectTime            (= 200 ms)
 
 PSEUDOCODE:
-IF ABS(actual_velocity) < 0.5 AND
-   ABS(actual_torque) >= 0.9 * torque_limit THEN
-    IF stall_timer >= 200ms THEN
-        stall_confirmed = TRUE
-    ELSE
-        stall_timer = stall_timer + scan_time
+IF ABS(ActualVelocity) < rVelocityThreshold AND
+   ABS(ActualTorque)   >= TorqueThreshold * rTorqueMultiplier THEN
+    tStallConfirm(IN := TRUE, PT := G_cfgStallDetectTime);
+    IF tStallConfirm.Q THEN
+        (* stall confirmed, proceed to HE_SETREF *)
     END_IF
 ELSE
-    stall_timer = 0
+    tStallConfirm(IN := FALSE);    (* resets on any criterion failure *)
 END_IF
 ```
 
@@ -322,31 +356,35 @@ MASTER:
 
 | Parameter | Default | Units | Description |
 |-----------|---------|-------|-------------|
-| cfgHomeLimApproachVelocity | -20.0 | mm/s | Approach velocity (negative = toward switch) |
-| cfgHomeLimBackoffVelocity | +5.0 | mm/s | Backoff velocity (positive = away from switch) |
-| G_cfgHomeLimSetPosition | 0.0 | mm | Position value after homing |
-| cfgHomeLimTimeout | 30.0 | s | Maximum time for homing |
+| `G_cfgHomeLimApproachVel` | 50.0 | mm/s | Approach velocity magnitude (FB picks direction) |
+| `G_cfgHomeLimBackoffDist` | 5.0 | mm | Distance to move off the switch after detection |
+| `G_cfgVelHomingSlow` | 5.0 | mm/s | Backoff velocity (also reused as Mode 111 slow velocity input by FBs) |
+| `G_cfgHomeLimSetPosition` | 0.0 | mm | Position reference written via `AbsolutePositionManager` |
+| `G_cfgHomingTimeout` | T#30S | — | Overall FB timeout for either homing mode |
 
 ### Mode 111 Parameters
 
 | Parameter | Default | Units | Description |
 |-----------|---------|-------|-------------|
-| cfgHomeEOTFastVelocity | +50.0 | mm/s | Fast approach velocity |
-| cfgHomeEOTSlowStartPos | 280.0 | mm | Position to start slow approach |
-| cfgHomeEOTSlowVelocity | +10.0 | mm/s | Slow approach velocity |
-| cfgHomeEOTTorqueLimit | 30.0 | % | Torque limit during stall |
-| cfgHomeEOTStallVelocity | 0.5 | mm/s | Velocity threshold for stall |
-| cfgHomeEOTStallTorquePercent | 90.0 | % | Torque threshold (of limit) |
-| cfgHomeEOTStallTime | 200 | ms | Stall confirmation time |
-| G_cfgHomeEOTSetPosition | 305.0 | mm | Position value at EOT |
-| cfgHomeEOTTimeout | 30.0 | s | Maximum time for homing |
+| `G_cfgHomeEOTFastVel` | 50.0 | mm/s | Fast approach velocity |
+| `G_cfgHomeEOTApproachDist` | 20.0 | mm | Distance from expected EOT at which to switch to slow approach |
+| `G_cfgHomeEOTSlowVel` | 5.0 | mm/s | Slow torque-limited approach velocity |
+| `G_cfgTorqueHomingLimit` | 60.0 | % | Torque limit applied during slow approach |
+| `G_cfgHomeEOTTorqueThresh` | 50.0 | % | Stall detection torque threshold (actual trigger at 90% × threshold = 45%) |
+| `G_cfgStallDetectTime` | T#200MS | — | Stall confirmation duration |
+| `G_cfgHomeEOTSetPosition` | 300.0 | mm | Expected master-view position at EOT (used for offset calculation) |
+| `G_cfgHomingTimeout` | T#30S | — | Overall sequence timeout |
+
+Notes:
+- The stall velocity threshold (`0.5 mm/s`) and torque multiplier (`0.9`) are FB-internal constants inside `FB_HomeEOT` (`rVelocityThreshold`, `rTorqueMultiplier`) and are not exposed as configurable globals.
+- See [Stall_Detection_Calculation](../Stall_Detection_Calculation.md) for the full derivation.
 
 ### Mode 101 Parameters
 
 | Parameter | Default | Units | Description |
 |-----------|---------|-------|-------------|
-| G_cfgGoHomePosition | 0.0 | mm | Target home position |
-| G_cfgGoHomeVelocity | 50.0 | mm/s | Movement velocity |
+| `G_cfgGoHomePosition` | 0.0 | mm | Target home position |
+| `G_cfgGoHomeVelocity` | 50.0 | mm/s | Movement velocity |
 
 ---
 

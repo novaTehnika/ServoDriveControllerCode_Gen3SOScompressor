@@ -91,15 +91,15 @@ Hold Secure ______________________|‾‾‾‾‾‾‾‾‾‾‾‾
 
 ## 4. Digital Input Timing
 
-### Input Debounce
+### Input Debounce (from `GVL_Config`)
 
-| Signal | Debounce Time | Description |
-|--------|---------------|-------------|
-| G_diModeBit0-2 | 5 ms | Mode command filtering |
-| G_diMotionEnable | 5 ms | Motion enable filtering |
-| G_diFaultReset | 5 ms | Fault reset filtering |
-| G_diLimitRetract | 5 ms | Limit switch filtering |
-| G_diLimitHome | 5 ms | Limit switch filtering |
+| Signal | Debounce Time | Config Parameter |
+|--------|---------------|------------------|
+| G_diModeBit0-2 | 50 ms | `G_cfgDebounceTimeMode` |
+| G_diMotionEnable | 20 ms | `G_cfgDebounceTimeMotion` |
+| G_diFaultReset | 20 ms | `G_cfgDebounceTimeFault` |
+| G_diLimitRetract | 5 ms | `G_cfgDebounceTimeLimitStd` |
+| G_diLimitHome | 2 ms | `G_cfgDebounceTimeLimitHome` (shorter for homing precision) |
 
 ### Edge Detection
 
@@ -117,10 +117,11 @@ Hold Secure ______________________|‾‾‾‾‾‾‾‾‾‾‾‾
 | Parameter | Value | Description |
 |-----------|-------|-------------|
 | Sample Rate | 1 kHz | Per scan cycle |
-| Filter Time Constant | 10 ms | First-order low-pass |
-| Step Response (10%) | 1.1 ms | Time to 10% of final value |
-| Step Response (90%) | 23 ms | Time to 90% of final value |
-| Settling Time (2%) | 40 ms | Time to within 2% of final |
+| Filter Time Constant | 50 ms | First-order IIR low-pass (`G_cfgAnalogFilterTimeConst`) |
+| Median Filter Size | 3 samples | `G_cfgAnalogMedianSize` (valid: 3 or 5) |
+| Step Response (10%) | 5.3 ms | Time to 10% of final value (τ = 50 ms) |
+| Step Response (90%) | 115 ms | Time to 90% of final value (τ = 50 ms) |
+| Settling Time (2%) | 200 ms | Time to within 2% of final (τ = 50 ms) |
 
 ### Analog Output (Position Feedback)
 
@@ -168,7 +169,7 @@ Hold Secure ______________________|‾‾‾‾‾‾‾‾‾‾‾‾
 | Approach | 5-15 s | 30 s | Moving to limit switch |
 | Detect | 100 ms | 500 ms | Confirming switch trigger |
 | Backoff | 1-2 s | 5 s | Moving off switch |
-| Set Reference | 50 ms | 200 ms | MC_SetPosition execution |
+| Set Reference | 50 ms | 200 ms | `AbsolutePositionManager.SetPosition` via `G_cmdEncMngr` |
 | **Total** | **7-18 s** | **36 s** | Complete sequence |
 
 ### Mode 111 (Home to EOT)
@@ -178,7 +179,7 @@ Hold Secure ______________________|‾‾‾‾‾‾‾‾‾‾‾‾
 | Fast Approach | 3-5 s | 10 s | High-speed move |
 | Slow Approach | 1-3 s | 10 s | Torque-limited approach |
 | Stall Detection | 200-500 ms | 2 s | Confirming stall |
-| Set Reference | 50 ms | 200 ms | MC_SetPosition execution |
+| Set Reference | 50 ms | 200 ms | Compute `G_posEOTOffset` (no encoder re-zero; preserves Mode 110 reference) |
 | **Total** | **5-9 s** | **22 s** | Complete sequence |
 
 ### Stall Detection Timing
@@ -320,12 +321,16 @@ FaultReset   _______________|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 | Parameter | Default | Range | Description |
 |-----------|---------|-------|-------------|
 | G_cfgHandshakeTimeout | 500 ms | 100-2000 ms | Mode confirmation timeout |
-| cfgFaultResetTimeout | 1000 ms | 500-5000 ms | Fault reset timeout |
+| G_cfgFaultIdleTimeout | 30000 ms | 10000-60000 ms | Fault-to-idle transition timeout |
 | G_cfgBrakeEngageDelay | 200 ms | 100-500 ms | Brake engage wait |
 | G_cfgBrakeDisengageDelay | 100 ms | 50-200 ms | Brake release wait |
 | G_cfgDriveReadyTimeout | 5000 ms | 1000-10000 ms | Drive enable timeout |
-| cfgInputDebounceTime | 5 ms | 1-20 ms | Digital input filter |
-| cfgAnalogFilterTC | 10 ms | 1-50 ms | Analog input filter |
+| G_cfgDebounceTimeMode | 50 ms | 10-200 ms | Mode bits debounce |
+| G_cfgDebounceTimeMotion | 20 ms | 5-100 ms | MotionEnable debounce |
+| G_cfgDebounceTimeFault | 20 ms | 5-100 ms | FaultReset debounce |
+| G_cfgDebounceTimeLimitStd | 5 ms | 1-20 ms | Retract limit debounce |
+| G_cfgDebounceTimeLimitHome | 2 ms | 1-10 ms | Home limit debounce |
+| G_cfgAnalogFilterTimeConst | 50 ms | 1-200 ms | Analog low-pass time constant |
 | G_cfgHomingTimeout | 30000 ms | 10000-60000 ms | Homing sequence timeout |
 | G_cfgStallDetectTime | 200 ms | 100-500 ms | EOT stall confirmation |
 

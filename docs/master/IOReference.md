@@ -181,25 +181,32 @@ Mode-dependent status indicator:
 
 #### Position Control (Mode 010)
 
-**Single-stage linear mapping** (simplified for command):
-```
-position_mm = (voltage + 10) / 20 * 305
-```
+**Two-stage piecewise linear mapping** — identical to the position feedback mapping in §4, so commanding `V` yields the same physical position as the feedback reports at `V`. Stage 1 covers 0–200 mm (higher resolution, in-cylinder region); Stage 2 covers 200–305 mm.
 
 | Voltage | Position |
 |---------|----------|
-| -10V | 0 mm |
-| 0V | 152.5 mm |
-| +10V | 305 mm |
+| -10.00V | 0 mm |
+| 0.00V | 133.33 mm |
+| +5.00V | 200 mm (stage boundary) |
+| +7.50V | 252.5 mm |
+| +10.00V | 305 mm |
 
-**Formula (voltage to position)**:
+**Formula (voltage to position)** — applied by `FB_AnalogProcessor` in the slave:
 ```
-position = (voltage + 10) * 305 / 20
+IF voltage < +5V THEN
+    position = 0 + (voltage + 10) / 15 * 200     // Stage 1
+ELSE
+    position = 200 + (voltage - 5) / 5 * 105     // Stage 2
+END_IF
 ```
 
-**Formula (position to voltage)**:
+**Formula (position to voltage)** — the master applies this to command a given position:
 ```
-voltage = (position / 305) * 20 - 10
+IF position <= 200 THEN
+    voltage = (position / 200) * 15 - 10         // Stage 1
+ELSE
+    voltage = 5 + ((position - 200) / 105) * 5   // Stage 2
+END_IF
 ```
 
 #### Velocity Control (Mode 011)
@@ -348,16 +355,20 @@ float voltage_to_position(float voltage) {
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| Input Debounce | 5 ms | Software filter in slave |
+| Input Debounce (mode bits) | 50 ms | `G_cfgDebounceTimeMode` |
+| Input Debounce (MotionEnable) | 20 ms | `G_cfgDebounceTimeMotion` |
+| Input Debounce (FaultReset) | 20 ms | `G_cfgDebounceTimeFault` |
+| Input Debounce (LimitRetract) | 5 ms | `G_cfgDebounceTimeLimitStd` |
+| Input Debounce (LimitHome) | 2 ms | `G_cfgDebounceTimeLimitHome` |
 | Output Update | 1 ms | Scan cycle time |
 | Handshake Timeout | 500 ms | Mode confirmation |
-| Fault Code Stable | 10 ms | Before reading after G_doFaultActive rises |
+| Fault Code Stable | 10 ms | Before reading after `G_doFaultActive` rises |
 
 ### Analog Signal Timing
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| AI Filter Time Constant | 10 ms | Low-pass filter |
+| AI Filter Time Constant | 50 ms | `G_cfgAnalogFilterTimeConst` (IIR low-pass after a 3-sample median) |
 | AO Update Rate | 1 kHz | Position feedback |
 | AI Sample Rate | 1 kHz minimum | For smooth control |
 
@@ -414,8 +425,8 @@ float voltage_to_position(float voltage) {
 | DO5 | G_doFaultActive | MP→NI | P1.5 |
 | DO6 | G_doInMotion | MP→NI | P1.6 |
 | DO7 | G_doHomingComplete | MP→NI | P1.7 |
-| AI0 | G_aiReference | NI→MP | AO0 |
-| AO0 | aoPositionFeedback | MP→NI | AI0 |
+| AI0 | G_aiReference (`AT %IW0 : LREAL`) | NI→MP | AO0 |
+| AO0 | G_aoPositionOutput (`AT %QW0 : LREAL`) | MP→NI | AI0 |
 
 **Note**: Verify actual MP2600iec I/O module addresses in MotionWorksIEC configuration.
 
