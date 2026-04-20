@@ -588,7 +588,7 @@ END_IF;
 
 
 (* --------------------------------------------------------------------------
-   Command Arbitration (ST -> LD POU via G_cmd*)
+   Command Arbitration (ST -> LD POU via G_cmd* )
    Default all commands to idle, then override per state.
    -------------------------------------------------------------------------- *)
 
