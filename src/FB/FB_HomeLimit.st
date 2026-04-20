@@ -23,33 +23,33 @@
 
    Integration:
    - Called once per scan at end of PRG_Main
-   - CmdMoveVelocity/CmdStop/CmdEncMngr routed to G_cmd* by PRG_Main
-   - Receives built-in FB status via StaMoveVelocity/StaStop/StaEncMngr inputs
-   - PRG_Main routes G_staMoveVelocity/G_staStop/G_staEncMngr into these inputs
+   - CmdMoveVelocity/CmdStop/CmdSetPosition routed to G_cmd* by PRG_Main
+   - Receives built-in FB status via StaMoveVelocity/StaStop/StaSetPosition inputs
+   - PRG_Main routes G_staMoveVelocity/G_staStop/G_staSetPosition into these inputs
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
-       Enable              : BOOL                 (* Enable the function block
-       Execute             : BOOL                 (* Start homing sequence
-       ApproachVelocity    : LREAL                (* Approach velocity (mm/s)
-       BackoffVelocity     : LREAL                (* Backoff velocity (mm/s)
-       SetPosition         : LREAL                (* Position to set at home switch (mm)
-       Timeout             : TIME                 (* Overall sequence timeout
-       LimitHomeActive     : BOOL                 (* Home limit switch is triggered
-       LimitRetractActive  : BOOL                 (* Retract limit switch is triggered
-       Abort               : BOOL                 (* Abort the sequence
-       StaMoveVelocity     : ST_StaMoveVelocity   (* Status from MC_MoveVelocity
-       StaStop             : ST_StaStop           (* Status from MC_Stop
-       StaEncMngr          : ST_StaEncMngr        (* Status from AbsolutePositionManager
+       Enable              : BOOL                   (* Enable the function block
+       Execute             : BOOL                   (* Start homing sequence
+       ApproachVelocity    : LREAL                  (* Approach velocity (mm/s)
+       BackoffVelocity     : LREAL                  (* Backoff velocity (mm/s)
+       SetPosition         : LREAL                  (* Position to set at home switch (mm)
+       Timeout             : TIME                   (* Overall sequence timeout
+       LimitHomeActive     : BOOL                   (* Home limit switch is triggered
+       LimitRetractActive  : BOOL                   (* Retract limit switch is triggered
+       Abort               : BOOL                   (* Abort the sequence
+       StaMoveVelocity     : ST_StaMoveVelocity     (* Status from MC_MoveVelocity
+       StaStop             : ST_StaStop             (* Status from MC_Stop
+       StaSetPosition      : ST_StaSetPosition      (* Status from MC_SetPosition
      VAR_OUTPUT:
-       Active              : BOOL             (* Sequence is running
-       Done                : BOOL             (* Homing complete
-       InMotion            : BOOL             (* Currently moving
-       Error               : BOOL             (* Error occurred
-       ApproachingPositive : BOOL             (* Currently approaching from positive direction
-       CmdMoveVelocity     : ST_CmdMoveVelocity  (* Command output for MC_MoveVelocity
-       CmdStop             : ST_CmdStop          (* Command output for MC_Stop
-       CmdEncMngr          : ST_CmdEncMngr       (* Command output for AbsolutePositionManager
+       Active              : BOOL                   (* Sequence is running
+       Done                : BOOL                   (* Homing complete
+       InMotion            : BOOL                   (* Currently moving
+       Error               : BOOL                   (* Error occurred
+       ApproachingPositive : BOOL                   (* Currently approaching from positive direction
+       CmdMoveVelocity     : ST_CmdMoveVelocity     (* Command output for MC_MoveVelocity
+       CmdStop             : ST_CmdStop             (* Command output for MC_Stop
+       CmdSetPosition      : ST_CmdSetPosition      (* Command output for MC_SetPosition
      VAR:
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
@@ -82,7 +82,7 @@ IF NOT Enable THEN
     bStopDoneLatched := FALSE;
     CmdMoveVelocity.Execute := FALSE;
     CmdStop.Execute := FALSE;
-    CmdEncMngr.SetPosition := FALSE;
+    CmdSetPosition.Execute := FALSE;
     tTimeout(IN := FALSE);
     RETURN;
 END_IF;
@@ -93,7 +93,7 @@ rTrigExecute(CLK := Execute);
 (* Handle abort in most states *)
 IF Abort AND (eState <> HL_IDLE) AND (eState <> HL_ERROR) AND (eState <> HL_DONE) THEN
     CmdMoveVelocity.Execute := FALSE;
-    CmdEncMngr.SetPosition := FALSE;
+    CmdSetPosition.Execute := FALSE;
     tTimeout(IN := FALSE);
     eState := HL_ABORTING;
 END_IF;
@@ -105,7 +105,7 @@ tTimeout(IN := (eState <> HL_IDLE) AND (eState <> HL_DONE) AND (eState <> HL_ERR
 IF tTimeout.Q THEN
     CmdMoveVelocity.Execute := FALSE;
     CmdStop.Execute := FALSE;
-    CmdEncMngr.SetPosition := FALSE;
+    CmdSetPosition.Execute := FALSE;
     Error := TRUE;
     eState := HL_ERROR;
 END_IF;
@@ -127,7 +127,7 @@ IF eState = HL_IDLE THEN
 
         CmdMoveVelocity.Execute := FALSE;
         CmdStop.Execute := FALSE;
-        CmdEncMngr.SetPosition := FALSE;
+        CmdSetPosition.Execute := FALSE;
         tTimeout(IN := FALSE);
 
         IF rTrigExecute.Q OR Execute THEN
@@ -228,18 +228,18 @@ ELSIF eState = HL_SETREF THEN
                 bStopDoneLatched := TRUE;
             END_IF;
         ELSE
-            CmdEncMngr.Enable := TRUE;
-            CmdEncMngr.SetPosition := TRUE;
-            CmdEncMngr.Position := SetPosition;
+            CmdSetPosition.Execute := TRUE;
+            CmdSetPosition.Position := SetPosition;
+            CmdSetPosition.Mode := FALSE;
 
-            IF StaEncMngr.SetPositionDone THEN
-                CmdEncMngr.SetPosition := FALSE;
+            IF StaSetPosition.Done THEN
+                CmdSetPosition.Execute := FALSE;
                 InMotion := FALSE;
                 Done := TRUE;
                 eState := HL_DONE;
 
-            ELSIF StaEncMngr.Error THEN
-                CmdEncMngr.SetPosition := FALSE;
+            ELSIF StaSetPosition.Error THEN
+                CmdSetPosition.Execute := FALSE;
                 Error := TRUE;
                 eState := HL_ERROR;
             END_IF;

@@ -333,7 +333,7 @@
         ======================================================================== *)
 
      (* These flags track homing requirements *)
-     G_flagAbsHomeRequired     : BOOL := FALSE    (* Set if encoder invalid, cleared by Mode 110 *)
+     G_flagAbsHomeRequired     : BOOL := TRUE     (* Forced TRUE on boot/fault; cleared by Mode 110 *)
      G_flagEOTHomeRequired     : BOOL := TRUE     (* Set on power-up, cleared by Mode 111 *)
      G_flagHomingInProgress    : BOOL := FALSE    (* TRUE while homing sequence active *)
      G_flagHomingComplete      : BOOL := FALSE    (* TRUE after successful homing *)
@@ -418,10 +418,6 @@
      (* Timing diagnostics *)
      G_sysStateEntryTime       : TIME := T#0MS    (* Time when current state was entered *)
      G_sysTimeInState          : TIME := T#0MS    (* Duration in current state *)
-
-     (* Encoder status *)
-     G_sysEncoderValid         : BOOL := FALSE    (* Absolute encoder position is valid *)
-     G_sysEncoderBatteryOK     : BOOL := FALSE    (* Encoder battery status OK *)
    END_VAR
 
 
@@ -446,7 +442,7 @@
      G_cmdMoveAbsolute     : ST_CmdMoveAbsolute
      G_cmdMoveVelocity     : ST_CmdMoveVelocity
      G_cmdDirectControl    : ST_CmdDirectControl
-     G_cmdEncMngr     : ST_CmdEncMngr
+     G_cmdSetPosition      : ST_CmdSetPosition
 
 
      (* ========================================================================
@@ -459,7 +455,7 @@
      G_staMoveAbsolute     : ST_StaMoveAbsolute
      G_staMoveVelocity     : ST_StaMoveVelocity
      G_staDirectControl    : ST_StaDirectControl
-     G_staEncMngr     : ST_StaEncMngr
+     G_staSetPosition      : ST_StaSetPosition
    END_VAR
 
 *)

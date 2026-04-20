@@ -10,18 +10,16 @@
    making the system easier to audit and maintain.
 
    Monitored Conditions:
-   - Drive faults (from servo amplifier)
-   - Encoder faults (invalid position, battery low)
+   - Drive faults (from servo amplifier; encoder alarms surface here via the drive)
    - Limit switch faults (unexpected triggers during motion)
    - Position limit violations (beyond soft limits)
    - Piston exit guard faults (from FB_PistonExitGuard)
 
    Fault Priority (highest to lowest):
    1. Drive fault (FAULT_DRIVE)
-   2. Encoder fault (FAULT_ENCODER)
-   3. Limit switch fault (FAULT_LIMIT_SWITCH)
-   4. Position limit fault (FAULT_POSITION)
-   5. Piston exit fault (FAULT_PISTON_EXIT)
+   2. Limit switch fault (FAULT_LIMIT_SWITCH)
+   3. Position limit fault (FAULT_POSITION)
+   4. Piston exit fault (FAULT_PISTON_EXIT)
 
    Integration:
    - Called every scan after state machine, before output update
@@ -37,19 +35,15 @@
        SoftLimitMax        : LREAL            (* Maximum allowed position (mm)
        DriveReady          : BOOL             (* Drive is ready for motion
        DriveFault          : BOOL             (* Drive has reported a fault
-       EncoderValid        : BOOL             (* Absolute encoder position valid
-       EncoderBatteryOK    : BOOL             (* Encoder battery status OK
        CurrentState        : E_SystemState    (* Current state machine state
        CurrentMode         : E_OperatingMode  (* Current operating mode
        ExitGuardTriggered  : BOOL             (* Piston exit guard triggered fault
-       AbsHomeRequired     : BOOL             (* Homing required - suppresses encoder fault
      VAR_OUTPUT:
        FaultDetected       : BOOL             (* A fault condition exists
        FaultCode           : E_FaultCode      (* Fault code to report
        FaultLimitSwitch    : BOOL             (* Limit switch fault detected
        FaultPosition       : BOOL             (* Position limit exceeded
        FaultDrive          : BOOL             (* Drive fault detected
-       FaultEncoder        : BOOL             (* Encoder fault detected
        FaultPistonExit     : BOOL             (* Piston exit guard fault
      VAR:
        bLatchedFault       : BOOL
@@ -70,7 +64,6 @@ IF NOT Enable THEN
     FaultLimitSwitch := FALSE;
     FaultPosition := FALSE;
     FaultDrive := FALSE;
-    FaultEncoder := FALSE;
     FaultPistonExit := FALSE;
     bLatchedFault := FALSE;
     eLatchedFaultCode := E_FaultCode#FAULT_NONE;
@@ -95,7 +88,6 @@ bInHomingState := (CurrentState = E_SystemState#ST_HOME_LIMIT) OR
 
 (* Check if already in fault state *)
 bInFaultState := (CurrentState = E_SystemState#ST_FAULT) OR
-                 (CurrentState = E_SystemState#ST_FAULT_RECOVERY) OR
                  (CurrentState = E_SystemState#ST_FAULT_IDLE);
 
 (* --------------------------------------------------------------------------
@@ -116,21 +108,6 @@ END_IF;
    -------------------------------------------------------------------------- *)
 
 FaultDrive := DriveFault;
-
-(* --------------------------------------------------------------------------
-   ENCODER FAULT MONITORING
-   Invalid position data or battery issues
-   -------------------------------------------------------------------------- *)
-
-(* Encoder is faulty if position invalid (but only check when relevant) *)
-(* Don't trigger during initialization (before check completes) or when
-   AbsHomeRequired is set (system is aware and trying to resolve via homing) *)
-IF (CurrentState <> E_SystemState#ST_INIT) AND (CurrentState <> E_SystemState#ST_ENCODER_CHECK)
-   AND NOT AbsHomeRequired THEN
-    FaultEncoder := NOT EncoderValid;
-ELSE
-    FaultEncoder := FALSE;
-END_IF;
 
 (* --------------------------------------------------------------------------
    LIMIT SWITCH FAULT MONITORING
@@ -175,14 +152,10 @@ FaultPistonExit := ExitGuardTriggered;
    Determine highest priority fault and set outputs
    -------------------------------------------------------------------------- *)
 
-(* Priority order: Drive > Encoder > LimitSwitch > Position > PistonExit *)
+(* Priority order: Drive > LimitSwitch > Position > PistonExit *)
 IF FaultDrive THEN
     FaultDetected := TRUE;
     FaultCode := E_FaultCode#FAULT_DRIVE;
-
-ELSIF FaultEncoder THEN
-    FaultDetected := TRUE;
-    FaultCode := E_FaultCode#FAULT_ENCODER;
 
 ELSIF FaultLimitSwitch THEN
     FaultDetected := TRUE;

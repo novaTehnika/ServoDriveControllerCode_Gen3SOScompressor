@@ -10,21 +10,20 @@
    the handshake protocol with the master controller.
 
    All built-in motion FBs (MC_Power, MC_Stop, MC_Reset, MC_MoveAbsolute,
-   MC_MoveVelocity, MC_ReadActual*, Y_DirectControl, AbsolutePositionManager)
+   MC_MoveVelocity, MC_ReadActual*, Y_DirectControl, MC_SetPosition)
    are instantiated in the LD POU and communicate
    via G_cmd*/G_sta* structured globals.
 
    Every user-defined FB is called exactly once at the end of this file.
 
    State Machine Groups:
-   - Initialization: ST_INIT, ST_ENCODER_CHECK, ST_REQUIRE_ABS_HOME
-   - Idle: ST_IDLE
+   - Idle: ST_IDLE (first scan goes directly here; both homing flags forced TRUE)
    - Transition (Activation): ST_DRIVE_ENABLE, ST_BRAKE_RELEASE
    - Operational: ST_BRAKE_HOLD, ST_POSITION_CTRL, ST_VELOCITY_CTRL,
                   ST_TORQUE_CTRL, ST_GO_HOME, ST_HOME_*
    - Transition (Inter-Mode): ST_HOLD_POSITION
    - Transition (Deactivation): ST_BRAKE_ENGAGE, ST_DRIVE_DISABLE
-   - Fault: ST_FAULT, ST_FAULT_RECOVERY
+   - Fault: ST_FAULT, ST_FAULT_IDLE
 
    Variables (define in MWiec GUI):
      VAR:
@@ -48,7 +47,6 @@
        fbGoHome            : FB_GoHome
        fbHomeLimit         : FB_HomeLimit
        fbHomeEOT           : FB_HomeEOT
-       fbEncoderManager    : FB_EncoderManager
        (* Timers
        tStateTimer         : TON
        tBrakeTimer         : TON
@@ -86,11 +84,11 @@
 IF bFirstScan THEN
     bFirstScan := FALSE;
 
-    G_sysCurrentState := E_SystemState#ST_INIT;
-    G_sysPreviousState := E_SystemState#ST_INIT;
+    G_sysCurrentState := E_SystemState#ST_IDLE;
+    G_sysPreviousState := E_SystemState#ST_IDLE;
 
     G_flagEOTHomeRequired := TRUE;
-    G_flagAbsHomeRequired := FALSE;
+    G_flagAbsHomeRequired := TRUE;
 
     G_doBrakeDisengage := FALSE;
     G_doPerformanceStatus := FALSE;
@@ -145,51 +143,11 @@ IF bEnterState THEN
     tStateTimer(IN := FALSE);
 END_IF;
 
-IF G_sysCurrentState = E_SystemState#ST_INIT THEN
-
-    (* ======================================================================
-       INITIALIZATION STATES
-       ====================================================================== *)
-
-        IF bEnterState THEN
-            G_doBrakeDisengage := FALSE;
-        END_IF;
-
-        G_sysCurrentState := E_SystemState#ST_ENCODER_CHECK;
-
-
-ELSIF G_sysCurrentState = E_SystemState#ST_ENCODER_CHECK THEN
-
-        IF fbEncoderManager.CheckComplete THEN
-            G_sysEncoderValid := fbEncoderManager.EncoderValid;
-
-            IF G_sysEncoderValid THEN
-                G_flagAbsHomeRequired := FALSE;
-                G_sysCurrentState := E_SystemState#ST_IDLE;
-            ELSE
-                G_sysCurrentState := E_SystemState#ST_REQUIRE_ABS_HOME;
-            END_IF;
-
-        ELSIF fbEncoderManager.Error THEN
-            G_sysEncoderValid := FALSE;
-            G_sysCurrentState := E_SystemState#ST_REQUIRE_ABS_HOME;
-        END_IF;
-
-
-ELSIF G_sysCurrentState = E_SystemState#ST_REQUIRE_ABS_HOME THEN
-
-        IF bEnterState THEN
-            G_flagAbsHomeRequired := TRUE;
-        END_IF;
-
-        G_sysCurrentState := E_SystemState#ST_IDLE;
-
+IF G_sysCurrentState = E_SystemState#ST_IDLE THEN
 
     (* ======================================================================
        IDLE STATE
        ====================================================================== *)
-
-ELSIF G_sysCurrentState = E_SystemState#ST_IDLE THEN
 
         IF bEnterState THEN
             G_doBrakeDisengage := FALSE;
@@ -410,7 +368,6 @@ ELSIF G_sysCurrentState = E_SystemState#ST_HOME_LIMIT THEN
 
         IF fbHomeLimit.Done THEN
             G_flagAbsHomeRequired := FALSE;
-            G_sysEncoderValid := TRUE;
             G_flagHomingComplete := TRUE;
             G_sysCurrentState := E_SystemState#ST_HOME_COMPLETE;
 
@@ -594,29 +551,16 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT THEN
         END_IF;
 
 
-ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_RECOVERY THEN
-        (* ----------------------------------------------------------------
-           LEGACY STATE - Kept for MC_Reset if needed
-           Currently bypassed by fast recovery path in ST_FAULT
-           ---------------------------------------------------------------- *)
-        IF G_staReset.Done THEN
-            G_sysActiveFault := E_FaultCode#FAULT_NONE;
-            G_sysCurrentState := E_SystemState#ST_FAULT_IDLE;
-
-        ELSIF G_staReset.Error THEN
-            G_sysCurrentState := E_SystemState#ST_FAULT;
-        END_IF;
-
-
 ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_IDLE THEN
         (* ----------------------------------------------------------------
            FAULT IDLE STATE - Drive disabled, brake engaged
 
-           Entered after:
-           - ST_FAULT timeout (slow recovery)
-           - ST_FAULT_RECOVERY completion
-
+           Entered after ST_FAULT timeout (slow recovery path).
            Awaits fault reset handshake to return to normal ST_IDLE.
+
+           Any fault invalidates trust in position, so both homing flags
+           are re-asserted on exit - the operator must re-home before
+           resuming operational modes.
            ---------------------------------------------------------------- *)
         IF bEnterState THEN
             G_doBrakeDisengage := FALSE;
@@ -635,6 +579,8 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_IDLE THEN
 
         IF fbFaultReset.FaultResetValid THEN
             G_sysActiveFault := E_FaultCode#FAULT_NONE;
+            G_flagAbsHomeRequired := TRUE;
+            G_flagEOTHomeRequired := TRUE;
             G_sysCurrentState := E_SystemState#ST_IDLE;
         END_IF;
 
@@ -669,10 +615,9 @@ G_cmdDirectControl.ControlMode := 0;
 G_cmdDirectControl.Position := LREAL#0.0;
 G_cmdDirectControl.Velocity := LREAL#0.0;
 G_cmdDirectControl.Torque := LREAL#0.0;
-G_cmdEncMngr.Enable := FALSE;
-G_cmdEncMngr.SetPosition := FALSE;
-G_cmdEncMngr.Position := LREAL#0.0;
-G_cmdEncMngr.ResetEncoder := FALSE;
+G_cmdSetPosition.Execute := FALSE;
+G_cmdSetPosition.Position := LREAL#0.0;
+G_cmdSetPosition.Mode := FALSE;
 
 (* MC_Power: enable for all drive-active states *)
 IF (G_sysCurrentState = E_SystemState#ST_DRIVE_ENABLE) OR
@@ -687,8 +632,7 @@ IF (G_sysCurrentState = E_SystemState#ST_DRIVE_ENABLE) OR
    (G_sysCurrentState = E_SystemState#ST_HOME_COMPLETE) OR
    (G_sysCurrentState = E_SystemState#ST_HOLD_POSITION) OR
    (G_sysCurrentState = E_SystemState#ST_BRAKE_ENGAGE) OR
-   (G_sysCurrentState = E_SystemState#ST_FAULT) OR
-   (G_sysCurrentState = E_SystemState#ST_FAULT_RECOVERY) THEN
+   (G_sysCurrentState = E_SystemState#ST_FAULT) THEN
     G_cmdPower.Enable := TRUE;
     G_cmdPower.EnablePositive := TRUE;
     G_cmdPower.EnableNegative := TRUE;
@@ -725,9 +669,6 @@ ELSIF G_sysCurrentState = E_SystemState#ST_HOLD_POSITION THEN
 
 ELSIF G_sysCurrentState = E_SystemState#ST_FAULT THEN
     G_cmdStop.Execute := NOT G_staStop.Done;
-
-ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_RECOVERY THEN
-    G_cmdReset.Execute := TRUE;
 
 END_IF;
 
@@ -813,13 +754,6 @@ fbFaultReset(
     MasterFaultCode := FN_BitsToFaultCode(bFilteredModeBit0, bFilteredModeBit1, bFilteredModeBit2)
 );
 
-(* Encoder manager *)
-fbEncoderManager(
-    Enable := (G_sysCurrentState = E_SystemState#ST_ENCODER_CHECK),
-    CheckOnStartup := TRUE,
-    StaEncMngr := G_staEncMngr
-);
-
 (* Go Home handler *)
 fbGoHome(
     Enable := (G_sysCurrentState = E_SystemState#ST_GO_HOME),
@@ -846,7 +780,7 @@ fbHomeLimit(
     Abort := fTrigMotionEnable.Q,
     StaMoveVelocity := G_staMoveVelocity,
     StaStop := G_staStop,
-    StaEncMngr := G_staEncMngr
+    StaSetPosition := G_staSetPosition
 );
 
 (* Home to End-of-Travel handler *)
@@ -891,19 +825,15 @@ fbSafetyMonitor(
     SoftLimitMax := G_cfgPosSoftLimitMax,
     DriveReady := G_sysDriveReady,
     DriveFault := G_sysDriveFault,
-    EncoderValid := G_sysEncoderValid,
-    EncoderBatteryOK := G_sysEncoderBatteryOK,
     CurrentState := G_sysCurrentState,
     CurrentMode := G_sysConfirmedMode,
-    ExitGuardTriggered := fbPistonExitGuard.FaultTriggered,
-    AbsHomeRequired := G_flagAbsHomeRequired
+    ExitGuardTriggered := fbPistonExitGuard.FaultTriggered
 );
 
 (* Output multiplexer *)
 fbOutputMux(
     Enable := TRUE,
     FaultActive := (G_sysCurrentState = E_SystemState#ST_FAULT) OR
-                   (G_sysCurrentState = E_SystemState#ST_FAULT_RECOVERY) OR
                    (G_sysCurrentState = E_SystemState#ST_FAULT_IDLE),
     FaultCode := G_sysActiveFault,
     ConfirmedMode := fbHandshake.ConfirmedMode
@@ -930,17 +860,14 @@ fbPosOutput(
    where a user FB owns the motion command.
    -------------------------------------------------------------------------- *)
 
-IF G_sysCurrentState = E_SystemState#ST_ENCODER_CHECK THEN
-    G_cmdEncMngr := fbEncoderManager.CmdEncMngr;
-
-ELSIF G_sysCurrentState = E_SystemState#ST_GO_HOME THEN
+IF G_sysCurrentState = E_SystemState#ST_GO_HOME THEN
     G_cmdMoveAbsolute := fbGoHome.CmdMoveAbsolute;
     G_cmdStop := fbGoHome.CmdStop;
 
 ELSIF G_sysCurrentState = E_SystemState#ST_HOME_LIMIT THEN
     G_cmdMoveVelocity := fbHomeLimit.CmdMoveVelocity;
     G_cmdStop := fbHomeLimit.CmdStop;
-    G_cmdEncMngr := fbHomeLimit.CmdEncMngr;
+    G_cmdSetPosition := fbHomeLimit.CmdSetPosition;
 
 ELSIF G_sysCurrentState = E_SystemState#ST_HOME_EOT THEN
     G_cmdDirectControl := fbHomeEOT.CmdDirectControl;
@@ -959,10 +886,7 @@ G_sysInCylinderZone := NOT fbPistonExitGuard.InDangerZone;
 
 IF fbSafetyMonitor.FaultDetected AND
    (G_sysCurrentState <> E_SystemState#ST_FAULT) AND
-   (G_sysCurrentState <> E_SystemState#ST_FAULT_RECOVERY) AND
-   (G_sysCurrentState <> E_SystemState#ST_FAULT_IDLE) AND
-   (G_sysCurrentState <> E_SystemState#ST_INIT) AND
-   (G_sysCurrentState <> E_SystemState#ST_ENCODER_CHECK) THEN
+   (G_sysCurrentState <> E_SystemState#ST_FAULT_IDLE) THEN
     G_sysActiveFault := fbSafetyMonitor.FaultCode;
     G_sysCurrentState := E_SystemState#ST_FAULT;
 END_IF;

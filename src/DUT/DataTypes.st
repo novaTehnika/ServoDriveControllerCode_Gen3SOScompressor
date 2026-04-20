@@ -14,6 +14,7 @@
    - E_SystemState: System state machine enumeration
    - ST_AxisLimits: Position, velocity, torque, accel/decel limits
    - ST_HomingParams: Homing sequence parameters
+   - ST_Cmd*/ST_Sta*: Command/status struct pairs bridging ST and LD POUs
    ============================================================================ *)
 
 TYPE
@@ -79,10 +80,8 @@ TYPE
       States are grouped logically below for readability. *)
    E_SystemState :
    (
-      (* Initialization States *)
-      ST_INIT,                 (* Power-on initialization *)
-      ST_ENCODER_CHECK,        (* Validate absolute encoder status *)
-      ST_REQUIRE_ABS_HOME,     (* Encoder invalid, set flag and proceed to idle *)
+      (* Initialization State *)
+      ST_INIT,                 (* Default initializer; first scan transitions directly to ST_IDLE *)
 
       (* Idle State *)
       ST_IDLE,                 (* Drive OFF, brake engaged, awaiting commands *)
@@ -126,7 +125,6 @@ TYPE
 
       (* Fault States *)
       ST_FAULT,                (* Fault active, no brake, MC_Stop, await handshake/timeout *)
-      ST_FAULT_RECOVERY,       (* Legacy - may be removed *)
       ST_FAULT_IDLE            (* Drive disabled, brake engaged, await fault reset handshake *)
    );
 
@@ -244,12 +242,11 @@ TYPE
       Torque          : LREAL;
    END_STRUCT;
 
-   ST_CmdEncMngr :
+   ST_CmdSetPosition :
    STRUCT
-      Enable          : BOOL;
-      SetPosition     : BOOL;
+      Execute         : BOOL;
       Position        : LREAL;
-      ResetEncoder    : BOOL;
+      Mode            : BOOL;       (* FALSE = absolute (default), TRUE = relative *)
    END_STRUCT;
 
 
@@ -305,14 +302,10 @@ TYPE
       Error           : BOOL;
    END_STRUCT;
 
-   ST_StaEncMngr :
+   ST_StaSetPosition :
    STRUCT
-      Valid           : BOOL;
-      SetPositionDone : BOOL;
-      PositionValid   : BOOL;
-      ResetDone       : BOOL;
-      EncoderAlarmID  : UINT;
-      ControllerAlarmID : UDINT;
+      Done            : BOOL;
+      Busy            : BOOL;
       Error           : BOOL;
    END_STRUCT;
 
