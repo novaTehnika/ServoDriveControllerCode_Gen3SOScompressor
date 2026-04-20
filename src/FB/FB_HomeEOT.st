@@ -62,8 +62,10 @@
      VAR:
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
-       tTimeout            : TON
-       tStallConfirm       : TON
+       tTimeout            : TON              (* Single call site — see end of body
+       tStallConfirm       : TON              (* Single call site — see end of body
+       bTimeoutIN          : BOOL             (* Latched IN for tTimeout
+       bStallConfirmIN     : BOOL             (* Latched IN for tStallConfirm
        rVelocityThreshold  : LREAL := 0.5
        rTorqueMultiplier   : LREAL := 0.9
      VAR CONSTANT:
@@ -94,33 +96,32 @@ IF NOT Enable THEN
     eState := HE_IDLE;
     CmdDirectControl.Enable := FALSE;
     CmdStop.Execute := FALSE;
-    tTimeout(IN := FALSE);
-    tStallConfirm(IN := FALSE);
-    RETURN;
-END_IF;
+    bTimeoutIN := FALSE;
+    bStallConfirmIN := FALSE;
 
-(* Detect rising edge on Execute *)
-rTrigExecute(CLK := Execute);
+ELSE
+    (* Detect rising edge on Execute *)
+    rTrigExecute(CLK := Execute);
 
-(* Handle abort in most states *)
-IF Abort AND (eState <> HE_IDLE) AND (eState <> HE_ERROR) AND
-   (eState <> HE_DONE) AND (eState <> HE_REQUIRES_HOME) THEN
-    CmdDirectControl.Enable := FALSE;
-    tTimeout(IN := FALSE);
-    tStallConfirm(IN := FALSE);
-    eState := HE_ABORTING;
-END_IF;
+    (* Handle abort in most states *)
+    IF Abort AND (eState <> HE_IDLE) AND (eState <> HE_ERROR) AND
+       (eState <> HE_DONE) AND (eState <> HE_REQUIRES_HOME) THEN
+        CmdDirectControl.Enable := FALSE;
+        eState := HE_ABORTING;
+    END_IF;
 
-(* Overall timeout check *)
-tTimeout(IN := (eState >= HE_FAST_APPROACH) AND (eState <= HE_SETREF),
-         PT := Timeout);
+    (* Default timer IN values for this scan; state machine may override *)
+    bTimeoutIN := (eState >= HE_FAST_APPROACH) AND (eState <= HE_SETREF);
+    bStallConfirmIN := FALSE;
 
-IF tTimeout.Q THEN
-    CmdDirectControl.Enable := FALSE;
-    CmdStop.Execute := FALSE;
-    Error := TRUE;
-    eState := HE_ERROR;
-END_IF;
+    (* Overall timeout check (uses last scan's timer Q) *)
+    IF tTimeout.Q THEN
+        CmdDirectControl.Enable := FALSE;
+        CmdStop.Execute := FALSE;
+        Error := TRUE;
+        bTimeoutIN := FALSE;
+        eState := HE_ERROR;
+    END_IF;
 
 (* --------------------------------------------------------------------------
    State Machine
@@ -139,8 +140,6 @@ IF eState = HE_IDLE THEN
 
         CmdDirectControl.Enable := FALSE;
         CmdStop.Execute := FALSE;
-        tTimeout(IN := FALSE);
-        tStallConfirm(IN := FALSE);
 
         IF rTrigExecute.Q OR Execute THEN
             Active := TRUE;
@@ -197,7 +196,6 @@ ELSIF eState = HE_SLOW_APPROACH THEN
         CmdDirectControl.Torque := TorqueLimit;
 
         InMotion := TRUE;
-        tStallConfirm(IN := FALSE);
 
         IF (ABS(ActualVelocity) < rVelocityThreshold) AND
            (ABS(ActualTorque) >= TorqueThreshold * rTorqueMultiplier) THEN
@@ -220,16 +218,14 @@ ELSIF eState = HE_STALL_DETECT THEN
 
         InMotion := TRUE;
 
-        tStallConfirm(IN := TRUE, PT := StallDetectTime);
-
         IF (ABS(ActualVelocity) < rVelocityThreshold) AND
            (ABS(ActualTorque) >= TorqueThreshold * rTorqueMultiplier) THEN
+            bStallConfirmIN := TRUE;
             IF tStallConfirm.Q THEN
                 CmdDirectControl.Enable := FALSE;
                 eState := HE_SETREF;
             END_IF;
         ELSE
-            tStallConfirm(IN := FALSE);
             eState := HE_SLOW_APPROACH;
         END_IF;
 
@@ -298,4 +294,11 @@ ELSIF eState = HE_ERROR THEN
             eState := HE_IDLE;
         END_IF;
 
-END_IF;
+    END_IF;  (* state machine *)
+END_IF;  (* Enable gate *)
+
+(* --------------------------------------------------------------------------
+   Timer calls - exactly one site per instance per scan
+   -------------------------------------------------------------------------- *)
+tTimeout(IN := bTimeoutIN, PT := Timeout);
+tStallConfirm(IN := bStallConfirmIN, PT := StallDetectTime);

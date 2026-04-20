@@ -14,7 +14,7 @@
    - If requirements met: Command MC_MoveAbsolute via CmdMoveAbsolute output
    - After reaching position: Hold there until mode change
 
-   Note: EOTHomeRequired does NOT block Go Home - the axis can still move
+   Note: EOT homing status does NOT block Go Home - the axis can still move
    to the home position even if EOT homing hasn't been done. Only
    AbsHomeRequired (encoder validity) blocks the move.
 
@@ -29,7 +29,6 @@
        Enable              : BOOL                  (* Enable the function block
        Execute             : BOOL                  (* Start go home sequence
        AbsHomeRequired     : BOOL                  (* Encoder homing required (blocks Go Home)
-       EOTHomeRequired     : BOOL                  (* EOT homing required (does NOT block)
        HomePosition        : LREAL                 (* Target home position (mm)
        HomeVelocity        : LREAL                 (* Movement velocity (mm/s)
        Abort               : BOOL                  (* Abort the move

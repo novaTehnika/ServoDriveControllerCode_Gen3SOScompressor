@@ -24,7 +24,8 @@
        Stable              : BOOL             (* Output has been stable (not changing)
        RawPassthrough      : BOOL             (* Raw input passthrough for debugging
      VAR:
-       tDebounce           : TON              (* Debounce timer
+       tDebounce           : TON              (* Debounce timer (single call site)
+       bDebounceIN         : BOOL             (* Latched IN value for tDebounce
        bLastRaw            : BOOL             (* Previous raw input state
        bLastFiltered       : BOOL             (* Previous filtered output state
        bPendingState       : BOOL             (* State we're debouncing toward
@@ -47,33 +48,30 @@ IF bFirstScan THEN
     Stable := TRUE;
     RisingEdge := FALSE;
     FallingEdge := FALSE;
+    bDebounceIN := FALSE;
     bFirstScan := FALSE;
-    RETURN;
-END_IF;
-
-(* Detect raw input change *)
-IF RawInput <> bLastRaw THEN
-    (* Input changed - start debouncing toward new state *)
-    bPendingState := RawInput;
-    tDebounce(IN := FALSE);  (* Reset timer *)
-END_IF;
-
-bLastRaw := RawInput;
-
-(* Run debounce timer if pending state differs from current output *)
-IF bPendingState <> FilteredOutput THEN
-    tDebounce(IN := TRUE, PT := DebounceTime);
-    Stable := FALSE;
-
-    IF tDebounce.Q THEN
-        (* Debounce complete - update output *)
-        FilteredOutput := bPendingState;
-        tDebounce(IN := FALSE);
+ELSE
+    (* Detect raw input change - update pending state and force one-scan reset *)
+    IF RawInput <> bLastRaw THEN
+        bPendingState := RawInput;
+        bDebounceIN := FALSE;  (* One scan at IN=FALSE resets TON before retrigger *)
+    ELSIF bPendingState <> FilteredOutput THEN
+        bDebounceIN := TRUE;
+        Stable := FALSE;
+    ELSE
+        bDebounceIN := FALSE;
         Stable := TRUE;
     END_IF;
-ELSE
-    (* No state change pending *)
-    tDebounce(IN := FALSE);
+
+    bLastRaw := RawInput;
+END_IF;
+
+(* Single call site for tDebounce *)
+tDebounce(IN := bDebounceIN, PT := DebounceTime);
+
+IF tDebounce.Q AND NOT bFirstScan THEN
+    FilteredOutput := bPendingState;
+    bDebounceIN := FALSE;
     Stable := TRUE;
 END_IF;
 

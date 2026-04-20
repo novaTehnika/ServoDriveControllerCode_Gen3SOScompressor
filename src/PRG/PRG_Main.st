@@ -47,11 +47,17 @@
        fbGoHome            : FB_GoHome
        fbHomeLimit         : FB_HomeLimit
        fbHomeEOT           : FB_HomeEOT
-       (* Timers
+       (* Timers — each has exactly one call site (see end of body)
        tStateTimer         : TON
        tBrakeTimer         : TON
        tDriveReadyTimer    : TON
        tHandshakeTimer     : TON
+       (* Timer IN/PT latches (single-call-per-scan pattern)
+       bStateTimerIN       : BOOL
+       bBrakeTimerIN       : BOOL
+       tBrakeTimerPT       : TIME
+       bDriveReadyTimerIN  : BOOL
+       bHandshakeTimerIN   : BOOL
        (* Edge triggers
        rTrigMotionEnable   : R_TRIG
        fTrigMotionEnable   : F_TRIG
@@ -140,7 +146,6 @@ IF bEnterState THEN
         G_sysLastFaultState := G_sysPreviousState;
     END_IF;
     G_sysPreviousState := G_sysCurrentState;
-    tStateTimer(IN := FALSE);
 END_IF;
 
 IF G_sysCurrentState = E_SystemState#ST_IDLE THEN
@@ -187,12 +192,6 @@ IF G_sysCurrentState = E_SystemState#ST_IDLE THEN
 
 ELSIF G_sysCurrentState = E_SystemState#ST_DRIVE_ENABLE THEN
 
-        IF bEnterState THEN
-            tDriveReadyTimer(IN := FALSE);
-        END_IF;
-
-        tDriveReadyTimer(IN := TRUE, PT := G_cfgDriveReadyTimeout);
-
         IF G_staPower.Status THEN
             G_sysDriveEnabled := TRUE;
             G_sysDriveReady := TRUE;
@@ -208,10 +207,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_BRAKE_RELEASE THEN
 
         IF bEnterState THEN
             G_doBrakeDisengage := TRUE;
-            tBrakeTimer(IN := FALSE);
         END_IF;
-
-        tBrakeTimer(IN := TRUE, PT := G_cfgBrakeDisengageDelay);
 
         IF tBrakeTimer.Q THEN
             G_sysBrakeEngaged := FALSE;
@@ -245,7 +241,6 @@ ELSIF G_sysCurrentState = E_SystemState#ST_BRAKE_HOLD THEN
         IF bEnterState THEN
             G_doBrakeDisengage := FALSE;
             G_sysConfirmedMode := E_OperatingMode#MODE_BRAKE_HOLD;
-            tHandshakeTimer(IN := FALSE);
         END_IF;
 
         G_doInMotion := FALSE;
@@ -444,7 +439,6 @@ ELSIF G_sysCurrentState = E_SystemState#ST_HOLD_POSITION THEN
 
         IF bEnterState THEN
             G_sysHalted := FALSE;
-            tHandshakeTimer(IN := FALSE);
         END_IF;
 
         IF NOT G_sysHalted THEN
@@ -454,8 +448,6 @@ ELSIF G_sysCurrentState = E_SystemState#ST_HOLD_POSITION THEN
         END_IF;
 
         G_doInMotion := NOT G_sysHalted;
-
-        tHandshakeTimer(IN := TRUE, PT := G_cfgHandshakeTimeout);
 
         IF fbHandshake.HandshakeComplete THEN
             eTargetMode := G_sysRequestedMode;
@@ -498,10 +490,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_BRAKE_ENGAGE THEN
 
         IF bEnterState THEN
             G_doBrakeDisengage := FALSE;
-            tBrakeTimer(IN := FALSE);
         END_IF;
-
-        tBrakeTimer(IN := TRUE, PT := G_cfgBrakeEngageDelay);
 
         IF tBrakeTimer.Q THEN
             G_sysBrakeEngaged := TRUE;
@@ -536,11 +525,7 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT THEN
 
             G_sysLastFaultCode := G_sysActiveFault;
             G_sysFaultCount := G_sysFaultCount + UDINT#1;
-
-            tStateTimer(IN := FALSE);
         END_IF;
-
-        tStateTimer(IN := TRUE, PT := G_cfgFaultIdleTimeout);
 
         IF fbFaultReset.FaultResetValid THEN
             G_sysActiveFault := E_FaultCode#FAULT_NONE;
@@ -564,11 +549,8 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_IDLE THEN
            ---------------------------------------------------------------- *)
         IF bEnterState THEN
             G_doBrakeDisengage := FALSE;
-            tBrakeTimer(IN := FALSE);
             G_doInMotion := FALSE;
         END_IF;
-
-        tBrakeTimer(IN := TRUE, PT := G_cfgBrakeEngageDelay);
 
         IF tBrakeTimer.Q THEN
             G_sysBrakeEngaged := TRUE;
@@ -585,6 +567,37 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_IDLE THEN
         END_IF;
 
 END_IF;
+
+
+(* --------------------------------------------------------------------------
+   Timer calls — exactly one call site per timer per scan.
+   bEnterState is used as a 1-scan reset gate so the TON sees IN=FALSE
+   on the state-entry scan, then IN=TRUE on subsequent scans.
+   -------------------------------------------------------------------------- *)
+
+bDriveReadyTimerIN := (G_sysCurrentState = E_SystemState#ST_DRIVE_ENABLE) AND NOT bEnterState;
+
+bBrakeTimerIN := ((G_sysCurrentState = E_SystemState#ST_BRAKE_RELEASE) OR
+                  (G_sysCurrentState = E_SystemState#ST_BRAKE_ENGAGE) OR
+                  (G_sysCurrentState = E_SystemState#ST_FAULT_IDLE)) AND NOT bEnterState;
+
+IF G_sysCurrentState = E_SystemState#ST_BRAKE_RELEASE THEN
+    tBrakeTimerPT := G_cfgBrakeDisengageDelay;
+ELSIF (G_sysCurrentState = E_SystemState#ST_BRAKE_ENGAGE) OR
+      (G_sysCurrentState = E_SystemState#ST_FAULT_IDLE) THEN
+    tBrakeTimerPT := G_cfgBrakeEngageDelay;
+ELSE
+    tBrakeTimerPT := T#0MS;
+END_IF;
+
+bHandshakeTimerIN := (G_sysCurrentState = E_SystemState#ST_HOLD_POSITION) AND NOT bEnterState;
+
+bStateTimerIN := (G_sysCurrentState = E_SystemState#ST_FAULT) AND NOT bEnterState;
+
+tDriveReadyTimer(IN := bDriveReadyTimerIN, PT := G_cfgDriveReadyTimeout);
+tBrakeTimer(IN := bBrakeTimerIN, PT := tBrakeTimerPT);
+tHandshakeTimer(IN := bHandshakeTimerIN, PT := G_cfgHandshakeTimeout);
+tStateTimer(IN := bStateTimerIN, PT := G_cfgFaultIdleTimeout);
 
 
 (* --------------------------------------------------------------------------
@@ -759,7 +772,6 @@ fbGoHome(
     Enable := (G_sysCurrentState = E_SystemState#ST_GO_HOME),
     Execute := (G_sysCurrentState = E_SystemState#ST_GO_HOME),
     AbsHomeRequired := G_flagAbsHomeRequired,
-    EOTHomeRequired := G_flagEOTHomeRequired,
     HomePosition := G_cfgGoHomePosition - G_posEOTOffset,
     HomeVelocity := G_cfgGoHomeVelocity,
     Abort := fTrigMotionEnable.Q,
@@ -823,10 +835,8 @@ fbSafetyMonitor(
     ActualPosition := G_sysActualPosition,
     SoftLimitMin := G_cfgPosSoftLimitMin,
     SoftLimitMax := G_cfgPosSoftLimitMax,
-    DriveReady := G_sysDriveReady,
     DriveFault := G_sysDriveFault,
     CurrentState := G_sysCurrentState,
-    CurrentMode := G_sysConfirmedMode,
     ExitGuardTriggered := fbPistonExitGuard.FaultTriggered
 );
 

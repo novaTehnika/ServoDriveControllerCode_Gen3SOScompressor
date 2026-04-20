@@ -31,7 +31,8 @@
        HandshakeTimeout_Q  : BOOL             (* TRUE when timeout occurred
      VAR:
        eState              : INT := 0         (* Handshake state - initialized to HS_IDLE
-       tTimeout            : TON              (* Handshake timeout timer
+       tTimeout            : TON              (* Handshake timeout timer (single call site)
+       bTimeoutIN          : BOOL             (* Latched IN for tTimeout
        eModeAtStart        : E_OperatingMode  (* Mode when handshake started
        bModeStableAtStart  : BOOL             (* Capture mode stability at handshake start
      VAR CONSTANT:
@@ -53,9 +54,11 @@ IF NOT Enable THEN
     HandshakeComplete := FALSE;
     HandshakeTimeout_Q := FALSE;
     eState := HS_IDLE;
-    tTimeout(IN := FALSE);
-    RETURN;
-END_IF;
+    bTimeoutIN := FALSE;
+
+ELSE
+    (* Default timer IN: active only while waiting for motion enable *)
+    bTimeoutIN := (eState = HS_WAIT_MOTION_EN);
 
 (* --------------------------------------------------------------------------
    Mode Handshake State Machine
@@ -67,56 +70,44 @@ IF eState = HS_IDLE THEN
         HandshakeActive := FALSE;
         HandshakeComplete := FALSE;
         HandshakeTimeout_Q := FALSE;
-        tTimeout(IN := FALSE);
 
         (* Start handshake when mode is stable and different from idle
            (or when transitioning to a new mode) *)
         IF ModeStable AND (RequestedMode <> E_OperatingMode#MODE_IDLE) AND NOT MotionEnable THEN
-            (* Set confirmation to match requested mode *)
             ConfirmedMode := RequestedMode;
             eModeAtStart := RequestedMode;
             bModeStableAtStart := TRUE;
             HandshakeActive := TRUE;
             eState := HS_WAIT_MOTION_EN;
-            tTimeout(IN := TRUE, PT := HandshakeTimeout);
+            bTimeoutIN := TRUE;
         ELSIF ModeStable AND (RequestedMode = E_OperatingMode#MODE_IDLE) THEN
-            (* Idle mode - just confirm it *)
             ConfirmedMode := E_OperatingMode#MODE_IDLE;
         END_IF;
 
 ELSIF eState = HS_WAIT_MOTION_EN THEN
 
     (* HS_WAIT_MOTION_EN - Waiting for master to assert motion enable *)
-        (* Timer must be called each scan to update *)
-        tTimeout(IN := TRUE, PT := HandshakeTimeout);
-
         IF tTimeout.Q THEN
-            (* Timeout - handshake failed *)
-            tTimeout(IN := FALSE);
+            bTimeoutIN := FALSE;
             eState := HS_TIMEOUT;
 
         ELSIF RequestedMode <> eModeAtStart THEN
-            (* Mode changed during handshake - abort and reset timer *)
-            tTimeout(IN := FALSE);
+            bTimeoutIN := FALSE;
             eState := HS_IDLE;
 
         ELSIF MotionEnable THEN
-            (* Motion enable received, verify mode still matches *)
             eState := HS_VERIFY_MODE;
         END_IF;
 
 ELSIF eState = HS_VERIFY_MODE THEN
 
     (* HS_VERIFY_MODE - Verify requested mode hasn't changed since handshake start *)
+        bTimeoutIN := FALSE;
         IF RequestedMode = eModeAtStart THEN
-            (* Mode matches - handshake complete *)
             HandshakeComplete := TRUE;
             HandshakeActive := FALSE;
-            tTimeout(IN := FALSE);
             eState := HS_COMPLETE;
         ELSE
-            (* Mismatch - treat as timeout/failure *)
-            tTimeout(IN := FALSE);
             eState := HS_TIMEOUT;
         END_IF;
 
@@ -134,13 +125,18 @@ ELSIF eState = HS_TIMEOUT THEN
     (* HS_TIMEOUT - Handshake timed out or failed *)
         HandshakeTimeout_Q := TRUE;
         HandshakeActive := FALSE;
-        ConfirmedMode := E_OperatingMode#MODE_IDLE;  (* Reset confirmed mode on failure *)
-        tTimeout(IN := FALSE);
+        ConfirmedMode := E_OperatingMode#MODE_IDLE;
+        bTimeoutIN := FALSE;
 
-        (* Exit timeout when motion enable drops - simpler and more reliable *)
         IF NOT MotionEnable THEN
             HandshakeTimeout_Q := FALSE;
             eState := HS_IDLE;
         END_IF;
 
-END_IF;
+    END_IF;  (* state machine *)
+END_IF;  (* Enable gate *)
+
+(* --------------------------------------------------------------------------
+   Timer call - exactly one site per scan
+   -------------------------------------------------------------------------- *)
+tTimeout(IN := bTimeoutIN, PT := HandshakeTimeout);

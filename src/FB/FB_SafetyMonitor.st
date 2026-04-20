@@ -33,10 +33,8 @@
        ActualPosition      : LREAL            (* Current axis position (mm)
        SoftLimitMin        : LREAL            (* Minimum allowed position (mm)
        SoftLimitMax        : LREAL            (* Maximum allowed position (mm)
-       DriveReady          : BOOL             (* Drive is ready for motion
        DriveFault          : BOOL             (* Drive has reported a fault
        CurrentState        : E_SystemState    (* Current state machine state
-       CurrentMode         : E_OperatingMode  (* Current operating mode
        ExitGuardTriggered  : BOOL             (* Piston exit guard triggered fault
      VAR_OUTPUT:
        FaultDetected       : BOOL             (* A fault condition exists

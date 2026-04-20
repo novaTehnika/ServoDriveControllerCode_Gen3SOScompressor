@@ -53,7 +53,8 @@
      VAR:
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
-       tTimeout            : TON
+       tTimeout            : TON              (* Single call site — see end of body
+       bTimeoutIN          : BOOL             (* Latched IN for tTimeout
        bApproachFromPositive : BOOL := FALSE
        bStopDoneLatched    : BOOL := FALSE
      VAR CONSTANT:
@@ -83,32 +84,30 @@ IF NOT Enable THEN
     CmdMoveVelocity.Execute := FALSE;
     CmdStop.Execute := FALSE;
     CmdSetPosition.Execute := FALSE;
-    tTimeout(IN := FALSE);
-    RETURN;
-END_IF;
+    bTimeoutIN := FALSE;
 
-(* Detect rising edge on Execute *)
-rTrigExecute(CLK := Execute);
+ELSE
+    (* Detect rising edge on Execute *)
+    rTrigExecute(CLK := Execute);
 
-(* Handle abort in most states *)
-IF Abort AND (eState <> HL_IDLE) AND (eState <> HL_ERROR) AND (eState <> HL_DONE) THEN
-    CmdMoveVelocity.Execute := FALSE;
-    CmdSetPosition.Execute := FALSE;
-    tTimeout(IN := FALSE);
-    eState := HL_ABORTING;
-END_IF;
+    (* Handle abort in most states *)
+    IF Abort AND (eState <> HL_IDLE) AND (eState <> HL_ERROR) AND (eState <> HL_DONE) THEN
+        CmdMoveVelocity.Execute := FALSE;
+        CmdSetPosition.Execute := FALSE;
+        eState := HL_ABORTING;
+    END_IF;
 
-(* Overall timeout check *)
-tTimeout(IN := (eState <> HL_IDLE) AND (eState <> HL_DONE) AND (eState <> HL_ERROR) AND (eState <> HL_ABORTING),
-         PT := Timeout);
+    (* Default timer IN based on state; overall timeout check uses last-scan Q *)
+    bTimeoutIN := (eState <> HL_IDLE) AND (eState <> HL_DONE) AND (eState <> HL_ERROR) AND (eState <> HL_ABORTING);
 
-IF tTimeout.Q THEN
-    CmdMoveVelocity.Execute := FALSE;
-    CmdStop.Execute := FALSE;
-    CmdSetPosition.Execute := FALSE;
-    Error := TRUE;
-    eState := HL_ERROR;
-END_IF;
+    IF tTimeout.Q THEN
+        CmdMoveVelocity.Execute := FALSE;
+        CmdStop.Execute := FALSE;
+        CmdSetPosition.Execute := FALSE;
+        Error := TRUE;
+        bTimeoutIN := FALSE;
+        eState := HL_ERROR;
+    END_IF;
 
 (* --------------------------------------------------------------------------
    State Machine
@@ -128,7 +127,6 @@ IF eState = HL_IDLE THEN
         CmdMoveVelocity.Execute := FALSE;
         CmdStop.Execute := FALSE;
         CmdSetPosition.Execute := FALSE;
-        tTimeout(IN := FALSE);
 
         IF rTrigExecute.Q OR Execute THEN
             Active := TRUE;
@@ -289,4 +287,10 @@ ELSIF eState = HL_ERROR THEN
             eState := HL_IDLE;
         END_IF;
 
-END_IF;
+    END_IF;  (* state machine *)
+END_IF;  (* Enable gate *)
+
+(* --------------------------------------------------------------------------
+   Timer calls - exactly one site per instance per scan
+   -------------------------------------------------------------------------- *)
+tTimeout(IN := bTimeoutIN, PT := Timeout);
