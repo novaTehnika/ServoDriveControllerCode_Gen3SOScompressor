@@ -13,18 +13,15 @@
                                v
 +------------------------------------------------------------------+
 |                    INITIALIZATION PHASE                           |
-|  +----------+     +--------------+     +----------------+         |
-|  | ST_INIT  | --> | ST_ENCODER   | --> | ST_REQUIRE     |         |
-|  |          |     | _CHECK       |     | _ABS_HOME      |         |
-|  +----------+     +--------------+     +----------------+         |
-|                          |                    |                   |
-|                     (Valid)              (Invalid)                |
-|                          |                    |                   |
-+--------------------------|--------------------|---------+---------+
-                           |                    |         |
-                           v                    v         |
-                    +----------+                |         |
-                    | ST_IDLE  |<---------------+         |
+|  +----------+                                                     |
+|  | ST_INIT  | --> First scan sets both homing flags TRUE and      |
+|  |          |     transitions directly to ST_IDLE                 |
+|  +----------+                                                     |
++------------------------|-----------------------------------------+
+                         |
+                         v
+                    +----------+
+                    | ST_IDLE  |
                     +----------+                          |
                            |                              |
             (Mode != 000 + G_diMotionEnable)                |
@@ -138,10 +135,10 @@
         | (LimitHomeActive = FALSE)
         v
 +-------------------+
-| HL_SETREF         |  CmdEncMngr.SetPosition -> G_cmdEncMngr
-|                   |  -> AbsolutePositionManager (LD POU)
+| HL_SETREF         |  CmdSetPosition.Execute -> G_cmdSetPosition
+|                   |  -> MC_SetPosition (LD POU)
 +-------+-----------+  PRG_Main clears G_flagAbsHomeRequired
-                        after StaEncMngr.SetPositionDone
+                        after StaSetPosition.Done
         |
         v
 +---------------+
@@ -302,9 +299,7 @@ The enum uses dense sequential numbering (0, 1, 2, ...). Code never references n
 ```
 STATE                      DESCRIPTION
 -----------------------------------------------------
-ST_INIT                    Power-on initialization
-ST_ENCODER_CHECK           Validate absolute encoder
-ST_REQUIRE_ABS_HOME        Set homing required flag
+ST_INIT                    Default initializer (first scan -> ST_IDLE)
 ST_IDLE                    Drive OFF, awaiting commands
 ST_DRIVE_ENABLE            Powering on drive
 ST_BRAKE_RELEASE           Releasing brake

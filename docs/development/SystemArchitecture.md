@@ -13,10 +13,10 @@ This document provides a high-level overview of the slave controller's software 
 
 ## 2. Software Block Diagram
 
-The application spans two POUs: `PRG_Main` (Structured Text) contains the state machine and all custom function blocks, and a Ladder Diagram POU owns `G_sysAxis` together with every built-in motion FB (`MC_Power`, `MC_Stop`, `MC_Reset`, `MC_MoveAbsolute`, `MC_MoveVelocity`, `MC_ReadActual*`, `Y_DirectControl`, `AbsolutePositionManager`). The two POUs exchange data each scan through a pair of structured global families:
+The application spans two POUs: `PRG_Main` (Structured Text) contains the state machine and all custom function blocks, and a Ladder Diagram POU owns `G_sysAxis` together with every built-in motion FB (`MC_Power`, `MC_Stop`, `MC_Reset`, `MC_MoveAbsolute`, `MC_MoveVelocity`, `MC_SetPosition`, `MC_ReadActual*`, `Y_DirectControl`). The two POUs exchange data each scan through a pair of structured global families:
 
-- **`G_cmd*`** — written by `PRG_Main`, read by the LD POU. Each struct mirrors the pin names of its target built-in FB (`G_cmdPower`, `G_cmdStop`, `G_cmdReset`, `G_cmdMoveAbsolute`, `G_cmdMoveVelocity`, `G_cmdDirectControl`, `G_cmdEncMngr`).
-- **`G_sta*`** — written by the LD POU, read by `PRG_Main` and by custom FBs that need built-in FB status (`G_staPower`, `G_staStop`, `G_staReset`, `G_staMoveAbsolute`, `G_staMoveVelocity`, `G_staDirectControl`, `G_staEncMngr`).
+- **`G_cmd*`** — written by `PRG_Main`, read by the LD POU. Each struct mirrors the pin names of its target built-in FB (`G_cmdPower`, `G_cmdStop`, `G_cmdReset`, `G_cmdMoveAbsolute`, `G_cmdMoveVelocity`, `G_cmdDirectControl`, `G_cmdSetPosition`).
+- **`G_sta*`** — written by the LD POU, read by `PRG_Main` and by custom FBs that need built-in FB status (`G_staPower`, `G_staStop`, `G_staReset`, `G_staMoveAbsolute`, `G_staMoveVelocity`, `G_staDirectControl`, `G_staSetPosition`).
 
 `PRG_Main` is structured as a series of processing stages that execute on every 1 ms scan cycle.
 
@@ -77,8 +77,8 @@ The application spans two POUs: `PRG_Main` (Structured Text) contains the state 
 -   **Input Filters:** A layer of digital (`FB_DigitalInputFilter`) and analog (`FB_AnalogInputFilter`) filters that debounce signals and remove noise from the raw I/O, providing stable values for the rest of the program.
 -   **Decoders/Processors:** Function blocks that convert raw, filtered inputs into meaningful data (e.g., `FB_ModeDecoder` converts three booleans into an `E_OperatingMode`).
 -   **Core Logic (State Machine):** The `IF/ELSIF` chain in `PRG_Main` that orchestrates all system behavior based on the current state (`G_sysCurrentState`). MotionWorks IEC Express does not support enum-valued `CASE` selectors, hence the `IF/ELSIF` pattern.
--   **Control Blocks (`Y_DirectControl`, `MC_*`, `AbsolutePositionManager`):** PLCopen (`MC_`) and Yaskawa-specific (`Y_`) function blocks. These live in the LD POU and are driven from ST through the `G_cmd*` / `G_sta*` globals.
--   **Homing FBs (`FB_HomeLimit`, `FB_HomeEOT`, `FB_GoHome`) and `FB_EncoderManager`:** Emit built-in FB commands via `Cmd*` `VAR_OUTPUT` structs and receive built-in FB status via `Sta*` `VAR_INPUT` structs. `PRG_Main` bridges these to the matching globals.
+-   **Control Blocks (`Y_DirectControl`, `MC_*`):** PLCopen (`MC_`) and Yaskawa-specific (`Y_`) function blocks. These live in the LD POU and are driven from ST through the `G_cmd*` / `G_sta*` globals.
+-   **Homing FBs (`FB_HomeLimit`, `FB_HomeEOT`, `FB_GoHome`):** Emit built-in FB commands via `Cmd*` `VAR_OUTPUT` structs and receive built-in FB status via `Sta*` `VAR_INPUT` structs. `PRG_Main` bridges these to the matching globals.
 -   **Safety Monitor:** A watchdog (`FB_SafetyMonitor`) that runs every cycle to check for fault conditions.
 -   **Output Processors:** Function blocks (`FB_OutputMux`, `FB_PositionOutput`) that format system data into the correct signals for the physical outputs.
 

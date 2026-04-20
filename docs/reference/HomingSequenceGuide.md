@@ -19,8 +19,8 @@ The system requires two types of homing to establish accurate position reference
 
 | Flag | Set When | Cleared By |
 |------|----------|------------|
-| `G_flagAbsHomeRequired` | Encoder invalid on startup | Completing Mode 110 |
-| `G_flagEOTHomeRequired` | Every power cycle | Completing Mode 111 |
+| `G_flagAbsHomeRequired` | Every power cycle and every fault reset | Completing Mode 110 |
+| `G_flagEOTHomeRequired` | Every power cycle and every fault reset | Completing Mode 111 |
 
 ---
 
@@ -33,7 +33,7 @@ Establish the coordinate system zero reference using the physical home limit swi
 >
 > The sequence of steps described below is encapsulated within the `FB_HomeLimit` function block. `PRG_Main` runs a single `ST_HOME_LIMIT` state that enables the FB each scan; the deprecated sub-state enum members (`ST_HOME_LIM_APPROACH` / `DETECT` / `BACKOFF` / `SETREF`) still exist in `E_SystemState` but are not used by the live state machine. The step labels below (`HL_APPROACH`, etc.) are `FB_HomeLimit`'s internal `INT` constants.
 >
-> **Command/status routing.** `FB_HomeLimit` does not instantiate any built-in motion FBs. It emits `CmdMoveVelocity`, `CmdStop`, and `CmdEncMngr` `VAR_OUTPUT` structs which `PRG_Main` copies into `G_cmdMoveVelocity` / `G_cmdStop` / `G_cmdEncMngr`; the LD POU's `MC_MoveVelocity`, `MC_Stop`, and `AbsolutePositionManager` act on those and report back through `G_sta*` globals wired into the FB's `Sta*` `VAR_INPUT` structs.
+> **Command/status routing.** `FB_HomeLimit` does not instantiate any built-in motion FBs. It emits `CmdMoveVelocity`, `CmdStop`, and `CmdSetPosition` `VAR_OUTPUT` structs which `PRG_Main` copies into `G_cmdMoveVelocity` / `G_cmdStop` / `G_cmdSetPosition`; the LD POU's `MC_MoveVelocity`, `MC_Stop`, and `MC_SetPosition` act on those and report back through `G_sta*` globals wired into the FB's `Sta*` `VAR_INPUT` structs.
 
 ### Sequence Steps
 
@@ -78,14 +78,14 @@ Step 3: BACKOFF
 Step 4: SET REFERENCE
 +------------------------------------------+
 | Step: HL_SETREF                          |
-| Action: CmdEncMngr.Enable := TRUE        |
-|         CmdEncMngr.SetPosition := TRUE   |
-|         CmdEncMngr.Position :=           |
+| Action: CmdSetPosition.Execute := TRUE   |
+|         CmdSetPosition.Position :=       |
 |           G_cfgHomeLimSetPosition (0.0)  |
-|         -> G_cmdEncMngr -> LD POU        |
-|         -> AbsolutePositionManager       |
+|         CmdSetPosition.Mode := FALSE     |
+|         -> G_cmdSetPosition -> LD POU    |
+|         -> MC_SetPosition                |
 |         writes the encoder reference     |
-| Exit: StaEncMngr.SetPositionDone         |
+| Exit: StaSetPosition.Done                |
 | PRG_Main clears G_flagAbsHomeRequired    |
 | after FB reports Done                    |
 +------------------------------------------+
@@ -143,7 +143,7 @@ Calibrate the cylinder end-of-travel position by detecting mechanical stall. Thi
 >
 > The sequence below is encapsulated within the `FB_HomeEOT` function block. `PRG_Main` runs a single `ST_HOME_EOT` state; the deprecated sub-state enum members (`ST_HOME_EOT_FAST` / `SLOW` / `DETECT` / `SETREF`) still exist in `E_SystemState` but are unused by the live state machine. The labels below (`HE_FAST_APPROACH`, etc.) are the FB's internal `INT` constants.
 >
-> **Command/status routing.** `FB_HomeEOT` emits `CmdMoveVelocity`, `CmdDirectControl`, and `CmdStop` `VAR_OUTPUT` structs, which `PRG_Main` copies into the matching `G_cmd*` globals so the LD POU's `MC_MoveVelocity`, `Y_DirectControl`, and `MC_Stop` instances act on them. Status flows back via `G_sta*` globals wired into `FB_HomeEOT.Sta*` inputs. Unlike Mode 110, this FB **does not** command `AbsolutePositionManager` — the encoder reference established by Mode 110 is preserved; Mode 111 only calculates a master/slave coordinate offset.
+> **Command/status routing.** `FB_HomeEOT` emits `CmdMoveVelocity`, `CmdDirectControl`, and `CmdStop` `VAR_OUTPUT` structs, which `PRG_Main` copies into the matching `G_cmd*` globals so the LD POU's `MC_MoveVelocity`, `Y_DirectControl`, and `MC_Stop` instances act on them. Status flows back via `G_sta*` globals wired into `FB_HomeEOT.Sta*` inputs. Unlike Mode 110, this FB **does not** command `MC_SetPosition` — the encoder reference established by Mode 110 is preserved; Mode 111 only calculates a master/slave coordinate offset.
 
 ### Sequence Steps
 
@@ -203,7 +203,7 @@ Step 4: SET REFERENCE (offset only)
 |                - EOTPosition             |
 |   where ExpectedEOTPosition =            |
 |     G_cfgHomeEOTSetPosition (300 mm)     |
-| Note: No AbsolutePositionManager call —  |
+| Note: No MC_SetPosition call —           |
 |       encoder zero from Mode 110 kept.   |
 | PRG_Main writes offset to G_posEOTOffset |
 | and clears G_flagEOTHomeRequired         |
@@ -327,7 +327,7 @@ If `G_flagAbsHomeRequired = FALSE`:
 
 - EOT homing (`G_flagEOTHomeRequired`) does NOT block Go Home
 - Go Home can execute even if EOT homing not done
-- Only encoder validity (`G_flagAbsHomeRequired`) causes redirect
+- Only the abs-home flag (`G_flagAbsHomeRequired`) causes redirect
 - After Go Home, position is at home switch location
 
 ### Master Coordination
@@ -359,7 +359,7 @@ MASTER:
 | `G_cfgHomeLimApproachVel` | 50.0 | mm/s | Approach velocity magnitude (FB picks direction) |
 | `G_cfgHomeLimBackoffDist` | 5.0 | mm | Distance to move off the switch after detection |
 | `G_cfgVelHomingSlow` | 5.0 | mm/s | Backoff velocity (also reused as Mode 111 slow velocity input by FBs) |
-| `G_cfgHomeLimSetPosition` | 0.0 | mm | Position reference written via `AbsolutePositionManager` |
+| `G_cfgHomeLimSetPosition` | 0.0 | mm | Position reference written via `MC_SetPosition` |
 | `G_cfgHomingTimeout` | T#30S | — | Overall FB timeout for either homing mode |
 
 ### Mode 111 Parameters
@@ -390,39 +390,12 @@ Notes:
 
 ## 6. Typical Startup Homing Sequence
 
-### After Normal Power Cycle
+### Every Power Cycle (And After Every Fault Reset)
+
+Both homing flags are unconditionally forced TRUE on boot and whenever the fault-reset handshake exits `ST_FAULT_IDLE`. There is no "retained position" fast path.
 
 ```
-POWER ON
-    |
-    v
-Encoder Check --> Valid
-    |
-    v
-G_flagAbsHomeRequired = FALSE
-G_flagEOTHomeRequired = TRUE (always on power-up)
-    |
-    v
-MASTER: Command Mode 111 (Home to EOT)
-    |
-    v
-EOT homing executes
-    |
-    v
-G_flagEOTHomeRequired = FALSE
-G_doHomingComplete = TRUE
-    |
-    v
-Ready for operational modes
-```
-
-### After Encoder Battery Failure
-
-```
-POWER ON
-    |
-    v
-Encoder Check --> INVALID (battery fail)
+POWER ON (or ST_FAULT_IDLE -> ST_IDLE)
     |
     v
 G_flagAbsHomeRequired = TRUE
@@ -486,20 +459,6 @@ Ready for operational modes
 2. Increase stall velocity threshold slightly
 3. Check mechanical friction
 4. Verify expected EOT position
-
-### Frequent Homing Required
-
-**Symptom**: `G_flagAbsHomeRequired` set frequently
-
-**Possible Causes**:
-- Encoder battery failing
-- Electrical noise on encoder signals
-- Loose encoder cable
-
-**Resolution**:
-1. Check encoder battery voltage (drive parameter)
-2. Replace encoder battery proactively
-3. Verify encoder cable shielding and routing
 
 ### Position Drift After Homing
 

@@ -169,7 +169,7 @@ Hold Secure ______________________|‾‾‾‾‾‾‾‾‾‾‾‾
 | Approach | 5-15 s | 30 s | Moving to limit switch |
 | Detect | 100 ms | 500 ms | Confirming switch trigger |
 | Backoff | 1-2 s | 5 s | Moving off switch |
-| Set Reference | 50 ms | 200 ms | `AbsolutePositionManager.SetPosition` via `G_cmdEncMngr` |
+| Set Reference | 50 ms | 200 ms | `MC_SetPosition` via `G_cmdSetPosition` |
 | **Total** | **7-18 s** | **36 s** | Complete sequence |
 
 ### Mode 111 (Home to EOT)
@@ -199,8 +199,7 @@ Hold Secure ______________________|‾‾‾‾‾‾‾‾‾‾‾‾
 
 | Fault Type | Detection Time | Description |
 |------------|----------------|-------------|
-| Drive Fault | 1 scan (1 ms) | Direct from drive status |
-| Encoder Fault | 1 scan | From AbsolutePositionManager |
+| Drive Fault | 1 scan (1 ms) | Direct from drive status (includes encoder alarms A.810/A.CC0/A.830) |
 | Limit Switch | 1 scan + 5 ms debounce | Unexpected activation |
 | Position Limit | 1 scan | Software limit exceeded |
 | Piston Exit | 1 scan | Guard condition met |
@@ -256,7 +255,6 @@ Internal Scan      ________________________________
 | Mode Handshake | 500 ms | FAULT_HANDSHAKE |
 | Fault Reset | 1000 ms | Fault persists |
 | Drive Ready | 5000 ms | Stuck in DRIVE_ENABLE |
-| Encoder Check | 2000 ms | FAULT_ENCODER |
 | Homing | 30000 ms | Homing fault |
 | Motion Complete | Varies | Mode-dependent |
 

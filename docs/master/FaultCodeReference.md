@@ -27,7 +27,7 @@ When `G_doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 co
 | 100 | 4 | FAULT_HOMING_REQ | Low | Yes (with homing) |
 | 101 | 5 | FAULT_PISTON_EXIT | High | Conditional |
 | 110 | 6 | FAULT_LIMIT_SWITCH | High | No (investigation) |
-| 111 | 7 | FAULT_ENCODER | High | No (homing required) |
+| 111 | 7 | FAULT_ENCODER | High | **Reserved (not emitted by current firmware — encoder alarms surface as FAULT_DRIVE)** |
 
 ---
 
@@ -154,7 +154,7 @@ When `G_doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 co
 4. Pulse G_diFaultReset
 5. After clear: command homing modes
 
-   If G_flagAbsHomeRequired (encoder invalid):
+   If G_flagAbsHomeRequired:
    - Command Mode 110 (Home to Limit)
 
    If G_flagEOTHomeRequired (every power-up):
@@ -236,37 +236,15 @@ When `G_doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 co
 
 ---
 
-### FAULT_ENCODER (111)
+### FAULT_ENCODER (111) — RESERVED
 
-**Description**: Absolute encoder position data invalid.
+**Status**: Reserved but not emitted by current firmware.
 
-**Triggered When**:
-- Encoder battery failure
-- Multi-turn data corruption
-- Encoder communication lost (after initialization)
-- AbsolutePositionManager reports invalid
+As of 2026-04, the dedicated encoder-validity path was removed from `FB_SafetyMonitor`. Encoder alarms (A.810 battery backup loss, A.CC0 multi-turn error, A.830 low battery) are detected by the Sigma-7 servo amplifier and surface as `FAULT_DRIVE` (010) through `G_sysDriveFault`.
 
-**Symptoms**:
-- Position feedback may be incorrect
-- `G_flagAbsHomeRequired` was set TRUE
-- Cannot trust absolute position
+Any fault-reset exit (drive fault or otherwise) unconditionally sets both `G_flagAbsHomeRequired` and `G_flagEOTHomeRequired` TRUE, so the operator must re-home before resuming operational modes.
 
-**Master Recovery**:
-```
-1. Read fault code (111)
-2. Set G_diMotionEnable = FALSE
-3. Mirror code: DI0=1, DI1=1, DI2=1
-4. Pulse G_diFaultReset
-5. After clear: MUST perform homing
-   - Command Mode 110 (Home to Limit)
-```
-
-**Investigation**:
-- Check encoder battery status (drive parameter)
-- Verify encoder cable connection
-- Check for electrical noise interference
-
-**Important**: Never operate in position-dependent modes without valid homing after this fault.
+The enum value is retained in `E_FaultCode` for wire-protocol stability but is not currently asserted.
 
 ---
 

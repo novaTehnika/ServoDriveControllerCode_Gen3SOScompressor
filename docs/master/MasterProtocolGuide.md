@@ -361,10 +361,9 @@ END_IF
 
 ```
 1. Power on MP2600iec
-   - Slave initializes, checks encoder
-   - Slave sets G_flagEOTHomeRequired = TRUE
-   - If encoder invalid: G_flagAbsHomeRequired = TRUE
-   - Slave enters ST_IDLE
+   - Slave initializes
+   - Slave forces G_flagEOTHomeRequired = TRUE and G_flagAbsHomeRequired = TRUE
+   - Slave enters ST_IDLE (both homing modes are mandatory each boot)
 
 2. Initialize Simulink model
    - Set all outputs LOW initially

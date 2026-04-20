@@ -5,7 +5,7 @@ This document summarizes the agent reviews of the function blocks in `src/FB/`.
 
 > **Architecture update**
 >
-> Since the original review, the codebase was refactored so that all built-in motion FBs (`MC_Power`, `MC_Stop`, `MC_Reset`, `MC_MoveAbsolute`, `MC_MoveVelocity`, `MC_ReadActual*`, `Y_DirectControl`, `AbsolutePositionManager`) live in a Ladder Diagram POU. Custom ST function blocks that previously instantiated built-in FBs internally (`FB_HomeLimit`, `FB_HomeEOT`, `FB_GoHome`, `FB_EncoderManager`) were converted to receive status via `VAR_INPUT` (`StaMoveVelocity`, `StaStop`, `StaDirectControl`, `StaMoveAbsolute`, `StaEncMngr`) and emit commands via `VAR_OUTPUT` (`CmdMoveVelocity`, `CmdStop`, `CmdDirectControl`, `CmdMoveAbsolute`, `CmdEncMngr`). `PRG_Main` wires these to the corresponding `G_cmd*`/`G_sta*` structured globals.
+> Since the original review, the codebase was refactored so that all built-in motion FBs (`MC_Power`, `MC_Stop`, `MC_Reset`, `MC_MoveAbsolute`, `MC_MoveVelocity`, `MC_ReadActual*`, `Y_DirectControl`, `MC_SetPosition`) live in a Ladder Diagram POU. Custom ST function blocks that previously instantiated built-in FBs internally (`FB_HomeLimit`, `FB_HomeEOT`, `FB_GoHome`) were converted to receive status via `VAR_INPUT` (`StaMoveVelocity`, `StaStop`, `StaDirectControl`, `StaMoveAbsolute`, `StaSetPosition`) and emit commands via `VAR_OUTPUT` (`CmdMoveVelocity`, `CmdStop`, `CmdDirectControl`, `CmdMoveAbsolute`, `CmdSetPosition`). `PRG_Main` wires these to the corresponding `G_cmd*`/`G_sta*` structured globals. `FB_EncoderManager` and the `AbsolutePositionManager` toolbox FB were removed in 2026-04 — encoder alarms now surface as `FAULT_DRIVE` via the servo amplifier.
 >
 > The FB-by-FB findings below still apply to the logic contained in each FB, but their instantiation footprint no longer includes internal built-in FB calls.
 
@@ -196,11 +196,13 @@ Validates: FaultReset HIGH, MotionEnable LOW, InFaultState, BitsStable, and Mast
 
 2. **Updated fault state detection**:
    - Added ST_FAULT_IDLE to bInFaultState check
-   - Updated fault latch reset to trigger on ST_FAULT_IDLE instead of ST_FAULT_RECOVERY
 
 3. **Additional changes from restructuring**:
-   - Added `AbsHomeRequired` input for encoder fault suppression when homing is required
    - Deprecated homing sub-states removed from `bInHomingState` check (now only checks `ST_HOME_LIMIT`, `ST_HOME_EOT`, `ST_HOME_COMPLETE`)
+
+4. **Encoder fault path removed (2026-04)**:
+   - Inputs `EncoderValid`, `EncoderBatteryOK`, `AbsHomeRequired` and output `FaultEncoder` deleted
+   - Encoder alarms now propagate via `DriveFault -> FAULT_DRIVE` from the servo amplifier
 
 ### Recommendations:
 - Production ready after simplification
