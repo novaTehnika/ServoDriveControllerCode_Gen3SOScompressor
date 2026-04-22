@@ -1,0 +1,11 @@
+(* ============================================================================
+   FN_AlwaysTrue_ENUM - Throwaway function
+
+   Returns: BOOL
+
+   Variables (define in MWiec GUI):
+     VAR_INPUT:
+       Mode            : E_OperationalMode
+*)
+
+FN_AlwaysTrue_ENUM := TRUE;
