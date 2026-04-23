@@ -17,7 +17,7 @@
        Bit2            : BOOL             (* MSB
      VAR:
        nValue          : INT              (* Integer fault value
-	   byteValue       : BYTE             (* Byte fault value
+       byteValue       : BYTE             (* Byte fault value
        fbFaultToInt    : FB_FaultToInt    (* Enum -> int helper (was FN_FaultToInt)
 *)
 
