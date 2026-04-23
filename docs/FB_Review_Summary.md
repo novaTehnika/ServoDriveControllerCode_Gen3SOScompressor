@@ -89,7 +89,7 @@ Validates: FaultReset HIGH, MotionEnable LOW, InFaultState, BitsStable, and Mast
 
 ### Findings:
 - Clean single-responsibility implementation
-- Uses `FN_BitsToFaultCode` for type-correct fault code decoding (DI0-2 decoded as `E_FaultCode`, not `E_OperatingMode`)
+- Receives pre-decoded `MasterFaultCode : E_FaultCode` via `VAR_INPUT` — `PRG_Main` calls `FB_BitsToFaultCode` against DI0-2 and wires the result in, ensuring type-correct fault-code decoding (bits decoded as `E_FaultCode`, not `E_OperatingMode`)
 - `BitsStable` input guards against transient bit patterns during DI0-2 transitions
 
 ### Recommendations:

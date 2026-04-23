@@ -20,8 +20,7 @@ The MotionWorks IEC project is organized into several key folders, following sta
 | Folder | Name | Purpose |
 |--------|------|---------|
 | `src/PRG/` | Programs | Contains the main program entry point, `PRG_Main.st` (Structured Text), which houses the core state machine. A separate Ladder Diagram POU owns `G_sysAxis` and every built-in motion FB (`MC_Power`, `MC_Stop`, `MC_Reset`, `MC_MoveAbsolute`, `MC_MoveVelocity`, `MC_SetPosition`, `MC_ReadActual*`, `Y_DirectControl`). |
-| `src/FB/` | Function Blocks | Contains reusable modules of encapsulated logic (e.g., `FB_HandshakeManager`, `FB_HomeEOT`). This is where most of the application logic resides. |
-| `src/FN/` | Functions | Contains standalone conversion and utility functions (e.g., `FN_BitsToMode`, `FN_IsOperationalMode`). |
+| `src/FB/` | Function Blocks | Contains reusable modules of encapsulated logic (e.g., `FB_HandshakeManager`, `FB_HomeEOT`) as well as the enum-conversion helpers (`FB_BitsToMode`, `FB_IsOperationalMode`, etc.). This is where most of the application logic resides. |
 | `src/GVL/` | Global Variable Lists | Contains a single comment-only reference file (`GlobalVariables_Reference.st`). Variables are defined in the MWiec GUI; this file documents their names, types, and defaults. It also documents the `G_cmd*` / `G_sta*` structured globals used to connect ST and LD POUs. |
 | `src/DUT/` | Data Unit Types | Contains all custom data structures (`STRUCT`) and enumerations (`ENUM`) in a single `DataTypes.st` file, including the `ST_Cmd*` / `ST_Sta*` structs that shape the ST↔LD command/status interface. |
 
@@ -114,6 +113,10 @@ END_CASE;
 
 Functions can only have one output. For multiple outputs, use a function block instead.
 
+**User-Enum Parameters on Functions:**
+
+MotionWorks IEC Express fails native code generation with `E2001: circular assembly references` when a `FUNCTION` POU has a user-defined enum in its signature — as a `VAR_INPUT` type or as the return type. Always implement such conversions as `FUNCTION_BLOCK`s. Precedent: the six enum-helper FBs (`FB_IsOperationalMode`, `FB_IsHomingMode`, `FB_ModeToInt`, `FB_FaultToInt`, `FB_BitsToMode`, `FB_BitsToFaultCode`) exist as FBs specifically to work around this defect.
+
 ---
 
 ## 4. State Machine Deep Dive
@@ -146,7 +149,7 @@ Let's say you want to add `MODE_NEW_FEATURE` with a value of `101` (currently un
     MODE_NEW_FEATURE, (* Binary 101 - new feature mode *)
     ```
 
-2.  **Update Conversions:** In the individual function files under `src/FN/`, add the new mode to `FN_ModeToInt.st`, `FN_IntToMode.st`, `FN_BitsToMode.st`, and `FN_ModeToBits.st`.
+2.  **Update Conversions:** Update the mode helpers in `src/FB/` to handle the new mode: `FB_ModeToInt.st` (add an `ELSIF` branch for the new enum → int value) and `FB_BitsToMode.st` (add an `ELSIF` branch for the new int → enum value). `FB_ModeToBits` delegates to `FB_ModeToInt` and needs no direct change.
 
 3.  **Update Master Docs:** In `docs/master/MasterProtocolGuide.md` and `docs/master/IOReference.md`, add the new mode to the mode tables so the master developer knows about it.
 
@@ -177,7 +180,7 @@ Let's say you want to add `FAULT_NEW_CONDITION` with a value of `5` (currently `
 
 1.  **Define Enum:** In `src/DUT/DataTypes.st`, add the new fault to `E_FaultCode`. Note that ordinal position matters for bit encoding.
 
-2.  **Update Conversions:** In the individual function files under `src/FN/`, add the new fault to `FN_FaultToInt.st`, `FN_FaultToBits.st`, and `FN_BitsToFaultCode.st`.
+2.  **Update Conversions:** Update the fault helpers in `src/FB/` to handle the new fault: `FB_FaultToInt.st` (add an `ELSIF` branch for the new enum → int value) and `FB_BitsToFaultCode.st` (add an `ELSIF` branch for the new int → enum value). `FB_FaultToBits` delegates to `FB_FaultToInt` and needs no direct change.
 
 3.  **Update Master Docs:** Add the new fault to the tables in `docs/master/FaultCodeReference.md` and other relevant guides.
 
