@@ -1,5 +1,5 @@
 (* ============================================================================
-   FN_BitsToMode - Convert 3 Digital Input Bits to Operating Mode
+   FB_BitsToMode - Convert 3 Digital Input Bits to Operating Mode
 
    Project: Gen3 SOS Compressor Servo Controller
    Controller: Yaskawa MP2600iec
@@ -9,16 +9,19 @@
    enumeration value. Calculates the integer value from bits then
    maps to the corresponding mode.
 
-   Returns: E_OperatingMode
+   NOTE: Implemented as an FB (not an FN) to work around a MotionWorks IEC
+   native-code-gen defect on FUNCTIONs with user-enum return types.
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
        Bit0            : BOOL             (* LSB
        Bit1            : BOOL
        Bit2            : BOOL             (* MSB
+     VAR_OUTPUT:
+       Mode            : E_OperatingMode  (* Decoded operating mode
      VAR:
        nValue          : INT              (* Calculated integer value
-*)
+   ============================================================================ *)
 
 (* Calculate integer value from bits *)
 nValue := 0;
@@ -28,21 +31,21 @@ IF Bit2 THEN nValue := nValue + 4; END_IF;
 
 (* Convert integer to mode *)
 IF nValue = 0 THEN
-    FN_BitsToMode := E_OperatingMode#MODE_IDLE;
+    Mode := E_OperatingMode#MODE_IDLE;
 ELSIF nValue = 1 THEN
-    FN_BitsToMode := E_OperatingMode#MODE_BRAKE_HOLD;
+    Mode := E_OperatingMode#MODE_BRAKE_HOLD;
 ELSIF nValue = 2 THEN
-    FN_BitsToMode := E_OperatingMode#MODE_POSITION;
+    Mode := E_OperatingMode#MODE_POSITION;
 ELSIF nValue = 3 THEN
-    FN_BitsToMode := E_OperatingMode#MODE_VELOCITY;
+    Mode := E_OperatingMode#MODE_VELOCITY;
 ELSIF nValue = 4 THEN
-    FN_BitsToMode := E_OperatingMode#MODE_TORQUE;
+    Mode := E_OperatingMode#MODE_TORQUE;
 ELSIF nValue = 5 THEN
-    FN_BitsToMode := E_OperatingMode#MODE_GO_HOME;
+    Mode := E_OperatingMode#MODE_GO_HOME;
 ELSIF nValue = 6 THEN
-    FN_BitsToMode := E_OperatingMode#MODE_HOME_LIMIT;
+    Mode := E_OperatingMode#MODE_HOME_LIMIT;
 ELSIF nValue = 7 THEN
-    FN_BitsToMode := E_OperatingMode#MODE_HOME_EOT;
+    Mode := E_OperatingMode#MODE_HOME_EOT;
 ELSE
-    FN_BitsToMode := E_OperatingMode#MODE_IDLE;
+    Mode := E_OperatingMode#MODE_IDLE;
 END_IF;

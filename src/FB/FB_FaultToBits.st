@@ -6,7 +6,7 @@
 
    Description:
    Converts an E_FaultCode enumeration value to 3 digital output bits.
-   Uses FN_FaultToInt to get the integer value, then extracts individual bits.
+   Uses FB_FaultToInt to get the integer value, then extracts individual bits.
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
@@ -18,9 +18,11 @@
      VAR:
        nValue          : INT              (* Integer fault value
 	   byteValue       : BYTE             (* Byte fault value
+       fbFaultToInt    : FB_FaultToInt    (* Enum -> int helper (was FN_FaultToInt)
 *)
 
-nValue := FN_FaultToInt(Fault);
+fbFaultToInt(Fault := Fault);
+nValue := fbFaultToInt.Value;
 byteValue := INT_TO_BYTE(nValue);
 Bit0 := (byteValue AND INT_TO_BYTE(1)) <> BYTE#0;
 Bit1 := (byteValue AND INT_TO_BYTE(2)) <> BYTE#0;

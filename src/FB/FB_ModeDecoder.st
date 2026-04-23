@@ -25,6 +25,8 @@
      VAR:
        nCurrentValue   : INT              (* Current mode value
        nPreviousValue  : INT              (* Previous scan mode value
+       fbBitsToMode    : FB_BitsToMode    (* Bits -> enum helper (was FN_BitsToMode)
+       fbModeToInt     : FB_ModeToInt     (* Enum -> int helper (was FN_ModeToInt)
    ============================================================================ *)
 
 (* ============================================================================
@@ -41,9 +43,12 @@ IF NOT Enable THEN
     RETURN;
 END_IF;
 
-(* Decode mode from bits using centralized conversion function *)
-DecodedMode := FN_BitsToMode(ModeBit0, ModeBit1, ModeBit2);
-nCurrentValue := FN_ModeToInt(DecodedMode);
+(* Decode mode from bits using centralized conversion helper FBs *)
+fbBitsToMode(Bit0 := ModeBit0, Bit1 := ModeBit1, Bit2 := ModeBit2);
+DecodedMode := fbBitsToMode.Mode;
+
+fbModeToInt(Mode := DecodedMode);
+nCurrentValue := fbModeToInt.Value;
 
 (* Update outputs *)
 ModeValue := nCurrentValue;
