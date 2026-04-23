@@ -1,5 +1,5 @@
 (* ============================================================================
-   FN_BitsToFaultCode - Convert 3 Digital Input Bits to Fault Code
+   FB_BitsToFaultCode - Convert 3 Digital Input Bits to Fault Code
 
    Project: Gen3 SOS Compressor Servo Controller
    Controller: Yaskawa MP2600iec
@@ -9,16 +9,19 @@
    enumeration value. Used during fault reset to decode the master's
    fault acknowledgement from DI0-DI2.
 
-   Returns: E_FaultCode
+   NOTE: Implemented as an FB (not an FN) to work around a MotionWorks IEC
+   native-code-gen defect on FUNCTIONs with user-enum return types.
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
        Bit0            : BOOL             (* LSB
        Bit1            : BOOL
        Bit2            : BOOL             (* MSB
+     VAR_OUTPUT:
+       Fault           : E_FaultCode      (* Decoded fault code
      VAR:
        nValue          : INT              (* Calculated integer value
-*)
+   ============================================================================ *)
 
 (* Calculate integer value from bits *)
 nValue := 0;
@@ -28,21 +31,21 @@ IF Bit2 THEN nValue := nValue + 4; END_IF;
 
 (* Convert integer to fault code *)
 IF nValue = 0 THEN
-    FN_BitsToFaultCode := E_FaultCode#FAULT_NONE;
+    Fault := E_FaultCode#FAULT_NONE;
 ELSIF nValue = 1 THEN
-    FN_BitsToFaultCode := E_FaultCode#FAULT_HANDSHAKE;
+    Fault := E_FaultCode#FAULT_HANDSHAKE;
 ELSIF nValue = 2 THEN
-    FN_BitsToFaultCode := E_FaultCode#FAULT_DRIVE;
+    Fault := E_FaultCode#FAULT_DRIVE;
 ELSIF nValue = 3 THEN
-    FN_BitsToFaultCode := E_FaultCode#FAULT_POSITION;
+    Fault := E_FaultCode#FAULT_POSITION;
 ELSIF nValue = 4 THEN
-    FN_BitsToFaultCode := E_FaultCode#FAULT_HOMING_REQ;
+    Fault := E_FaultCode#FAULT_HOMING_REQ;
 ELSIF nValue = 5 THEN
-    FN_BitsToFaultCode := E_FaultCode#FAULT_PISTON_EXIT;
+    Fault := E_FaultCode#FAULT_PISTON_EXIT;
 ELSIF nValue = 6 THEN
-    FN_BitsToFaultCode := E_FaultCode#FAULT_LIMIT_SWITCH;
+    Fault := E_FaultCode#FAULT_LIMIT_SWITCH;
 ELSIF nValue = 7 THEN
-    FN_BitsToFaultCode := E_FaultCode#FAULT_ENCODER;
+    Fault := E_FaultCode#FAULT_ENCODER;
 ELSE
-    FN_BitsToFaultCode := E_FaultCode#FAULT_NONE;
+    Fault := E_FaultCode#FAULT_NONE;
 END_IF;

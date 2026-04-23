@@ -6,7 +6,7 @@
 
    Description:
    Converts an E_OperatingMode enumeration value to 3 digital output bits.
-   Uses FN_ModeToInt to get the integer value, then extracts individual bits.
+   Uses FB_ModeToInt to get the integer value, then extracts individual bits.
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
@@ -18,9 +18,11 @@
      VAR:
        nValue          : INT              (* Integer mode value
 	   byteValue       : BYTE             (* Byte fault value
+       fbModeToInt     : FB_ModeToInt     (* Enum -> int helper (was FN_ModeToInt)
 *)
 
-nValue := FN_ModeToInt(Mode);
+fbModeToInt(Mode := Mode);
+nValue := fbModeToInt.Value;
 byteValue := INT_TO_BYTE(nValue);
 Bit0 := (byteValue AND INT_TO_BYTE(1)) <> BYTE#0;
 Bit1 := (byteValue AND INT_TO_BYTE(2)) <> BYTE#0;

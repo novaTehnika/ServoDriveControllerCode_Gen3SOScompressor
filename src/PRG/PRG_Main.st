@@ -47,6 +47,10 @@
        fbGoHome            : FB_GoHome
        fbHomeLimit         : FB_HomeLimit
        fbHomeEOT           : FB_HomeEOT
+       (* Enum-helper FBs (replacing FN_* with user-enum signatures — MWIEC bug)
+       fbIsOperational     : FB_IsOperationalMode
+       fbIsHoming          : FB_IsHomingMode
+       fbBitsToFaultCode   : FB_BitsToFaultCode
        (* Timers — each has exactly one call site (see end of body)
        tStateTimer         : TON
        tBrakeTimer         : TON
@@ -163,8 +167,10 @@ IF G_sysCurrentState = E_SystemState#ST_IDLE THEN
 
         IF fbHandshake.HandshakeComplete THEN
             eTargetMode := G_sysRequestedMode;
+            fbIsOperational(Mode := eTargetMode);
+            fbIsHoming(Mode := eTargetMode);
 
-            IF FN_IsOperationalMode(eTargetMode) THEN
+            IF fbIsOperational.Result THEN
                 IF G_flagAbsHomeRequired OR G_flagEOTHomeRequired THEN
                     G_sysActiveFault := E_FaultCode#FAULT_HOMING_REQ;
                     G_sysCurrentState := E_SystemState#ST_FAULT;
@@ -172,7 +178,7 @@ IF G_sysCurrentState = E_SystemState#ST_IDLE THEN
                     G_sysCurrentState := E_SystemState#ST_DRIVE_ENABLE;
                 END_IF;
 
-            ELSIF FN_IsHomingMode(eTargetMode) THEN
+            ELSIF fbIsHoming.Result THEN
                 IF (eTargetMode = E_OperatingMode#MODE_HOME_EOT) AND G_flagAbsHomeRequired THEN
                     G_sysActiveFault := E_FaultCode#FAULT_HOMING_REQ;
                     G_sysCurrentState := E_SystemState#ST_FAULT;
@@ -247,8 +253,9 @@ ELSIF G_sysCurrentState = E_SystemState#ST_BRAKE_HOLD THEN
 
         IF fbHandshake.HandshakeComplete THEN
             eTargetMode := G_sysRequestedMode;
+            fbIsOperational(Mode := eTargetMode);
 
-            IF FN_IsOperationalMode(eTargetMode) AND
+            IF fbIsOperational.Result AND
                (G_flagAbsHomeRequired OR G_flagEOTHomeRequired) THEN
                 G_sysActiveFault := E_FaultCode#FAULT_HOMING_REQ;
                 G_sysCurrentState := E_SystemState#ST_FAULT;
@@ -451,8 +458,9 @@ ELSIF G_sysCurrentState = E_SystemState#ST_HOLD_POSITION THEN
 
         IF fbHandshake.HandshakeComplete THEN
             eTargetMode := G_sysRequestedMode;
+            fbIsOperational(Mode := eTargetMode);
 
-            IF FN_IsOperationalMode(eTargetMode) AND
+            IF fbIsOperational.Result AND
                (G_flagAbsHomeRequired OR G_flagEOTHomeRequired) THEN
                 G_sysActiveFault := E_FaultCode#FAULT_HOMING_REQ;
                 G_sysCurrentState := E_SystemState#ST_FAULT;
@@ -756,6 +764,8 @@ ELSE
     eFaultResetActiveCode := E_FaultCode#FAULT_NONE;
 END_IF;
 
+fbBitsToFaultCode(Bit0 := bFilteredModeBit0, Bit1 := bFilteredModeBit1, Bit2 := bFilteredModeBit2);
+
 fbFaultReset(
     Enable := (G_sysCurrentState = E_SystemState#ST_FAULT) OR
               (G_sysCurrentState = E_SystemState#ST_FAULT_IDLE),
@@ -764,7 +774,7 @@ fbFaultReset(
     InFaultState := bFaultResetInFaultState,
     BitsStable := fbModeDecoder.ModeStable,
     ActiveFaultCode := eFaultResetActiveCode,
-    MasterFaultCode := FN_BitsToFaultCode(bFilteredModeBit0, bFilteredModeBit1, bFilteredModeBit2)
+    MasterFaultCode := fbBitsToFaultCode.Fault
 );
 
 (* Go Home handler *)
