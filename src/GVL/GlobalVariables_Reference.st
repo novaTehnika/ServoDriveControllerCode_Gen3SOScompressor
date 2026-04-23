@@ -53,7 +53,7 @@
      G_diFaultReset        AT %IX0.6 : BOOL   (* Fault reset command from master *)
 
      (* Reserved *)
-     G_diReserved          AT %IX0.7 : BOOL   (* Reserved for future use *)
+     (*G_diReserved          AT %IX0.7 : BOOL   (* Reserved for future use *)
 
 
      (* ========================================================================
