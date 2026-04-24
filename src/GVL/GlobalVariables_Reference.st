@@ -44,10 +44,11 @@
      (* Motion Control *)
      G_diMotionEnable      AT %IX0.3 : BOOL   (* Motion enable from master *)
 
-     (* Limit Switches - Tolomatic #8100-9092, Solid State, NC, PNP *)
+     (* Overtravel Switches - Tolomatic #8100-9092, Solid State, NC, PNP *)
      (* TRUE = switch NOT triggered (normal), FALSE = triggered or wire broken *)
-     G_diLimitRetract      AT %IX0.4 : BOOL   (* Retracted position limit switch *)
-     G_diLimitHome         AT %IX0.5 : BOOL   (* Homing reference limit switch *)
+     (* Negative overtravel doubles as the home reference switch (Mode 110). *)
+     G_diOvertravelNeg     AT %IX0.4 : BOOL   (* Negative overtravel / home reference *)
+     G_diOvertravelPos     AT %IX0.5 : BOOL   (* Positive overtravel *)
 
      (* Fault Control *)
      G_diFaultReset        AT %IX0.6 : BOOL   (* Fault reset command from master *)
@@ -110,7 +111,6 @@
 
      G_cfgGearRatio            : LREAL := 70.0        (* Motor turns per lead screw turn *)
      G_cfgLeadScrewPitch       : LREAL := 5.08        (* mm per lead screw turn (0.2 inch) *)
-     G_cfgUsableStroke         : LREAL := 305.0       (* Usable stroke in mm (~12 inches) *)
 
 
      (* ========================================================================
@@ -118,17 +118,11 @@
         Positive direction: toward cylinder EOT (compression direction)
         ======================================================================== *)
 
-     (* Hard limits - absolute mechanical boundaries *)
-     G_cfgPosLimitMax          : LREAL := 320.0       (* Absolute maximum position *)
-     G_cfgPosLimitMin          : LREAL := -10.0       (* Absolute minimum position *)
-
      (* Soft limits - software enforced boundaries *)
      G_cfgPosSoftLimitMax      : LREAL := 305.0       (* Soft limit - extend direction *)
      G_cfgPosSoftLimitMin      : LREAL := 0.0         (* Soft limit - retract direction *)
 
-     (* Critical position landmarks *)
-     G_cfgPosCylinderEntry     : LREAL := 20.0        (* Position where piston enters cylinder *)
-     G_cfgPosCylinderEOT       : LREAL := 300.0       (* End-of-travel inside cylinder *)
+     (* Piston exit guard margin *)
      G_cfgPosExitGuardMargin   : LREAL := 5.0         (* Safety margin for exit prevention *)
 
 
@@ -138,9 +132,6 @@
 
      G_cfgVelLimitMax          : LREAL := 200.0       (* Maximum velocity limit *)
      G_cfgVelLimitNormal       : LREAL := 100.0       (* Normal operating velocity *)
-     G_cfgVelHomingFast        : LREAL := 50.0        (* Fast homing approach velocity *)
-     G_cfgVelHomingSlow        : LREAL := 5.0         (* Slow homing approach velocity *)
-     G_cfgVelGoHome            : LREAL := 50.0        (* Go Home movement velocity *)
 
 
      (* ========================================================================
@@ -150,8 +141,7 @@
 
      G_cfgTorqueLimitMax       : LREAL := 300.0       (* Maximum torque limit *)
      G_cfgTorqueLimitNormal    : LREAL := 100.0       (* Normal operating torque *)
-     G_cfgTorqueHomingThreshold : LREAL := 50.0       (* Stall detection threshold for EOT homing *)
-     G_cfgTorqueHomingLimit    : LREAL := 60.0        (* Torque limit during slow homing approach *)
+     G_cfgTorqueStallThreshold : LREAL := 50.0        (* Torque threshold for piston exit guard *)
 
 
      (* ========================================================================
@@ -190,11 +180,9 @@
         ======================================================================== *)
 
      G_cfgHandshakeTimeout     : TIME := T#500MS      (* Handshake timeout duration *)
-     G_cfgModeTransitionDelay  : TIME := T#100MS      (* Delay between mode transitions *)
      G_cfgBrakeEngageDelay     : TIME := T#200MS      (* Wait after brake engage command *)
      G_cfgBrakeDisengageDelay  : TIME := T#100MS      (* Wait after brake disengage command *)
      G_cfgHomingTimeout        : TIME := T#30S        (* Overall homing sequence timeout *)
-     G_cfgStallDetectTime      : TIME := T#200MS      (* Time to confirm stall condition *)
      G_cfgDriveReadyTimeout    : TIME := T#5S         (* Timeout waiting for drive ready *)
      G_cfgFaultIdleTimeout     : TIME := T#30S        (* Timeout in fault before going to idle *)
 
@@ -204,16 +192,15 @@
         ======================================================================== *)
 
      (* Digital input debounce times *)
-     G_cfgDebounceTimeMode     : TIME := T#50MS       (* Mode bits (DI0-2) debounce *)
-     G_cfgDebounceTimeMotion   : TIME := T#20MS       (* Motion enable (DI3) debounce *)
-     G_cfgDebounceTimeFault    : TIME := T#20MS       (* Fault reset (DI6) debounce *)
-     G_cfgDebounceTimeLimitStd : TIME := T#5MS        (* Limit switches standard debounce *)
-     G_cfgDebounceTimeLimitHome: TIME := T#2MS        (* Home limit switch (shorter for precision) *)
+     G_cfgDebounceTimeMode         : TIME := T#50MS   (* Mode bits (DI0-2) debounce *)
+     G_cfgDebounceTimeMotion       : TIME := T#20MS   (* Motion enable (DI3) debounce *)
+     G_cfgDebounceTimeFault        : TIME := T#20MS   (* Fault reset (DI6) debounce *)
+     G_cfgDebounceTimeOvertravelNeg: TIME := T#2MS    (* Negative overtravel / home reference (short for homing precision) *)
+     G_cfgDebounceTimeOvertravelPos: TIME := T#5MS    (* Positive overtravel standard debounce *)
 
      (* Analog input filter parameters *)
      G_cfgAnalogFilterTimeConst: TIME := T#50MS       (* Low-pass filter time constant *)
      G_cfgAnalogMedianSize     : INT := 3             (* Median filter size (3 or 5) *)
-     G_cfgCycleTime            : TIME := T#1MS        (* PLC cycle time *)
 
 
      (* ========================================================================
@@ -227,17 +214,11 @@
         HOMING PARAMETERS
         ======================================================================== *)
 
-     (* Mode 110 - Home to Limit Switch *)
-     G_cfgHomeLimApproachVel   : LREAL := 50.0        (* Approach velocity (mm/s) *)
+     (* Mode 110 - Home to Negative Overtravel Switch *)
+     G_cfgHomeLimApproachVel   : LREAL := 50.0        (* Approach velocity toward negative overtravel (mm/s) *)
+     G_cfgHomeLimBackoffVel    : LREAL := 5.0         (* Backoff velocity away from switch (mm/s) *)
      G_cfgHomeLimBackoffDist   : LREAL := 5.0         (* Back-off distance after trigger (mm) *)
      G_cfgHomeLimSetPosition   : LREAL := 0.0         (* Position to set at home switch *)
-
-     (* Mode 111 - Home to End-of-Travel *)
-     G_cfgHomeEOTFastVel       : LREAL := 50.0        (* Fast approach velocity (mm/s) *)
-     G_cfgHomeEOTSlowVel       : LREAL := 5.0         (* Slow torque-limited velocity (mm/s) *)
-     G_cfgHomeEOTApproachDist  : LREAL := 20.0        (* Distance for slow approach (mm) *)
-     G_cfgHomeEOTTorqueThresh  : LREAL := 50.0        (* Torque threshold for stall (%) *)
-     G_cfgHomeEOTSetPosition   : LREAL := 300.0       (* Position to set at EOT *)
 
      (* Mode 101 - Go Home *)
      G_cfgGoHomePosition       : LREAL := 0.0         (* Target position for Go Home *)
@@ -250,65 +231,21 @@
    ============================================================================
 
    Coordinate System:
-   - Single zero reference established by homing to limit switch (Mode 110)
+   - Single zero reference established by homing to the negative overtravel
+     switch (Mode 110). Master and slave share this frame.
    - Positive direction: toward cylinder EOT (compression direction)
    - All positions in millimeters (mm)
 
    VAR_GLOBAL
      (* ========================================================================
-        POSITION LANDMARKS
-        These are set during commissioning and/or homing sequences
-        ======================================================================== *)
-
-     (* Limit switch positions *)
-     G_posLimitRetract         : LREAL := -5.0    (* Position of retract limit switch *)
-     G_posLimitHome            : LREAL := 0.0     (* Position of homing limit switch (= home) *)
-
-     (* Cylinder boundaries *)
-     G_posCylinderEntry        : LREAL := 20.0    (* Position where piston enters cylinder *)
-     G_posCylinderEOT          : LREAL := 300.0   (* End-of-travel inside cylinder *)
-
-     (* Software limits (enforced in all modes) *)
-     G_posSoftLimitMin         : LREAL := 0.0     (* Minimum allowed position (exit prevention) *)
-     G_posSoftLimitMax         : LREAL := 305.0   (* Maximum allowed position *)
-
-
-     (* ========================================================================
-        HOMING REFERENCE POSITIONS
-        These are recorded during homing sequences
-        ======================================================================== *)
-
-     (* Mode 110 - Home to Limit Switch *)
-     G_posHomeLimitSwitch      : LREAL := 0.0     (* Recorded position at limit switch *)
-
-     (* Mode 111 - Home to End-of-Travel *)
-     G_posHomeEOT              : LREAL := 0.0     (* Recorded position at EOT stall *)
-
-     (* Combined home reference *)
-     G_posHomeOffset           : LREAL := 0.0     (* Offset between limit switch and EOT *)
-
-
-     (* ========================================================================
         DYNAMIC POSITION TRACKING
         ======================================================================== *)
-
-     (* Position setpoint for Go Home (Mode 101) *)
-     G_posGoHomeTarget         : LREAL := 0.0     (* Target position for Go Home move *)
 
      (* Position at mode entry (for reference) *)
      G_posModeEntryPosition    : LREAL := 0.0     (* Position when entering current mode *)
 
      (* Exit guard boundary *)
      G_posExitGuardBoundary    : LREAL := 0.0     (* Dynamic boundary for exit prevention *)
-
-
-     (* ========================================================================
-        POSITION VALIDITY FLAGS
-        ======================================================================== *)
-
-     G_posAbsoluteValid        : BOOL := FALSE    (* Absolute position from encoder is valid *)
-     G_posHomeLimitValid       : BOOL := FALSE    (* Home limit switch position is valid *)
-     G_posHomeEOTValid         : BOOL := FALSE    (* EOT position is valid *)
    END_VAR
 
 
@@ -332,35 +269,11 @@
         HOMING FLAGS
         ======================================================================== *)
 
-     (* These flags track homing requirements *)
-     G_flagAbsHomeRequired     : BOOL := TRUE     (* Forced TRUE on boot/fault; cleared by Mode 110 *)
-     G_flagEOTHomeRequired     : BOOL := TRUE     (* Set on power-up, cleared by Mode 111 *)
+     (* Single homing-required flag. Forced TRUE on boot and after fault reset;
+        cleared when fbHomeLimit.Done (Mode 110). *)
+     G_flagHomingRequired      : BOOL := TRUE     (* Homing required before operational modes *)
      G_flagHomingInProgress    : BOOL := FALSE    (* TRUE while homing sequence active *)
      G_flagHomingComplete      : BOOL := FALSE    (* TRUE after successful homing *)
-
-
-     (* ========================================================================
-        DUAL COORDINATE SYSTEM
-
-        Slave coordinates: Encoder position with zero at limit switch
-        - Based on absolute encoder, zeroed during limit switch homing
-        - Used internally for motion control
-
-        Master coordinates: Master's view based on cylinder geometry
-        - Communicated via analog signals from the master controller
-        - EOT expected at G_cfgHomeEOTSetPosition
-        ======================================================================== *)
-
-     G_posActualEOT            : LREAL := 0.0     (* Encoder position at EOT stall (mm) *)
-     G_posEOTOffset            : LREAL := 0.0     (* Offset: master = slave + offset (mm) *)
-     (*
-        After EOT homing:
-        G_posEOTOffset = G_cfgHomeEOTSetPosition - G_posActualEOT
-
-        Position transforms (slave is responsible for translation):
-        - Master -> Slave: G_sysCommandedPosition = MasterPosition - G_posEOTOffset
-        - Slave -> Master: MasterPosition = G_sysActualPosition + G_posEOTOffset
-     *)
 
 
      (* ========================================================================
@@ -395,8 +308,8 @@
      (* Limit status *)
      G_sysAtPosLimitHigh       : BOOL := FALSE    (* At or beyond high position limit *)
      G_sysAtPosLimitLow        : BOOL := FALSE    (* At or beyond low position limit *)
-     G_sysLimitRetractActive   : BOOL := FALSE    (* Retract limit switch triggered *)
-     G_sysLimitHomeActive      : BOOL := FALSE    (* Home limit switch triggered *)
+     G_sysOvertravelNegActive  : BOOL := FALSE    (* Negative overtravel switch triggered *)
+     G_sysOvertravelPosActive  : BOOL := FALSE    (* Positive overtravel switch triggered *)
 
      (* Safety status *)
      G_sysExitGuardActive      : BOOL := FALSE    (* Piston exit prevention active *)

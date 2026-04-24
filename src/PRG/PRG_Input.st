@@ -16,8 +16,8 @@ G_diModeBit2 := MO1_DI_02; (* Mode bit 2 - MSB *)
 G_diMotionEnable := MO1_DI_03; (* Motion enable from master *)
 G_diFaultReset := MO1_DI_04; (* Fault reset command from master *)
 (*G_diReserved := MO1_DI_05; (* Reserved for future use *)
-G_diLimitRetract := MO1_DI_06; (* Retracted position limit switch *)
-G_diLimitHome := MO1_DI_07; (* Homing reference limit switch *)
+G_diOvertravelNeg := MO1_DI_06; (* Negative overtravel / home reference switch *)
+G_diOvertravelPos := MO1_DI_07; (* Positive overtravel switch *)
 
 
 (* Analog Input *)

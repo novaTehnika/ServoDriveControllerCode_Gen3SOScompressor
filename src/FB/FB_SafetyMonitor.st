@@ -11,7 +11,7 @@
 
    Monitored Conditions:
    - Drive faults (from servo amplifier; encoder alarms surface here via the drive)
-   - Limit switch faults (unexpected triggers during motion)
+   - Overtravel faults (unexpected switch triggers; positive switch never expected)
    - Position limit violations (beyond soft limits)
    - Piston exit guard faults (from FB_PistonExitGuard)
 
@@ -28,8 +28,8 @@
    Variables (define in MWiec GUI):
      VAR_INPUT:
        Enable              : BOOL             (* Enable safety monitoring
-       LimitRetractActive  : BOOL             (* TRUE = retract limit triggered
-       LimitHomeActive     : BOOL             (* TRUE = home limit triggered
+       OvertravelNegActive : BOOL             (* TRUE = negative overtravel / home switch triggered
+       OvertravelPosActive : BOOL             (* TRUE = positive overtravel switch triggered
        ActualPosition      : LREAL            (* Current axis position (mm)
        SoftLimitMin        : LREAL            (* Minimum allowed position (mm)
        SoftLimitMax        : LREAL            (* Maximum allowed position (mm)
@@ -81,7 +81,6 @@ bInMotionState := (CurrentState = E_SystemState#ST_POSITION_CTRL) OR
 
 (* Check if in a homing state *)
 bInHomingState := (CurrentState = E_SystemState#ST_HOME_LIMIT) OR
-                  (CurrentState = E_SystemState#ST_HOME_EOT) OR
                   (CurrentState = E_SystemState#ST_HOME_COMPLETE);
 
 (* Check if already in fault state *)
@@ -108,21 +107,29 @@ END_IF;
 FaultDrive := DriveFault;
 
 (* --------------------------------------------------------------------------
-   LIMIT SWITCH FAULT MONITORING
-   Unexpected limit switch activation during motion
+   OVERTRAVEL FAULT MONITORING
+   The positive overtravel switch must never activate during any state.
+   The negative overtravel switch is expected only as the homing target
+   inside ST_HOME_LIMIT.
    -------------------------------------------------------------------------- *)
 
-(* Limit switches are expected during homing - only fault if unexpected *)
-IF bInMotionState AND NOT bInHomingState THEN
-    (* During normal motion, hitting a limit switch is unexpected *)
-    (* This could indicate mechanical issue, runaway, or position error *)
-    IF LimitRetractActive OR LimitHomeActive THEN
+IF bInHomingState THEN
+    (* During homing, negative overtravel is the expected target.
+       Positive overtravel is never expected - always faults. *)
+    IF OvertravelPosActive THEN
+        FaultLimitSwitch := TRUE;
+    ELSE
+        FaultLimitSwitch := FALSE;
+    END_IF;
+ELSIF bInMotionState THEN
+    (* During normal motion, hitting either overtravel switch is a fault. *)
+    IF OvertravelNegActive OR OvertravelPosActive THEN
         FaultLimitSwitch := TRUE;
     ELSE
         FaultLimitSwitch := FALSE;
     END_IF;
 ELSE
-    (* Not in motion or in homing - limits are OK or expected *)
+    (* Not in motion - ignore switch state. *)
     FaultLimitSwitch := FALSE;
 END_IF;
 

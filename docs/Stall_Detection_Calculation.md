@@ -1,4 +1,15 @@
-# Stall Detection Calculation for EOT Homing (Mode 111)
+# Stall Detection Calculation for EOT Homing (Mode 111) — **OBSOLETE**
+
+> **This document is obsolete.** Torque-based EOT homing (Mode 111,
+> `FB_HomeEOT`) has been removed. Characterization showed the ram can drive
+> through a 1/8" aluminum plate with only a 1–2% torque rise above the ~8%
+> unloaded baseline — within the unfiltered noise floor — so stall detection
+> cannot reliably protect the PEEK piston against its weakened seal-groove
+> feature. Homing is now single-phase (Mode 110 only), against the negative
+> overtravel switch. The bits-`111` slot is a reserved placeholder
+> (`MODE_RESERVED_111`) and commanding it faults.
+>
+> Retained as a record of the design rationale behind the removal.
 
 ## Purpose
 This document clarifies the torque threshold calculation used for stall detection during End-of-Travel (EOT) homing in Mode 111.

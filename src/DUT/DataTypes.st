@@ -13,7 +13,7 @@
    - E_FaultCode: Fault code enumeration (3-bit encoding)
    - E_SystemState: System state machine enumeration
    - ST_AxisLimits: Position, velocity, torque, accel/decel limits
-   - ST_HomingParams: Homing sequence parameters
+   - ST_HomingParams: Limit-switch homing parameters
    - ST_Cmd*/ST_Sta*: Command/status struct pairs bridging ST and LD POUs
    ============================================================================ *)
 
@@ -28,7 +28,9 @@ TYPE
       ============================================================================ *)
 
    (* IMPORTANT: Member order defines implicit integer values (0-7).
-      These values map to 3-bit mode encoding on DI0-DI2 and DO0-DO2. Do not reorder. *)
+      These values map to 3-bit mode encoding on DI0-DI2 and DO0-DO2. Do not reorder.
+      MODE_RESERVED_111 is a placeholder for the legacy EOT-homing slot; commanding
+      bits 111 has no state handler and will raise FAULT_HOMING_REQ. *)
    E_OperatingMode :
    (
       MODE_IDLE,               (* implicit 0 - 000: Idle - Drive OFF, brake engaged *)
@@ -37,8 +39,8 @@ TYPE
       MODE_VELOCITY,           (* implicit 3 - 011: Velocity Control - Analog reference *)
       MODE_TORQUE,             (* implicit 4 - 100: Torque Control - Analog reference *)
       MODE_GO_HOME,            (* implicit 5 - 101: Go Home - Move to home position *)
-      MODE_HOME_LIMIT,         (* implicit 6 - 110: Home to Limit Switch *)
-      MODE_HOME_EOT            (* implicit 7 - 111: Home to End-of-Travel (torque detection) *)
+      MODE_HOME_LIMIT,         (* implicit 6 - 110: Home to Negative Overtravel Switch (reference) *)
+      MODE_RESERVED_111        (* implicit 7 - 111: Reserved (legacy EOT homing slot) *)
    );
 
 
@@ -98,8 +100,7 @@ TYPE
       ST_GO_HOME,              (* Mode 101: Moving to home position *)
 
       (* Homing States *)
-      ST_HOME_LIMIT,           (* Mode 110: Homing to limit switch - uses FB_HomeLimit *)
-      ST_HOME_EOT,             (* Mode 111: Homing to end-of-travel - uses FB_HomeEOT *)
+      ST_HOME_LIMIT,           (* Mode 110: Homing to negative overtravel switch - uses FB_HomeLimit *)
       ST_HOME_COMPLETE,        (* Homing finished, awaiting mode change *)
 
       (* DEPRECATED: Homing sub-states - Limit Switch (Mode 110)
@@ -108,13 +109,6 @@ TYPE
       ST_HOME_LIM_DETECT,      (* DEPRECATED - use FB_HomeLimit *)
       ST_HOME_LIM_BACKOFF,     (* DEPRECATED - use FB_HomeLimit *)
       ST_HOME_LIM_SETREF,      (* DEPRECATED - use FB_HomeLimit *)
-
-      (* DEPRECATED: Homing sub-states - End-of-Travel (Mode 111)
-         These states are now handled internally by FB_HomeEOT. *)
-      ST_HOME_EOT_FAST,        (* DEPRECATED - use FB_HomeEOT *)
-      ST_HOME_EOT_SLOW,        (* DEPRECATED - use FB_HomeEOT *)
-      ST_HOME_EOT_DETECT,      (* DEPRECATED - use FB_HomeEOT *)
-      ST_HOME_EOT_SETREF,      (* DEPRECATED - use FB_HomeEOT *)
 
       (* Transition State - Inter-Mode *)
       ST_HOLD_POSITION,        (* MC_Stop active, brake disengaged, awaiting handshake *)
@@ -159,29 +153,22 @@ TYPE
    (* ============================================================================
       ST_HomingParams - Homing Parameters Structure
 
-      Structure containing parameters for homing sequences.
-      Supports both limit switch homing (Mode 110) and EOT homing (Mode 111).
+      Structure containing parameters for limit-switch homing (Mode 110).
       ============================================================================ *)
 
    ST_HomingParams :
    STRUCT
       (* Approach velocities (mm/s) *)
       VelFast         : LREAL;    (* Fast approach velocity *)
-      VelSlow         : LREAL;    (* Slow approach velocity *)
-
-      (* Torque parameters (% of rated) *)
-      TorqueThreshold : LREAL;    (* Stall detection threshold (EOT homing) *)
-      TorqueLimit     : LREAL;    (* Torque limit during slow approach *)
+      VelSlow         : LREAL;    (* Slow backoff velocity *)
 
       (* Distance parameters (mm) *)
-      ApproachDist    : LREAL;    (* Distance for slow approach phase *)
       BackoffDist     : LREAL;    (* Distance to back off after detection *)
 
       (* Position to set after homing (mm) *)
       SetPosition     : LREAL;    (* Position value to assign at home point *)
 
       (* Timing *)
-      StallDetectTime : TIME;     (* Time to confirm stall condition *)
       Timeout         : TIME;     (* Overall homing sequence timeout *)
 
       (* Direction *)

@@ -1,42 +1,44 @@
 (* ============================================================================
-   FB_HomeLimit - Limit Switch Homing Sequence Handler (Mode 110)
+   FB_HomeLimit - Home-to-Negative-Overtravel Sequence Handler (Mode 110)
 
    Project: Gen3 SOS Compressor Servo Controller
    Controller: Yaskawa MP2600iec
 
    Description:
-   Encapsulates the complete limit switch homing sequence for Mode 110.
-   This FB handles the entire sequence from approach to setting the position
-   reference, including over-travel detection and direction reversal.
+   Drives the ram in the negative direction until the negative overtravel
+   switch is tripped, backs off until the switch clears, then sets the
+   position reference. This establishes the single coordinate frame used
+   by the rest of the system.
 
    Sequence:
-   1. APPROACH: Move toward home limit switch (negative direction first)
-      - If retract limit triggers instead, reverse to positive direction
-   2. DETECT: Stop motion when home limit switch detected
-   3. BACKOFF: Move away from switch at slow speed until switch clears
-   4. SETREF: Set position reference at switch edge location
+   1. APPROACH: MC_MoveVelocity at ApproachVelocity in negative direction.
+   2. DETECT:   MC_Stop triggered by OvertravelNegActive.
+   3. BACKOFF:  MC_MoveVelocity at BackoffVelocity in positive direction
+                until OvertravelNegActive clears.
+   4. SETREF:   MC_Stop, then MC_SetPosition(SetPosition).
 
-   Over-Travel Handling:
-   - If retract limit triggers during approach from negative direction,
-     the FB automatically reverses to approach from positive direction
-   - If retract limit triggers during positive approach, this is a fault
+   Error conditions:
+   - OvertravelPosActive at any point during the sequence (homing never
+     approaches the positive switch, so this is always a fault).
+   - Any built-in motion FB reporting Error.
+   - Overall Timeout expiring.
 
    Integration:
-   - Called once per scan at end of PRG_Main
-   - CmdMoveVelocity/CmdStop/CmdSetPosition routed to G_cmd* by PRG_Main
-   - Receives built-in FB status via StaMoveVelocity/StaStop/StaSetPosition inputs
-   - PRG_Main routes G_staMoveVelocity/G_staStop/G_staSetPosition into these inputs
+   - Called once per scan at end of PRG_Main.
+   - CmdMoveVelocity/CmdStop/CmdSetPosition routed to G_cmd* by PRG_Main.
+   - PRG_Main routes G_staMoveVelocity/G_staStop/G_staSetPosition into
+     the StaMoveVelocity/StaStop/StaSetPosition inputs.
 
    Variables (define in MWiec GUI):
      VAR_INPUT:
        Enable              : BOOL                   (* Enable the function block
        Execute             : BOOL                   (* Start homing sequence
-       ApproachVelocity    : LREAL                  (* Approach velocity (mm/s)
-       BackoffVelocity     : LREAL                  (* Backoff velocity (mm/s)
-       SetPosition         : LREAL                  (* Position to set at home switch (mm)
+       ApproachVelocity    : LREAL                  (* Approach velocity magnitude (mm/s)
+       BackoffVelocity     : LREAL                  (* Backoff velocity magnitude (mm/s)
+       SetPosition         : LREAL                  (* Position to set at home (mm)
        Timeout             : TIME                   (* Overall sequence timeout
-       LimitHomeActive     : BOOL                   (* Home limit switch is triggered
-       LimitRetractActive  : BOOL                   (* Retract limit switch is triggered
+       OvertravelNegActive : BOOL                   (* Negative overtravel / home switch triggered
+       OvertravelPosActive : BOOL                   (* Positive overtravel switch triggered (fault)
        Abort               : BOOL                   (* Abort the sequence
        StaMoveVelocity     : ST_StaMoveVelocity     (* Status from MC_MoveVelocity
        StaStop             : ST_StaStop             (* Status from MC_Stop
@@ -46,16 +48,14 @@
        Done                : BOOL                   (* Homing complete
        InMotion            : BOOL                   (* Currently moving
        Error               : BOOL                   (* Error occurred
-       ApproachingPositive : BOOL                   (* Currently approaching from positive direction
        CmdMoveVelocity     : ST_CmdMoveVelocity     (* Command output for MC_MoveVelocity
        CmdStop             : ST_CmdStop             (* Command output for MC_Stop
-       CmdSetPosition      : ST_CmdSetPosition      (* Command output for MC_SetPosition
+       CmdSetPosition      : ST_CmdSetPosition     (* Command output for MC_SetPosition
      VAR:
        eState              : INT := 0         (* State machine
        rTrigExecute        : R_TRIG
-       tTimeout            : TON              (* Single call site — see end of body
+       tTimeout            : TON              (* Single call site - see end of body
        bTimeoutIN          : BOOL             (* Latched IN for tTimeout
-       bApproachFromPositive : BOOL := FALSE
        bStopDoneLatched    : BOOL := FALSE
      VAR CONSTANT:
        HL_IDLE             : INT := 0
@@ -77,9 +77,7 @@ IF NOT Enable THEN
     Done := FALSE;
     InMotion := FALSE;
     Error := FALSE;
-    ApproachingPositive := FALSE;
     eState := HL_IDLE;
-    bApproachFromPositive := FALSE;
     bStopDoneLatched := FALSE;
     CmdMoveVelocity.Execute := FALSE;
     CmdStop.Execute := FALSE;
@@ -95,6 +93,16 @@ ELSE
         CmdMoveVelocity.Execute := FALSE;
         CmdSetPosition.Execute := FALSE;
         eState := HL_ABORTING;
+    END_IF;
+
+    (* Positive overtravel switch must never trigger during homing. *)
+    IF OvertravelPosActive AND (eState <> HL_IDLE) AND (eState <> HL_ERROR) AND
+       (eState <> HL_DONE) AND (eState <> HL_ABORTING) THEN
+        CmdMoveVelocity.Execute := FALSE;
+        CmdStop.Execute := FALSE;
+        CmdSetPosition.Execute := FALSE;
+        Error := TRUE;
+        eState := HL_ERROR;
     END_IF;
 
     (* Default timer IN based on state; overall timeout check uses last-scan Q *)
@@ -120,8 +128,6 @@ IF eState = HL_IDLE THEN
         Done := FALSE;
         InMotion := FALSE;
         Error := FALSE;
-        ApproachingPositive := FALSE;
-        bApproachFromPositive := FALSE;
         bStopDoneLatched := FALSE;
 
         CmdMoveVelocity.Execute := FALSE;
@@ -130,42 +136,24 @@ IF eState = HL_IDLE THEN
 
         IF rTrigExecute.Q OR Execute THEN
             Active := TRUE;
-            bApproachFromPositive := FALSE;
             eState := HL_APPROACH;
         END_IF;
 
 
 ELSIF eState = HL_APPROACH THEN
 
-    (* HL_APPROACH - Move toward home limit switch *)
-        ApproachingPositive := bApproachFromPositive;
-
+    (* HL_APPROACH - Move negative toward overtravel / home switch *)
         CmdMoveVelocity.Execute := TRUE;
         CmdMoveVelocity.Velocity := ApproachVelocity;
         CmdMoveVelocity.Acceleration := LREAL#0.0;
         CmdMoveVelocity.Deceleration := LREAL#0.0;
-        IF bApproachFromPositive THEN
-            CmdMoveVelocity.Direction := 1;
-        ELSE
-            CmdMoveVelocity.Direction := -1;
-        END_IF;
+        CmdMoveVelocity.Direction := -1;
 
         InMotion := StaMoveVelocity.Busy;
 
-        IF LimitHomeActive THEN
+        IF OvertravelNegActive THEN
             CmdMoveVelocity.Execute := FALSE;
             eState := HL_DETECT;
-
-        ELSIF LimitRetractActive THEN
-            IF NOT bApproachFromPositive THEN
-                CmdMoveVelocity.Execute := FALSE;
-                bApproachFromPositive := TRUE;
-
-            ELSE
-                CmdMoveVelocity.Execute := FALSE;
-                Error := TRUE;
-                eState := HL_ERROR;
-            END_IF;
 
         ELSIF StaMoveVelocity.Error THEN
             CmdMoveVelocity.Execute := FALSE;
@@ -176,7 +164,7 @@ ELSIF eState = HL_APPROACH THEN
 
 ELSIF eState = HL_DETECT THEN
 
-    (* HL_DETECT - Stop motion after limit switch detected *)
+    (* HL_DETECT - Stop motion after switch detected *)
         CmdStop.Execute := TRUE;
 
         InMotion := NOT StaStop.Done;
@@ -194,7 +182,7 @@ ELSIF eState = HL_DETECT THEN
 
 ELSIF eState = HL_BACKOFF THEN
 
-    (* HL_BACKOFF - Move away from limit switch at slow speed until switch clears *)
+    (* HL_BACKOFF - Move positive at slow speed until switch clears *)
         CmdMoveVelocity.Execute := TRUE;
         CmdMoveVelocity.Velocity := BackoffVelocity;
         CmdMoveVelocity.Acceleration := LREAL#0.0;
@@ -203,7 +191,7 @@ ELSIF eState = HL_BACKOFF THEN
 
         InMotion := StaMoveVelocity.Busy;
 
-        IF NOT LimitHomeActive THEN
+        IF NOT OvertravelNegActive THEN
             CmdMoveVelocity.Execute := FALSE;
             bStopDoneLatched := FALSE;
             eState := HL_SETREF;
@@ -217,7 +205,7 @@ ELSIF eState = HL_BACKOFF THEN
 
 ELSIF eState = HL_SETREF THEN
 
-    (* HL_SETREF - Set position reference at home switch edge location *)
+    (* HL_SETREF - Stop, then set position reference *)
         IF NOT bStopDoneLatched THEN
             CmdStop.Execute := NOT StaStop.Done;
 
@@ -250,7 +238,6 @@ ELSIF eState = HL_DONE THEN
         Done := TRUE;
         Active := TRUE;
         InMotion := FALSE;
-        ApproachingPositive := FALSE;
 
         IF NOT Execute THEN
             Done := FALSE;

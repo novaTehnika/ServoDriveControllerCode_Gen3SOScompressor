@@ -5,18 +5,14 @@
    Controller: Yaskawa MP2600iec
 
    Description:
-   Handles Mode 101 (Go Home) which moves the axis to the home position
-   (at the home limit switch). This mode checks homing requirements before
-   executing and redirects to homing mode if needed.
+   Handles Mode 101 (Go Home) which moves the axis to the home position.
+   Checks that homing has been performed before executing; if not, requests
+   that PRG_Main redirect to Mode 110.
 
    Behavior:
-   - If AbsHomeRequired is TRUE: Set RedirectToHoming, PRG_Main switches to 110
+   - If HomingRequired is TRUE: Set RedirectToHoming, PRG_Main switches to 110
    - If requirements met: Command MC_MoveAbsolute via CmdMoveAbsolute output
    - After reaching position: Hold there until mode change
-
-   Note: EOT homing status does NOT block Go Home - the axis can still move
-   to the home position even if EOT homing hasn't been done. Only
-   AbsHomeRequired (encoder validity) blocks the move.
 
    Integration:
    - Called once per scan at end of PRG_Main
@@ -28,7 +24,7 @@
      VAR_INPUT:
        Enable              : BOOL                  (* Enable the function block
        Execute             : BOOL                  (* Start go home sequence
-       AbsHomeRequired     : BOOL                  (* Encoder homing required (blocks Go Home)
+       AbsHomeRequired     : BOOL                  (* Homing required (blocks Go Home, bind G_flagHomingRequired)
        HomePosition        : LREAL                 (* Target home position (mm)
        HomeVelocity        : LREAL                 (* Movement velocity (mm/s)
        Abort               : BOOL                  (* Abort the move

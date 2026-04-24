@@ -13,7 +13,7 @@ This document provides step-by-step instructions for configuring the hardware in
 | Servo Drive | SGD7S2R8FE0A000300 | Sigma-7 200V, 2.8A servopack |
 | Servo Motor | SGM7J-04A6A6C | 400W with brake and absolute encoder |
 | Actuator | Tolomatic RSA64 | Linear electromechanical actuator |
-| Limit Switches | Tolomatic #8100-9092 | Solid State, Normally Closed, PNP |
+| Overtravel Switches | Tolomatic #8100-9092 | Solid State, Normally Closed, PNP (×2: negative & positive overtravel) |
 | Master Interface | NI PCI 6251 + SCB-68a | DAQ for analog/digital I/O |
 
 ---
@@ -80,8 +80,8 @@ Configure the axis scaling in MotionWorksIEC:
 | DI1 | %IX0.1 | G_diModeBit1 | NI DAQ DIO1 |
 | DI2 | %IX0.2 | G_diModeBit2 | NI DAQ DIO2 |
 | DI3 | %IX0.3 | G_diMotionEnable | NI DAQ DIO3 |
-| DI4 | %IX0.4 | G_diLimitRetract | Limit Switch (Retract) |
-| DI5 | %IX0.5 | G_diLimitHome | Limit Switch (Home) |
+| DI4 | %IX0.4 | G_diOvertravelNeg | Negative Overtravel / Home Reference Switch |
+| DI5 | %IX0.5 | G_diOvertravelPos | Positive Overtravel Switch |
 | DI6 | %IX0.6 | G_diFaultReset | NI DAQ DIO6 |
 | DI7 | %IX0.7 | G_diReserved | (Not connected) |
 
@@ -97,7 +97,23 @@ Configure the axis scaling in MotionWorksIEC:
 | DO6 | %QX0.6 | G_doInMotion | NI DAQ DIO (input) |
 | DO7 | %QX0.7 | G_doHomingComplete | NI DAQ DIO (input) |
 
-### 4.3 Limit Switch Wiring (PNP, Normally Closed)
+### 4.3 Overtravel Switch Wiring (PNP, Normally Closed)
+
+Two Tolomatic #8100-9092 switches are mounted as travel limits on the actuator:
+
+- **Negative overtravel (DI4 / `G_diOvertravelNeg`)** — positioned so that the
+  piston is still fully retracted but clear of mechanical hard stops. Also used
+  as the **home reference** for Mode 110 — Mode 110 drives the ram negative
+  into this switch, backs off, and sets the coordinate reference.
+- **Positive overtravel (DI5 / `G_diOvertravelPos`)** — positioned so that the
+  piston remains safely inside the cylinder with adequate margin against the
+  PEEK seal/groove feature. The homing sequence never approaches this switch,
+  so any activation is a `FAULT_LIMIT_SWITCH`.
+
+Both switches raise `FAULT_LIMIT_SWITCH` in all motion states except where the
+switch is the expected homing target (negative overtravel inside
+`FB_HomeLimit`).
+
 ```
 +24V ──────┬──────────────────────────────┐
            │                              │
@@ -166,7 +182,7 @@ The brake is controlled via DO3 through a relay:
 ### 7.2 Absolute Encoder Setup
 The SGM7J-04A6A6C has a 24-bit absolute encoder:
 - Battery backup maintains position across power cycles, but retained position is not trusted by this firmware
-- Both homing flags (`G_flagAbsHomeRequired`, `G_flagEOTHomeRequired`) are forced TRUE on every boot and after every fault reset
+- `G_flagHomingRequired` is forced TRUE on every boot and after every fault reset; it is cleared only by a successful Mode 110 homing sequence
 - Encoder alarms (A.810/A.CC0/A.830) surface as `FAULT_DRIVE` from the servo amplifier
 
 ---
@@ -175,7 +191,8 @@ The SGM7J-04A6A6C has a 24-bit absolute encoder:
 
 ### 8.1 Pre-Power Checks
 - [ ] Verify all wiring connections
-- [ ] Confirm limit switch operation (manual test)
+- [ ] Confirm negative and positive overtravel switches operate (manual test)
+- [ ] Confirm positive overtravel switch position keeps piston safely inside cylinder
 - [ ] Check brake relay wiring
 - [ ] Verify 24V power supply for I/O
 - [ ] Confirm Mechatrolink cable connections
@@ -197,16 +214,15 @@ The SGM7J-04A6A6C has a 24-bit absolute encoder:
 ### 8.4 Motion Testing (Manual Jog)
 1. [ ] Enable drive power (MC_Power)
 2. [ ] Release brake (DO3 = TRUE)
-3. [ ] Jog positive direction at low velocity
-4. [ ] Verify limit switch triggers correctly
-5. [ ] Jog negative direction at low velocity
-6. [ ] Engage brake and disable drive
+3. [ ] Jog positive direction at low velocity — verify positive overtravel triggers `FAULT_LIMIT_SWITCH` well before any mechanical interference
+4. [ ] Jog negative direction at low velocity — verify negative overtravel triggers `FAULT_LIMIT_SWITCH` when commanded outside homing
+5. [ ] Engage brake and disable drive
 
 ### 8.5 Homing Verification
-1. [ ] Execute Mode 110 (Home to Limit Switch)
-2. [ ] Verify position set correctly at home
-3. [ ] Execute Mode 111 (Home to EOT)
-4. [ ] Verify stall detection and position setting
+1. [ ] Execute Mode 110 (Home to Negative Overtravel Switch)
+2. [ ] Verify ram drives negative, stops at negative overtravel, backs off, and `MC_SetPosition` sets position to `G_cfgHomeLimSetPosition`
+3. [ ] Verify `G_flagHomingRequired` is cleared and `G_doHomingComplete` goes TRUE
+4. [ ] Command bits `111` (Mode 7) — verify the system enters `ST_FAULT` (no state handler exists for the reserved slot)
 
 ---
 
@@ -222,9 +238,9 @@ The SGM7J-04A6A6C has a 24-bit absolute encoder:
 - Use `Y_ResetAbsoluteEncoder` to clear
 - Homing required after reset
 
-### 9.3 Limit Switch Not Detecting
+### 9.3 Overtravel Switch Not Detecting
 - Check wiring (24V, signal, 0V)
-- Verify switch position on actuator
+- Verify switch position on actuator (negative switch = home reference; positive switch = safety only)
 - Test with multimeter
 
 ### 9.4 Brake Not Releasing

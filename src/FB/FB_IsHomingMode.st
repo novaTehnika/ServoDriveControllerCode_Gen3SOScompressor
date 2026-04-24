@@ -6,7 +6,7 @@
 
    Description:
    Checks if the given operating mode is one of the homing modes
-   (Go Home, Home to Limit Switch, or Home to End-of-Travel).
+   (Go Home or Home to Negative Overtravel / Home Reference).
 
    NOTE: Implemented as an FB (not an FN) to work around a MotionWorks IEC
    native-code-gen defect on FUNCTIONs with user-enum parameters.
@@ -19,5 +19,4 @@
    ============================================================================ *)
 
 Result := (Mode = E_OperatingMode#MODE_GO_HOME) OR
-          (Mode = E_OperatingMode#MODE_HOME_LIMIT) OR
-          (Mode = E_OperatingMode#MODE_HOME_EOT);
+          (Mode = E_OperatingMode#MODE_HOME_LIMIT);
