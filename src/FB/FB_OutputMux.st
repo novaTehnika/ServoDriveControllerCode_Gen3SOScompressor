@@ -31,7 +31,7 @@
        DO0_Output          : BOOL             (* Output for DO0
        DO1_Output          : BOOL             (* Output for DO1
        DO2_Output          : BOOL             (* Output for DO2
-       FaultActiveOutput   : BOOL             (* Output for doFaultActive (DO5)
+       FaultActiveOutput   : BOOL             (* Output for doFaultActive (DO4)
      VAR:
        fbFaultToBits       : FB_FaultToBits   (* Fault code to bits converter
        fbModeToBits        : FB_ModeToBits    (* Mode to bits converter

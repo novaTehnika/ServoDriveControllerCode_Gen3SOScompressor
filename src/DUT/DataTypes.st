@@ -89,6 +89,7 @@ TYPE
       ST_IDLE,                 (* Drive OFF, brake engaged, awaiting commands *)
 
       (* Transition States - Activation *)
+      ST_DRIVE_RESET,          (* Issue MC_Reset to clear drive alarms before power-on *)
       ST_DRIVE_ENABLE,         (* Power on drive, wait for ready *)
       ST_BRAKE_RELEASE,        (* Release brake, wait for mechanical delay *)
 

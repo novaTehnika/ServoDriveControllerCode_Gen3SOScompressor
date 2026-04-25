@@ -18,7 +18,7 @@
 
    State Machine Groups:
    - Idle: ST_IDLE (first scan goes directly here; homing flag forced TRUE)
-   - Transition (Activation): ST_DRIVE_ENABLE, ST_BRAKE_RELEASE
+   - Transition (Activation): ST_DRIVE_RESET, ST_DRIVE_ENABLE, ST_BRAKE_RELEASE
    - Operational: ST_BRAKE_HOLD, ST_POSITION_CTRL, ST_VELOCITY_CTRL,
                   ST_TORQUE_CTRL, ST_GO_HOME, ST_HOME_LIMIT, ST_HOME_COMPLETE
    - Transition (Inter-Mode): ST_HOLD_POSITION
@@ -173,11 +173,11 @@ IF G_sysCurrentState = E_SystemState#ST_IDLE THEN
                     G_sysActiveFault := E_FaultCode#FAULT_HOMING_REQ;
                     G_sysCurrentState := E_SystemState#ST_FAULT;
                 ELSE
-                    G_sysCurrentState := E_SystemState#ST_DRIVE_ENABLE;
+                    G_sysCurrentState := E_SystemState#ST_DRIVE_RESET;
                 END_IF;
 
             ELSIF fbIsHoming.Result THEN
-                G_sysCurrentState := E_SystemState#ST_DRIVE_ENABLE;
+                G_sysCurrentState := E_SystemState#ST_DRIVE_RESET;
 
             ELSE
                 ;
@@ -188,6 +188,17 @@ IF G_sysCurrentState = E_SystemState#ST_IDLE THEN
     (* ======================================================================
        TRANSITION STATES - ACTIVATION
        ====================================================================== *)
+
+ELSIF G_sysCurrentState = E_SystemState#ST_DRIVE_RESET THEN
+
+        IF G_staReset.Done THEN
+            G_sysCurrentState := E_SystemState#ST_DRIVE_ENABLE;
+
+        ELSIF G_staReset.Error OR tDriveReadyTimer.Q THEN
+            G_sysActiveFault := E_FaultCode#FAULT_DRIVE;
+            G_sysCurrentState := E_SystemState#ST_FAULT;
+        END_IF;
+
 
 ELSIF G_sysCurrentState = E_SystemState#ST_DRIVE_ENABLE THEN
 
@@ -534,7 +545,8 @@ END_IF;
    on the state-entry scan, then IN=TRUE on subsequent scans.
    -------------------------------------------------------------------------- *)
 
-bDriveReadyTimerIN := (G_sysCurrentState = E_SystemState#ST_DRIVE_ENABLE) AND NOT bEnterState;
+bDriveReadyTimerIN := ((G_sysCurrentState = E_SystemState#ST_DRIVE_RESET) OR
+                        (G_sysCurrentState = E_SystemState#ST_DRIVE_ENABLE)) AND NOT bEnterState;
 
 bBrakeTimerIN := ((G_sysCurrentState = E_SystemState#ST_BRAKE_RELEASE) OR
                   (G_sysCurrentState = E_SystemState#ST_BRAKE_ENGAGE) OR
@@ -637,6 +649,9 @@ ELSIF G_sysCurrentState = E_SystemState#ST_TORQUE_CTRL THEN
 
 ELSIF G_sysCurrentState = E_SystemState#ST_HOLD_POSITION THEN
     G_cmdStop.Execute := NOT G_sysHalted;
+
+ELSIF G_sysCurrentState = E_SystemState#ST_DRIVE_RESET THEN
+    G_cmdReset.Execute := TRUE;
 
 ELSIF G_sysCurrentState = E_SystemState#ST_FAULT THEN
     G_cmdStop.Execute := NOT G_staStop.Done;
@@ -832,8 +847,11 @@ G_sysInCylinderZone := NOT fbPistonExitGuard.InDangerZone;
 IF fbSafetyMonitor.FaultDetected AND
    (G_sysCurrentState <> E_SystemState#ST_FAULT) AND
    (G_sysCurrentState <> E_SystemState#ST_FAULT_IDLE) THEN
-    G_sysActiveFault := fbSafetyMonitor.FaultCode;
-    G_sysCurrentState := E_SystemState#ST_FAULT;
+    IF NOT (G_sysCurrentState = E_SystemState#ST_DRIVE_RESET AND
+            fbSafetyMonitor.FaultCode = E_FaultCode#FAULT_DRIVE) THEN
+        G_sysActiveFault := fbSafetyMonitor.FaultCode;
+        G_sysCurrentState := E_SystemState#ST_FAULT;
+    END_IF;
 END_IF;
 
 

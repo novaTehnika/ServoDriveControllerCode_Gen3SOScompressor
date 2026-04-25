@@ -44,17 +44,17 @@
      (* Motion Control *)
      G_diMotionEnable      AT %IX0.3 : BOOL   (* Motion enable from master *)
 
+     (* Fault Control *)
+     G_diFaultReset        AT %IX0.4 : BOOL   (* Fault reset command from master *)
+
+     (* Reserved *)
+     (*G_diReserved          AT %IX0.5 : BOOL   (* Reserved for future use *)
+
      (* Overtravel Switches - Tolomatic #8100-9092, Solid State, NC, PNP *)
      (* TRUE = switch NOT triggered (normal), FALSE = triggered or wire broken *)
      (* Negative overtravel doubles as the home reference switch (Mode 110). *)
-     G_diOvertravelNeg     AT %IX0.4 : BOOL   (* Negative overtravel / home reference *)
-     G_diOvertravelPos     AT %IX0.5 : BOOL   (* Positive overtravel *)
-
-     (* Fault Control *)
-     G_diFaultReset        AT %IX0.6 : BOOL   (* Fault reset command from master *)
-
-     (* Reserved *)
-     (*G_diReserved          AT %IX0.7 : BOOL   (* Reserved for future use *)
+     G_diOvertravelNeg     AT %IX0.6 : BOOL   (* Negative overtravel / home reference *)
+     G_diOvertravelPos     AT %IX0.7 : BOOL   (* Positive overtravel *)
 
 
      (* ========================================================================
@@ -66,15 +66,15 @@
      G_doModeConfBit1      AT %QX0.1 : BOOL   (* Mode confirm bit 1 / Fault code bit 1 *)
      G_doModeConfBit2      AT %QX0.2 : BOOL   (* Mode confirm bit 2 / Fault code bit 2 *)
 
+     (* Status Outputs *)
+     G_doPerformanceStatus AT %QX0.3 : BOOL   (* Mode-dependent status indicator *)
+     G_doFaultActive       AT %QX0.4 : BOOL   (* Fault indicator: HIGH = fault active *)
+     G_doHomingComplete    AT %QX0.5 : BOOL   (* Homing sequence complete *)
+     G_doInMotion          AT %QX0.6 : BOOL   (* Axis in motion indicator *)
+
      (* Brake Control *)
      (* Spring-engaged, electrically released: HIGH = brake disengaged (motion allowed) *)
-     G_doBrakeDisengage    AT %QX0.3 : BOOL   (* Brake release command *)
-
-     (* Status Outputs *)
-     G_doPerformanceStatus AT %QX0.4 : BOOL   (* Mode-dependent status indicator *)
-     G_doFaultActive       AT %QX0.5 : BOOL   (* Fault indicator: HIGH = fault active *)
-     G_doInMotion          AT %QX0.6 : BOOL   (* Axis in motion indicator *)
-     G_doHomingComplete    AT %QX0.7 : BOOL   (* Homing sequence complete *)
+     G_doBrakeDisengage    AT %QX0.7 : BOOL   (* Brake release command *)
 
 
      (* ========================================================================
