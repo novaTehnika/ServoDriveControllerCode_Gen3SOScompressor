@@ -130,8 +130,8 @@
         VELOCITY LIMITS (mm/s)
         ======================================================================== *)
 
-     G_cfgVelLimitMax          : LREAL := 7.0       (* Maximum velocity limit *)
-     G_cfgVelLimitNormal       : LREAL := 3.0       (* Normal operating velocity *)
+     G_cfgVelLimitMax          : LREAL := 7.0         (* Maximum velocity limit *)
+     G_cfgVelLimitNormal       : LREAL := 3.0         (* Normal operating velocity *)
 
 
      (* ========================================================================
@@ -179,7 +179,7 @@
         TIMING PARAMETERS
         ======================================================================== *)
 
-     G_cfgHandshakeTimeout     : TIME := T#5MS      (* Handshake timeout duration *)
+     G_cfgHandshakeTimeout     : TIME := T#5MS        (* Handshake timeout duration *)
      G_cfgBrakeEngageDelay     : TIME := T#500MS      (* Wait after brake engage command *)
      G_cfgBrakeDisengageDelay  : TIME := T#500MS      (* Wait after brake disengage command *)
      G_cfgHomingTimeout        : TIME := T#30S        (* Overall homing sequence timeout *)
@@ -195,8 +195,8 @@
      G_cfgDebounceTimeMode         : TIME := T#50MS   (* Mode bits (DI0-2) debounce *)
      G_cfgDebounceTimeMotion       : TIME := T#20MS   (* Motion enable (DI3) debounce *)
      G_cfgDebounceTimeFault        : TIME := T#20MS   (* Fault reset (DI6) debounce *)
-     G_cfgDebounceTimeOvertravelNeg: TIME := T#10MS    (* Negative overtravel / home reference (short for homing precision) *)
-     G_cfgDebounceTimeOvertravelPos: TIME := T#10MS    (* Positive overtravel standard debounce *)
+     G_cfgDebounceTimeOvertravelNeg: TIME := T#10MS   (* Negative overtravel / home reference (short for homing precision) *)
+     G_cfgDebounceTimeOvertravelPos: TIME := T#10MS   (* Positive overtravel standard debounce *)
 
      (* Analog input filter parameters *)
      G_cfgAnalogFilterTimeConst: TIME := T#50MS       (* Low-pass filter time constant *)
@@ -215,13 +215,13 @@
         ======================================================================== *)
 
      (* Mode 110 - Home to Negative Overtravel Switch *)
-     G_cfgHomeLimApproachVel   : LREAL := 50.0        (* Approach velocity toward negative overtravel (mm/s) *)
+     G_cfgHomeLimApproachVel   : LREAL := 3.0         (* Approach velocity toward negative overtravel (mm/s) *)
      G_cfgHomeLimBackoffVel    : LREAL := 5.0         (* Backoff velocity away from switch (mm/s) *)
      G_cfgHomeLimBackoffDist   : LREAL := 5.0         (* Back-off distance after trigger (mm) *)
      G_cfgHomeLimSetPosition   : LREAL := 0.0         (* Position to set at home switch *)
-     G_cfgHomeLimAccel         : LREAL := 500.0       (* Acceleration for approach/backoff moves (mm/s²) *)
-     G_cfgHomeLimDecel         : LREAL := 500.0       (* Deceleration for approach/backoff moves (mm/s²) *)
-     G_cfgHomeLimStopDecel     : LREAL := 1000.0      (* Deceleration for MC_Stop commands (mm/s²) *)
+     G_cfgHomeLimAccel         : LREAL := 5.0         (* Acceleration for approach/backoff moves (mm/s²) *)
+     G_cfgHomeLimDecel         : LREAL := 5.0         (* Deceleration for approach/backoff moves (mm/s²) *)
+     G_cfgHomeLimStopDecel     : LREAL := 5.0         (* Deceleration for MC_Stop commands (mm/s²) *)
 
      (* Mode 101 - Go Home *)
      G_cfgGoHomePosition       : LREAL := 0.0         (* Target position for Go Home *)
