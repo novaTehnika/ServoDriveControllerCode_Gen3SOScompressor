@@ -588,14 +588,14 @@ G_cmdMoveAbsolute.Position := LREAL#0.0;
 G_cmdMoveAbsolute.Velocity := LREAL#0.0;
 G_cmdMoveAbsolute.Acceleration := G_cfgGoHomeAccel;
 G_cmdMoveAbsolute.Deceleration := G_cfgGoHomeDecel;
-G_cmdMoveAbsolute.Direction := MC_Direction.MC_Current_Direction;
+G_cmdMoveAbsolute.Direction := MC_Direction#Current_Direction;
 G_cmdMoveVelocity.Execute := FALSE;
 G_cmdMoveVelocity.Velocity := LREAL#0.0;
 G_cmdMoveVelocity.Acceleration := G_cfgHomeLimAccel;
 G_cmdMoveVelocity.Deceleration := G_cfgHomeLimDecel;
-G_cmdMoveVelocity.Direction := MC_Direction.MC_Current_Direction;
+G_cmdMoveVelocity.Direction := MC_Direction#Current_Direction;
 G_cmdDirectControl.Enable := FALSE;
-G_cmdDirectControl.ControlMode := 0;
+G_cmdDirectControl.ControlMode := Y_ControlMode#NoControlMode;
 G_cmdDirectControl.Position := LREAL#0.0;
 G_cmdDirectControl.Velocity := LREAL#0.0;
 G_cmdDirectControl.Torque := LREAL#0.0;
@@ -630,20 +630,20 @@ END_IF;
 (* State-direct commands for built-in FBs *)
 IF G_sysCurrentState = E_SystemState#ST_POSITION_CTRL THEN
     G_cmdDirectControl.Enable := TRUE;
-    G_cmdDirectControl.ControlMode := 1;
+    G_cmdDirectControl.ControlMode := Y_ControlMode#PositionMode;
     G_cmdDirectControl.Position := G_sysCommandedPosition;
     G_cmdDirectControl.Velocity := stCurrentLimits.VelMax;
     G_cmdDirectControl.Torque := stCurrentLimits.TorqueMax;
 
 ELSIF G_sysCurrentState = E_SystemState#ST_VELOCITY_CTRL THEN
     G_cmdDirectControl.Enable := TRUE;
-    G_cmdDirectControl.ControlMode := 2;
+    G_cmdDirectControl.ControlMode := Y_ControlMode#VelocityTLMode;
     G_cmdDirectControl.Velocity := G_sysCommandedVelocity;
     G_cmdDirectControl.Torque := stCurrentLimits.TorqueMax;
 
 ELSIF G_sysCurrentState = E_SystemState#ST_TORQUE_CTRL THEN
     G_cmdDirectControl.Enable := TRUE;
-    G_cmdDirectControl.ControlMode := 3;
+    G_cmdDirectControl.ControlMode := Y_ControlMode#TorqueVLMode;
     G_cmdDirectControl.Velocity := stCurrentLimits.VelMax;
     G_cmdDirectControl.Torque := G_sysCommandedTorque;
 

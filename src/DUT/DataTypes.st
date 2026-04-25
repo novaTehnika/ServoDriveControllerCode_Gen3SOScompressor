@@ -224,7 +224,7 @@ TYPE
    ST_CmdDirectControl :
    STRUCT
       Enable          : BOOL;
-      ControlMode     : INT;
+      ControlMode     : Y_ControlMode;
       Position        : LREAL;
       Velocity        : LREAL;
       Torque          : LREAL;

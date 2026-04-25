@@ -139,6 +139,7 @@ ELSIF eState = GOH_MOVING THEN
         CmdMoveAbsolute.Velocity := HomeVelocity;
         CmdMoveAbsolute.Acceleration := Acceleration;
         CmdMoveAbsolute.Deceleration := Deceleration;
+        CmdMoveAbsolute.Direction := MC_Direction#Current_Direction;
 
         InMotion := StaMoveAbsolute.Busy;
 
