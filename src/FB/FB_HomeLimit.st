@@ -35,6 +35,8 @@
        Execute             : BOOL                   (* Start homing sequence
        ApproachVelocity    : LREAL                  (* Approach velocity magnitude (mm/s)
        BackoffVelocity     : LREAL                  (* Backoff velocity magnitude (mm/s)
+       Acceleration        : LREAL                  (* Move acceleration (mm/s²)
+       Deceleration        : LREAL                  (* Move/stop deceleration (mm/s²)
        SetPosition         : LREAL                  (* Position to set at home (mm)
        Timeout             : TIME                   (* Overall sequence timeout
        OvertravelNegActive : BOOL                   (* Negative overtravel / home switch triggered
@@ -145,8 +147,8 @@ ELSIF eState = HL_APPROACH THEN
     (* HL_APPROACH - Move negative toward overtravel / home switch *)
         CmdMoveVelocity.Execute := TRUE;
         CmdMoveVelocity.Velocity := ApproachVelocity;
-        CmdMoveVelocity.Acceleration := LREAL#0.0;
-        CmdMoveVelocity.Deceleration := LREAL#0.0;
+        CmdMoveVelocity.Acceleration := Acceleration;
+        CmdMoveVelocity.Deceleration := Deceleration;
         CmdMoveVelocity.Direction := -1;
 
         InMotion := StaMoveVelocity.Busy;
@@ -165,6 +167,7 @@ ELSIF eState = HL_APPROACH THEN
 ELSIF eState = HL_DETECT THEN
 
     (* HL_DETECT - Stop motion after switch detected *)
+        CmdStop.Deceleration := Deceleration;
         CmdStop.Execute := TRUE;
 
         InMotion := NOT StaStop.Done;
@@ -185,8 +188,8 @@ ELSIF eState = HL_BACKOFF THEN
     (* HL_BACKOFF - Move positive at slow speed until switch clears *)
         CmdMoveVelocity.Execute := TRUE;
         CmdMoveVelocity.Velocity := BackoffVelocity;
-        CmdMoveVelocity.Acceleration := LREAL#0.0;
-        CmdMoveVelocity.Deceleration := LREAL#0.0;
+        CmdMoveVelocity.Acceleration := Acceleration;
+        CmdMoveVelocity.Deceleration := Deceleration;
         CmdMoveVelocity.Direction := 1;
 
         InMotion := StaMoveVelocity.Busy;
@@ -207,6 +210,7 @@ ELSIF eState = HL_SETREF THEN
 
     (* HL_SETREF - Stop, then set position reference *)
         IF NOT bStopDoneLatched THEN
+            CmdStop.Deceleration := Deceleration;
             CmdStop.Execute := NOT StaStop.Done;
 
             IF StaStop.Done THEN
@@ -248,6 +252,7 @@ ELSIF eState = HL_DONE THEN
 ELSIF eState = HL_ABORTING THEN
 
     (* HL_ABORTING - Stop motion *)
+        CmdStop.Deceleration := Deceleration;
         CmdStop.Execute := TRUE;
 
         IF StaStop.Done THEN

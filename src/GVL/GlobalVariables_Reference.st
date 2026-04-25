@@ -219,10 +219,16 @@
      G_cfgHomeLimBackoffVel    : LREAL := 5.0         (* Backoff velocity away from switch (mm/s) *)
      G_cfgHomeLimBackoffDist   : LREAL := 5.0         (* Back-off distance after trigger (mm) *)
      G_cfgHomeLimSetPosition   : LREAL := 0.0         (* Position to set at home switch *)
+     G_cfgHomeLimAccel         : LREAL := 500.0       (* Acceleration for approach/backoff moves (mm/s²) *)
+     G_cfgHomeLimDecel         : LREAL := 500.0       (* Deceleration for approach/backoff moves (mm/s²) *)
+     G_cfgHomeLimStopDecel     : LREAL := 1000.0      (* Deceleration for MC_Stop commands (mm/s²) *)
 
      (* Mode 101 - Go Home *)
      G_cfgGoHomePosition       : LREAL := 0.0         (* Target position for Go Home *)
      G_cfgGoHomeVelocity       : LREAL := 50.0        (* Velocity for Go Home move *)
+     G_cfgGoHomeAccel          : LREAL := 500.0       (* Acceleration for Go Home move (mm/s²) *)
+     G_cfgGoHomeDecel          : LREAL := 500.0       (* Deceleration for Go Home move (mm/s²) *)
+     G_cfgGoHomeStopDecel      : LREAL := 1000.0      (* Deceleration for MC_Stop commands (mm/s²) *)
    END_VAR
 
 
