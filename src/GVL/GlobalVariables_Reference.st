@@ -130,8 +130,8 @@
         VELOCITY LIMITS (mm/s)
         ======================================================================== *)
 
-     G_cfgVelLimitMax          : LREAL := 200.0       (* Maximum velocity limit *)
-     G_cfgVelLimitNormal       : LREAL := 100.0       (* Normal operating velocity *)
+     G_cfgVelLimitMax          : LREAL := 7.0       (* Maximum velocity limit *)
+     G_cfgVelLimitNormal       : LREAL := 3.0       (* Normal operating velocity *)
 
 
      (* ========================================================================
@@ -139,9 +139,9 @@
         100 = 100% rated, up to 800% peak
         ======================================================================== *)
 
-     G_cfgTorqueLimitMax       : LREAL := 300.0       (* Maximum torque limit *)
+     G_cfgTorqueLimitMax       : LREAL := 110.0       (* Maximum torque limit *)
      G_cfgTorqueLimitNormal    : LREAL := 100.0       (* Normal operating torque *)
-     G_cfgTorqueStallThreshold : LREAL := 50.0        (* Torque threshold for piston exit guard *)
+     G_cfgTorqueStallThreshold : LREAL := 20.0        (* Torque threshold for piston exit guard *)
 
 
      (* ========================================================================
@@ -179,9 +179,9 @@
         TIMING PARAMETERS
         ======================================================================== *)
 
-     G_cfgHandshakeTimeout     : TIME := T#500MS      (* Handshake timeout duration *)
-     G_cfgBrakeEngageDelay     : TIME := T#200MS      (* Wait after brake engage command *)
-     G_cfgBrakeDisengageDelay  : TIME := T#100MS      (* Wait after brake disengage command *)
+     G_cfgHandshakeTimeout     : TIME := T#5MS      (* Handshake timeout duration *)
+     G_cfgBrakeEngageDelay     : TIME := T#500MS      (* Wait after brake engage command *)
+     G_cfgBrakeDisengageDelay  : TIME := T#500MS      (* Wait after brake disengage command *)
      G_cfgHomingTimeout        : TIME := T#30S        (* Overall homing sequence timeout *)
      G_cfgDriveReadyTimeout    : TIME := T#5S         (* Timeout waiting for drive ready *)
      G_cfgFaultIdleTimeout     : TIME := T#30S        (* Timeout in fault before going to idle *)
@@ -195,8 +195,8 @@
      G_cfgDebounceTimeMode         : TIME := T#50MS   (* Mode bits (DI0-2) debounce *)
      G_cfgDebounceTimeMotion       : TIME := T#20MS   (* Motion enable (DI3) debounce *)
      G_cfgDebounceTimeFault        : TIME := T#20MS   (* Fault reset (DI6) debounce *)
-     G_cfgDebounceTimeOvertravelNeg: TIME := T#2MS    (* Negative overtravel / home reference (short for homing precision) *)
-     G_cfgDebounceTimeOvertravelPos: TIME := T#5MS    (* Positive overtravel standard debounce *)
+     G_cfgDebounceTimeOvertravelNeg: TIME := T#10MS    (* Negative overtravel / home reference (short for homing precision) *)
+     G_cfgDebounceTimeOvertravelPos: TIME := T#10MS    (* Positive overtravel standard debounce *)
 
      (* Analog input filter parameters *)
      G_cfgAnalogFilterTimeConst: TIME := T#50MS       (* Low-pass filter time constant *)
