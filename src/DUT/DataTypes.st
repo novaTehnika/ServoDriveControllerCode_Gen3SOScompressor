@@ -209,7 +209,7 @@ TYPE
       Velocity        : LREAL;
       Acceleration    : LREAL;
       Deceleration    : LREAL;
-      Direction       : INT;
+      Direction       : MC_Direction;
    END_STRUCT;
 
    ST_CmdMoveVelocity :
@@ -218,7 +218,7 @@ TYPE
       Velocity        : LREAL;
       Acceleration    : LREAL;
       Deceleration    : LREAL;
-      Direction       : INT;
+      Direction       : MC_Direction;
    END_STRUCT;
 
    ST_CmdDirectControl :

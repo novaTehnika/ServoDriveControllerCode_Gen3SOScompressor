@@ -149,7 +149,7 @@ ELSIF eState = HL_APPROACH THEN
         CmdMoveVelocity.Velocity := ApproachVelocity;
         CmdMoveVelocity.Acceleration := Acceleration;
         CmdMoveVelocity.Deceleration := Deceleration;
-        CmdMoveVelocity.Direction := -1;
+        CmdMoveVelocity.Direction := MC_Direction.MC_Negative_Direction;
 
         InMotion := StaMoveVelocity.Busy;
 
@@ -190,7 +190,7 @@ ELSIF eState = HL_BACKOFF THEN
         CmdMoveVelocity.Velocity := BackoffVelocity;
         CmdMoveVelocity.Acceleration := Acceleration;
         CmdMoveVelocity.Deceleration := Deceleration;
-        CmdMoveVelocity.Direction := 1;
+        CmdMoveVelocity.Direction := MC_Direction.MC_Positive_Direction;
 
         InMotion := StaMoveVelocity.Busy;
 
