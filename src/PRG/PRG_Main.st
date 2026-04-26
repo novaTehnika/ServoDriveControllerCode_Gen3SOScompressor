@@ -10,9 +10,11 @@
    the handshake protocol with the master controller.
 
    All built-in motion FBs (MC_Power, MC_Stop, MC_Reset, MC_MoveAbsolute,
-   MC_MoveVelocity, MC_ReadActual*, Y_DirectControl, MC_SetPosition)
-   are instantiated in the LD POU and communicate
+   MC_MoveVelocity, MC_ReadActual*, Y_DirectControl, MC_SetPosition) and
+   the PLCopen Toolbox Jog FB are instantiated in the LD POU and communicate
    via G_cmd*/G_sta* structured globals.
+   Note: MC_MoveVelocity is retained in the LD POU but currently unused;
+   homing (ST_HOME_LIMIT) now uses Jog.
 
    Every user-defined FB is called exactly once at the end of this file.
 
@@ -581,7 +583,7 @@ G_cmdPower.Enable := FALSE;
 G_cmdPower.EnablePositive := FALSE;
 G_cmdPower.EnableNegative := FALSE;
 G_cmdStop.Execute := FALSE;
-G_cmdStop.Deceleration := G_cfgHomeLimStopDecel;
+G_cmdStop.Deceleration := G_cfgGoHomeDecel;
 G_cmdReset.Execute := FALSE;
 G_cmdMoveAbsolute.Execute := FALSE;
 G_cmdMoveAbsolute.Position := LREAL#0.0;
@@ -594,6 +596,11 @@ G_cmdMoveVelocity.Velocity := LREAL#0.0;
 G_cmdMoveVelocity.Acceleration := G_cfgHomeLimAccel;
 G_cmdMoveVelocity.Deceleration := G_cfgHomeLimDecel;
 G_cmdMoveVelocity.Direction := MC_Direction#Current_Direction;
+G_cmdJog.Forward := FALSE;
+G_cmdJog.Reverse := FALSE;
+G_cmdJog.Velocity := LREAL#0.0;
+G_cmdJog.Acceleration := G_cfgHomeLimAccel;
+G_cmdJog.Deceleration := G_cfgHomeLimDecel;
 G_cmdDirectControl.Enable := FALSE;
 G_cmdDirectControl.ControlMode := Y_ControlMode#VelocityTLMode;
 G_cmdDirectControl.Position := LREAL#0.0;
@@ -769,8 +776,7 @@ fbHomeLimit(
     OvertravelNegActive := G_sysOvertravelNegActive,
     OvertravelPosActive := G_sysOvertravelPosActive,
     Abort := fTrigMotionEnable.Q,
-    StaMoveVelocity := G_staMoveVelocity,
-    StaStop := G_staStop,
+    StaJog := G_staJog,
     StaSetPosition := G_staSetPosition
 );
 
@@ -780,7 +786,7 @@ fbPistonExitGuard(
     ActualPosition := G_sysActualPosition,
     ActualVelocity := G_sysActualVelocity,
     ActualTorque := G_sysActualTorque,
-    SoftLimitMin := G_cfgPosSoftLimitMin,
+    CylinderEntry := G_cfgPosCylinderEntry,
     GuardMargin := G_cfgPosExitGuardMargin,
     VelocityThreshold := G_cfgInMotionVelThreshold,
     TorqueThreshold := G_cfgTorqueStallThreshold
@@ -833,8 +839,7 @@ IF G_sysCurrentState = E_SystemState#ST_GO_HOME THEN
     G_cmdStop := fbGoHome.CmdStop;
 
 ELSIF G_sysCurrentState = E_SystemState#ST_HOME_LIMIT THEN
-    G_cmdMoveVelocity := fbHomeLimit.CmdMoveVelocity;
-    G_cmdStop := fbHomeLimit.CmdStop;
+    G_cmdJog := fbHomeLimit.CmdJog;
     G_cmdSetPosition := fbHomeLimit.CmdSetPosition;
 
 END_IF;

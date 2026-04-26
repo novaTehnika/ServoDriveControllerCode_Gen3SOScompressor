@@ -120,10 +120,16 @@
 
      (* Soft limits - software enforced boundaries *)
      G_cfgPosSoftLimitMax      : LREAL := 305.0       (* Soft limit - extend direction *)
-     G_cfgPosSoftLimitMin      : LREAL := 0.0         (* Soft limit - retract direction *)
+     G_cfgPosSoftLimitMin      : LREAL := -5.0        (* Soft limit - retract direction. Small negative
+                                                          value gives noise headroom after MC_SetPosition.
+                                                          Replace with a meaningful value once the homing
+                                                          redesign (fast/slow + fixed retract) establishes
+                                                          position 0 at a retract endpoint. *)
 
      (* Piston exit guard margin *)
-     G_cfgPosExitGuardMargin   : LREAL := 5.0         (* Safety margin for exit prevention *)
+     G_cfgPosExitGuardMargin   : LREAL := 20.0        (* Safety margin above cylinder entry (mm). Position
+                                                          within this band of G_cfgPosCylinderEntry triggers
+                                                          torque/velocity danger-zone monitoring. *)
 
 
      (* ========================================================================
@@ -218,17 +224,16 @@
      G_cfgHomeLimApproachVel   : LREAL := 3.0         (* Approach velocity toward negative overtravel (mm/s) *)
      G_cfgHomeLimBackoffVel    : LREAL := 5.0         (* Backoff velocity away from switch (mm/s) *)
      G_cfgHomeLimBackoffDist   : LREAL := 5.0         (* Back-off distance after trigger (mm) *)
-     G_cfgHomeLimSetPosition   : LREAL := 0.0         (* Position to set at home switch *)
+     G_cfgHomeLimSetPosition   : LREAL := 0.0         (* Position to set at home point *)
      G_cfgHomeLimAccel         : LREAL := 5.0         (* Acceleration for approach/backoff moves (mm/s²) *)
      G_cfgHomeLimDecel         : LREAL := 5.0         (* Deceleration for approach/backoff moves (mm/s²) *)
-     G_cfgHomeLimStopDecel     : LREAL := 5.0         (* Deceleration for MC_Stop commands (mm/s²) *)
 
      (* Mode 101 - Go Home *)
      G_cfgGoHomePosition       : LREAL := 0.0         (* Target position for Go Home *)
-     G_cfgGoHomeVelocity       : LREAL := 50.0        (* Velocity for Go Home move *)
-     G_cfgGoHomeAccel          : LREAL := 500.0       (* Acceleration for Go Home move (mm/s²) *)
-     G_cfgGoHomeDecel          : LREAL := 500.0       (* Deceleration for Go Home move (mm/s²) *)
-     G_cfgGoHomeStopDecel      : LREAL := 1000.0      (* Deceleration for MC_Stop commands (mm/s²) *)
+     G_cfgGoHomeVelocity       : LREAL := 5.0         (* Velocity for Go Home move *)
+     G_cfgGoHomeAccel          : LREAL := 5.0         (* Acceleration for Go Home move (mm/s²) *)
+     G_cfgGoHomeDecel          : LREAL := 5.0         (* Deceleration for Go Home move (mm/s²) *)
+     G_cfgGoHomeStopDecel      : LREAL := 5.0         (* Deceleration for MC_Stop commands (mm/s²) *)
    END_VAR
 
 
@@ -238,11 +243,38 @@
 
    Coordinate System:
    - Single zero reference established by homing to the negative overtravel
-     switch (Mode 110). Master and slave share this frame.
-   - Positive direction: toward cylinder EOT (compression direction)
+     switch (Mode 110). Master and slave share this frame — every landmark
+     below is defined relative to the switch position captured during homing.
+   - Positive direction: toward cylinder EOT (compression direction, INTO cylinder)
+   - Negative direction: toward exit (retract, OUT OF cylinder)
    - All positions in millimeters (mm)
 
+   Key landmarks (positive = deeper into cylinder, all relative to the homed zero):
+   - G_cfgPosSoftLimitMin (~-5 mm) : Software floor; small negative band absorbs
+                                     homing noise until the fast/slow redesign
+                                     places position 0 at a fixed retract endpoint.
+   - 0 mm                          : Home / zero reference. Set by MC_SetPosition
+                                     at the end of the Mode 110 homing sequence,
+                                     just past the negative overtravel switch.
+   - G_cfgPosCylinderEntry         : Physical cylinder-entry point. Below this the
+                                     piston is leaving the cylinder bore; the exit
+                                     guard monitors torque/velocity here.
+   - G_cfgPosMapTransitionPos      : Analog-scaling stage boundary (200 mm).
+   - G_cfgPosSoftLimitMax (305 mm) : Software ceiling; end-of-stroke in compression
+                                     direction.
+
    VAR_GLOBAL
+     (* ========================================================================
+        DEVICE DIMENSIONS (physical landmarks in the coordinate frame)
+        ======================================================================== *)
+
+     G_cfgPosCylinderEntry     : LREAL := 200.0       (* Physical cylinder-entry position (mm).
+                                                          Below this the piston is leaving the
+                                                          cylinder — exit guard fires regardless
+                                                          of soft-limit value. Measure and set to
+                                                          the actual mechanical entry point. *)
+
+
      (* ========================================================================
         DYNAMIC POSITION TRACKING
         ======================================================================== *)
@@ -359,7 +391,8 @@
      G_cmdStop             : ST_CmdStop
      G_cmdReset            : ST_CmdReset
      G_cmdMoveAbsolute     : ST_CmdMoveAbsolute
-     G_cmdMoveVelocity     : ST_CmdMoveVelocity
+     G_cmdMoveVelocity     : ST_CmdMoveVelocity     (* unused after Jog conversion; retained for future use *)
+     G_cmdJog              : ST_CmdJog
      G_cmdDirectControl    : ST_CmdDirectControl
      G_cmdSetPosition      : ST_CmdSetPosition
 
@@ -372,7 +405,8 @@
      G_staStop             : ST_StaStop
      G_staReset            : ST_StaReset
      G_staMoveAbsolute     : ST_StaMoveAbsolute
-     G_staMoveVelocity     : ST_StaMoveVelocity
+     G_staMoveVelocity     : ST_StaMoveVelocity     (* unused after Jog conversion; retained for future use *)
+     G_staJog              : ST_StaJog
      G_staDirectControl    : ST_StaDirectControl
      G_staSetPosition      : ST_StaSetPosition
    END_VAR

@@ -221,6 +221,15 @@ TYPE
       Direction       : MC_Direction;
    END_STRUCT;
 
+   ST_CmdJog :
+   STRUCT
+      Forward         : BOOL;
+      Reverse         : BOOL;
+      Velocity        : LREAL;
+      Acceleration    : LREAL;
+      Deceleration    : LREAL;
+   END_STRUCT;
+
    ST_CmdDirectControl :
    STRUCT
       Enable          : BOOL;
@@ -282,6 +291,15 @@ TYPE
       Active          : BOOL;
       CommandAborted  : BOOL;
       Error           : BOOL;
+   END_STRUCT;
+
+   ST_StaJog :
+   STRUCT
+      InVelocity      : BOOL;
+      Done            : BOOL;      (* one-scan pulse when stopped after both inputs FALSE *)
+      Busy            : BOOL;
+      Error           : BOOL;
+      ErrorID         : UINT;
    END_STRUCT;
 
    ST_StaDirectControl :

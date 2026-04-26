@@ -36,17 +36,19 @@
        ActualPosition      : LREAL            (* Current position (mm)
        ActualVelocity      : LREAL            (* Current velocity (mm/s)
        ActualTorque        : LREAL            (* Current torque (%)
-       SoftLimitMin        : LREAL            (* Minimum allowed position (mm)
-       GuardMargin         : LREAL            (* Safety margin before limit (mm)
+       CylinderEntry       : LREAL            (* Physical cylinder-entry position (mm). Below this
+                                                 the piston is leaving the cylinder.
+       GuardMargin         : LREAL            (* Safety margin above CylinderEntry (mm). Position
+                                                 within this band triggers torque/velocity monitoring.
        VelocityThreshold   : LREAL            (* Motion detection threshold (mm/s)
        TorqueThreshold     : LREAL            (* Torque threshold for detection (%)
      VAR_OUTPUT:
        FaultTriggered      : BOOL             (* Dangerous condition detected - transition to fault
        GuardActive         : BOOL             (* Guard is actively monitoring
-       InDangerZone        : BOOL             (* Position is near exit limit
+       InDangerZone        : BOOL             (* Position is within GuardMargin of cylinder entry
        ApproachingLimit    : BOOL             (* Moving toward exit limit
      VAR:
-       rGuardBoundary      : LREAL            (* Boundary = SoftLimitMin + GuardMargin
+       rGuardBoundary      : LREAL            (* Boundary = CylinderEntry + GuardMargin
    ============================================================================ *)
 
 (* ============================================================================
@@ -62,8 +64,8 @@ IF NOT Enable THEN
     RETURN;
 END_IF;
 
-(* Calculate guard boundary *)
-rGuardBoundary := SoftLimitMin + GuardMargin;
+(* Calculate guard boundary: margin above the physical cylinder entry *)
+rGuardBoundary := CylinderEntry + GuardMargin;
 
 (* Determine position and motion status *)
 InDangerZone := (ActualPosition <= rGuardBoundary);
@@ -107,6 +109,6 @@ END_IF;
    torque/velocity. This is a backup check.
    -------------------------------------------------------------------------- *)
 
-IF ActualPosition < SoftLimitMin THEN
+IF ActualPosition < CylinderEntry THEN
     FaultTriggered := TRUE;
 END_IF;
