@@ -782,6 +782,7 @@ fbHomeLimit(
     OvertravelNegActive := G_sysOvertravelNegActive,
     OvertravelPosActive := G_sysOvertravelPosActive,
     Abort := fTrigMotionEnable.Q,
+    ActualPosition := G_sysActualPosition,
     StaJog := G_staJog,
     StaMoveAbsolute := G_staMoveAbsolute,
     StaSetPosition := G_staSetPosition

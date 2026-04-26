@@ -9,12 +9,17 @@
    deterministic, repeatable coordinate frame:
    - Fast Jog approach toward the negative overtravel switch.
    - Inter-approach backoff just far enough to clear the switch.
-   - Slow Jog re-approach for a precise switch detect.
-   - At the precise switch, MC_SetPosition declares this point to be
-     (SetPosition - RetractDist), so the switch sits at -RetractDist in
-     the resulting frame.
-   - MC_MoveAbsolute to SetPosition then advances exactly RetractDist
-     positive of the switch — landing on what becomes coordinate-frame zero.
+   - Slow Jog re-approach for a precise switch detect; the encoder
+     reading at that instant is captured as rSwitchPos (in the pre-homed
+     frame).
+   - MC_MoveAbsolute(rSwitchPos + RetractDist) backs the axis off the
+     switch by exactly RetractDist measured from the captured switch
+     position. Backing off the switch before establishing the coordinate
+     frame avoids any drive-side overtravel interlock interfering with
+     the post-frame motion.
+   - MC_SetPosition(SetPosition) then declares this retract endpoint to
+     be coordinate-frame zero (= SetPosition by default). The switch
+     ends up at SetPosition - RetractDist in the homed frame.
 
    This places position 0 at a deterministic, geometrically-defined point
    (one RetractDist positive of the switch) rather than at whatever spot
@@ -30,10 +35,15 @@
    3. INTER_BACKOFF  : Jog Forward @ BackoffVelocity until switch clears.
    4. INTER_AWAIT    : Forward cleared; wait Jog.Done.
    5. SLOW_APPROACH  : Jog Reverse @ SlowApproachVelocity for precise detect.
+                       On switch trip, capture rSwitchPos := ActualPosition.
    6. SLOW_AWAIT     : Reverse cleared on OvertravelNegActive; wait Jog.Done.
-   7. SETREF         : MC_SetPosition(SetPosition - RetractDist) at switch.
-   8. RETRACT        : MC_MoveAbsolute(SetPosition) — moves +RetractDist.
-   9. RETRACT_AWAIT  : Wait MC_MoveAbsolute.Done; sequence complete.
+   7. RETRACT        : MC_MoveAbsolute(rSwitchPos + RetractDist) — backs the
+                       axis off the switch by exactly RetractDist measured from
+                       the captured precise switch position.
+   8. RETRACT_AWAIT  : Wait MC_MoveAbsolute.Done.
+   9. SETREF         : MC_SetPosition(SetPosition) — declares the retract
+                       endpoint to be SetPosition (=0). The switch then sits
+                       at SetPosition - RetractDist (= -RetractDist).
 
    Error conditions:
    - OvertravelPosActive at any point during the sequence.
@@ -64,6 +74,7 @@
        OvertravelNegActive  : BOOL                   (* Negative overtravel / home switch triggered
        OvertravelPosActive  : BOOL                   (* Positive overtravel switch triggered (fault)
        Abort                : BOOL                   (* Abort the sequence
+       ActualPosition       : LREAL                  (* Current axis position (mm); sampled at slow detect
        StaJog               : ST_StaJog              (* Status from Jog FB
        StaMoveAbsolute      : ST_StaMoveAbsolute     (* Status from MC_MoveAbsolute
        StaSetPosition       : ST_StaSetPosition      (* Status from MC_SetPosition
@@ -80,6 +91,7 @@
        rTrigExecute         : R_TRIG
        tTimeout             : TON               (* Single call site - see end of body
        bTimeoutIN           : BOOL              (* Latched IN for tTimeout
+       rSwitchPos           : LREAL             (* ActualPosition captured at SLOW_APPROACH switch trip
    ============================================================================ *)
 
 (* ============================================================================
@@ -238,7 +250,9 @@ ELSIF eState = E_HomeLimitState#INTER_AWAIT THEN
 
 ELSIF eState = E_HomeLimitState#SLOW_APPROACH THEN
 
-    (* SLOW_APPROACH - Jog negative at slow velocity for precise switch detect *)
+    (* SLOW_APPROACH - Jog negative at slow velocity for precise switch detect.
+       Capture ActualPosition on the rising edge of OvertravelNegActive — this
+       is the precise reference point for the subsequent retract. *)
         CmdJog.Reverse := TRUE;
         CmdJog.Forward := FALSE;
         CmdJog.Velocity := SlowApproachVelocity;
@@ -248,6 +262,7 @@ ELSIF eState = E_HomeLimitState#SLOW_APPROACH THEN
         InMotion := StaJog.Busy;
 
         IF OvertravelNegActive THEN
+            rSwitchPos := ActualPosition;  (* precise switch position in pre-homed frame *)
             CmdJog.Reverse := FALSE;       (* Jog auto-decels *)
             eState := E_HomeLimitState#SLOW_AWAIT;
 
@@ -266,7 +281,7 @@ ELSIF eState = E_HomeLimitState#SLOW_AWAIT THEN
         InMotion := StaJog.Busy;
 
         IF StaJog.Done THEN
-            eState := E_HomeLimitState#SETREF;
+            eState := E_HomeLimitState#RETRACT;
 
         ELSIF StaJog.Error THEN
             Error := TRUE;
@@ -274,35 +289,14 @@ ELSIF eState = E_HomeLimitState#SLOW_AWAIT THEN
         END_IF;
 
 
-ELSIF eState = E_HomeLimitState#SETREF THEN
-
-    (* SETREF - Declare the precise switch position to be (SetPosition - RetractDist).
-       The subsequent MoveAbsolute(SetPosition) will then traverse exactly RetractDist
-       in the positive direction to land on the coordinate-frame zero. *)
-        CmdJog.Forward := FALSE;
-        CmdJog.Reverse := FALSE;
-        InMotion := FALSE;
-
-        CmdSetPosition.Execute := TRUE;
-        CmdSetPosition.Position := SetPosition - RetractDist;
-        CmdSetPosition.Mode := FALSE;
-
-        IF StaSetPosition.Done THEN
-            CmdSetPosition.Execute := FALSE;
-            eState := E_HomeLimitState#RETRACT;
-
-        ELSIF StaSetPosition.Error THEN
-            CmdSetPosition.Execute := FALSE;
-            Error := TRUE;
-            eState := E_HomeLimitState#ERROR;
-        END_IF;
-
-
 ELSIF eState = E_HomeLimitState#RETRACT THEN
 
-    (* RETRACT - MoveAbsolute to SetPosition; lands at +RetractDist of the switch *)
+    (* RETRACT - MoveAbsolute to (rSwitchPos + RetractDist), backing the axis
+       off the limit switch by exactly RetractDist measured from the captured
+       precise switch position. This runs in the pre-homed frame; SETREF
+       relabels the resulting endpoint as SetPosition (= 0) afterwards. *)
         CmdMoveAbsolute.Execute := TRUE;
-        CmdMoveAbsolute.Position := SetPosition;
+        CmdMoveAbsolute.Position := rSwitchPos + RetractDist;
         CmdMoveAbsolute.Velocity := BackoffVelocity;
         CmdMoveAbsolute.Acceleration := Acceleration;
         CmdMoveAbsolute.Deceleration := Deceleration;
@@ -319,11 +313,34 @@ ELSIF eState = E_HomeLimitState#RETRACT_AWAIT THEN
         InMotion := StaMoveAbsolute.Busy;
 
         IF StaMoveAbsolute.Done THEN
-            Done := TRUE;
-            InMotion := FALSE;
-            eState := E_HomeLimitState#DONE;
+            eState := E_HomeLimitState#SETREF;
 
         ELSIF StaMoveAbsolute.Error OR StaMoveAbsolute.CommandAborted THEN
+            Error := TRUE;
+            eState := E_HomeLimitState#ERROR;
+        END_IF;
+
+
+ELSIF eState = E_HomeLimitState#SETREF THEN
+
+    (* SETREF - Declare the retract endpoint to be SetPosition (the
+       coordinate-frame zero by default). The switch then sits at
+       SetPosition - RetractDist in the resulting frame. *)
+        CmdJog.Forward := FALSE;
+        CmdJog.Reverse := FALSE;
+        InMotion := FALSE;
+
+        CmdSetPosition.Execute := TRUE;
+        CmdSetPosition.Position := SetPosition;
+        CmdSetPosition.Mode := FALSE;
+
+        IF StaSetPosition.Done THEN
+            CmdSetPosition.Execute := FALSE;
+            Done := TRUE;
+            eState := E_HomeLimitState#DONE;
+
+        ELSIF StaSetPosition.Error THEN
+            CmdSetPosition.Execute := FALSE;
             Error := TRUE;
             eState := E_HomeLimitState#ERROR;
         END_IF;
