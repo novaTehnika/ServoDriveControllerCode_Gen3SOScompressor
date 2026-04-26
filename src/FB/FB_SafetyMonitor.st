@@ -135,11 +135,16 @@ END_IF;
 
 (* --------------------------------------------------------------------------
    POSITION LIMIT MONITORING
-   Position beyond software limits
+   Position beyond software limits.
+
+   Suppressed during ST_HOME_LIMIT: the soft limits are defined in the
+   post-homing coordinate frame, and the homing sequence legitimately drives
+   the axis below SoftLimitMin to find the negative overtravel switch (which
+   physically sits at -G_cfgHomeLimRetractDist after homing completes).
    -------------------------------------------------------------------------- *)
 
-(* Check if position is outside software limits *)
-IF (ActualPosition < SoftLimitMin) OR (ActualPosition > SoftLimitMax) THEN
+IF (CurrentState <> E_SystemState#ST_HOME_LIMIT) AND
+   ((ActualPosition < SoftLimitMin) OR (ActualPosition > SoftLimitMax)) THEN
     FaultPosition := TRUE;
 ELSE
     FaultPosition := FALSE;
