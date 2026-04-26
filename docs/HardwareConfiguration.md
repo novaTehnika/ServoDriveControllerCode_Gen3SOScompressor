@@ -181,8 +181,8 @@ The brake is controlled via DO3 through a relay:
 
 ### 7.2 Absolute Encoder Setup
 The SGM7J-04A6A6C has a 24-bit absolute encoder:
-- Battery backup maintains position across power cycles, but retained position is not trusted by this firmware
-- `G_flagHomingRequired` is forced TRUE on every boot and after every fault reset; it is cleared only by a successful Mode 110 homing sequence
+- Battery backup maintains position across power cycles; position is trusted across drive power cycles since the controller and encoder retain position data
+- `G_flagHomingRequired` is forced TRUE on cold start (controller boot) only; it is cleared only by a successful Mode 110 homing sequence
 - Encoder alarms (A.810/A.CC0/A.830) surface as `FAULT_DRIVE` from the servo amplifier
 
 ---

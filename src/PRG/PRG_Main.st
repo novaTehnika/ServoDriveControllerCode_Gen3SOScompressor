@@ -516,9 +516,9 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_IDLE THEN
            Entered after ST_FAULT timeout (slow recovery path).
            Awaits fault reset handshake to return to normal ST_IDLE.
 
-           Any fault invalidates trust in position, so both homing flags
-           are re-asserted on exit - the operator must re-home before
-           resuming operational modes.
+           Drive power-down does not invalidate position — the controller
+           and encoder retain position data. Only a cold start resets
+           G_flagHomingRequired (handled in first-scan init above).
            ---------------------------------------------------------------- *)
         IF bEnterState THEN
             G_doBrakeDisengage := FALSE;
@@ -534,7 +534,6 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_IDLE THEN
 
         IF fbFaultReset.FaultResetValid THEN
             G_sysActiveFault := E_FaultCode#FAULT_NONE;
-            G_flagHomingRequired := TRUE;
             G_sysCurrentState := E_SystemState#ST_IDLE;
         END_IF;
 
