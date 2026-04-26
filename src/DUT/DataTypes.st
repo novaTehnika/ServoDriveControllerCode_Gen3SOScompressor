@@ -135,13 +135,17 @@ TYPE
    E_HomeLimitState :
    (
       IDLE,                    (* Waiting for execute command *)
-      APPROACH,                (* Jog reverse toward overtravel / home switch *)
-      AWAIT_STOP_1,            (* Wait for Jog to finish decelerating after switch detection *)
-      BACKOFF,                 (* Jog forward until switch clears *)
-      AWAIT_STOP_2,            (* Wait for Jog to finish decelerating after switch clears *)
-      SETREF,                  (* MC_SetPosition to establish coordinate frame *)
+      FAST_APPROACH,           (* Jog Reverse @ FastApproachVel toward switch *)
+      FAST_AWAIT,              (* Drop Reverse on switch trip; wait for Jog.Done *)
+      INTER_BACKOFF,           (* Jog Forward @ BackoffVel until switch clears *)
+      INTER_AWAIT,             (* Drop Forward; wait for Jog.Done *)
+      SLOW_APPROACH,           (* Jog Reverse @ SlowApproachVel for precise re-detect *)
+      SLOW_AWAIT,              (* Drop Reverse on switch trip; wait for Jog.Done *)
+      SETREF,                  (* MC_SetPosition(SetPosition - RetractDist) at the precise switch *)
+      RETRACT,                 (* MC_MoveAbsolute(SetPosition) to land at the retract endpoint *)
+      RETRACT_AWAIT,           (* Wait for MC_MoveAbsolute.Done *)
       DONE,                    (* Homing sequence complete *)
-      ABORTING,                (* Abort requested; wait for decel *)
+      ABORTING,                (* Abort requested; wait for whichever motion FB is busy *)
       ERROR                    (* Error latched; await Execute clear *)
    );
 

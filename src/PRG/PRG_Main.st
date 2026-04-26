@@ -762,12 +762,14 @@ fbGoHome(
     StaStop := G_staStop
 );
 
-(* Home to Negative Overtravel / Home Reference handler *)
+(* Home to Negative Overtravel / Home Reference handler (two-stage + retract) *)
 fbHomeLimit(
     Enable := (G_sysCurrentState = E_SystemState#ST_HOME_LIMIT),
     Execute := (G_sysCurrentState = E_SystemState#ST_HOME_LIMIT),
-    ApproachVelocity := G_cfgHomeLimApproachVel,
+    FastApproachVelocity := G_cfgHomeLimFastApproachVel,
+    SlowApproachVelocity := G_cfgHomeLimSlowApproachVel,
     BackoffVelocity := G_cfgHomeLimBackoffVel,
+    RetractDist := G_cfgHomeLimRetractDist,
     Acceleration := G_cfgHomeLimAccel,
     Deceleration := G_cfgHomeLimDecel,
     SetPosition := G_cfgHomeLimSetPosition,
@@ -776,6 +778,7 @@ fbHomeLimit(
     OvertravelPosActive := G_sysOvertravelPosActive,
     Abort := fTrigMotionEnable.Q,
     StaJog := G_staJog,
+    StaMoveAbsolute := G_staMoveAbsolute,
     StaSetPosition := G_staSetPosition
 );
 
@@ -839,6 +842,7 @@ IF G_sysCurrentState = E_SystemState#ST_GO_HOME THEN
 
 ELSIF G_sysCurrentState = E_SystemState#ST_HOME_LIMIT THEN
     G_cmdJog := fbHomeLimit.CmdJog;
+    G_cmdMoveAbsolute := fbHomeLimit.CmdMoveAbsolute;
     G_cmdSetPosition := fbHomeLimit.CmdSetPosition;
 
 END_IF;

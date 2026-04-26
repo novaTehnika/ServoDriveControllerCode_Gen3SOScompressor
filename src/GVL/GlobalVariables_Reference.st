@@ -120,11 +120,11 @@
 
      (* Soft limits - software enforced boundaries *)
      G_cfgPosSoftLimitMax      : LREAL := 305.0       (* Soft limit - extend direction *)
-     G_cfgPosSoftLimitMin      : LREAL := -5.0        (* Soft limit - retract direction. Small negative
-                                                          value gives noise headroom after MC_SetPosition.
-                                                          Replace with a meaningful value once the homing
-                                                          redesign (fast/slow + fixed retract) establishes
-                                                          position 0 at a retract endpoint. *)
+     G_cfgPosSoftLimitMin      : LREAL := -2.5        (* Soft limit - retract direction. Lives midway between
+                                                          position 0 (the homed retract endpoint) and the
+                                                          negative overtravel switch (at -G_cfgHomeLimRetractDist,
+                                                          default -5.0 mm). Adjust if RetractDist changes so the
+                                                          soft limit stays bracketed by 0 and the switch. *)
 
      (* Piston exit guard margin *)
      G_cfgPosExitGuardMargin   : LREAL := 20.0        (* Safety margin above cylinder entry (mm). Position
@@ -220,13 +220,15 @@
         HOMING PARAMETERS
         ======================================================================== *)
 
-     (* Mode 110 - Home to Negative Overtravel Switch *)
-     G_cfgHomeLimApproachVel   : LREAL := 3.0         (* Approach velocity toward negative overtravel (mm/s) *)
-     G_cfgHomeLimBackoffVel    : LREAL := 5.0         (* Backoff velocity away from switch (mm/s) *)
-     G_cfgHomeLimBackoffDist   : LREAL := 5.0         (* Back-off distance after trigger (mm) *)
-     G_cfgHomeLimSetPosition   : LREAL := 0.0         (* Position to set at home point *)
-     G_cfgHomeLimAccel         : LREAL := 5.0         (* Acceleration for approach/backoff moves (mm/s²) *)
-     G_cfgHomeLimDecel         : LREAL := 5.0         (* Deceleration for approach/backoff moves (mm/s²) *)
+     (* Mode 110 - Home to Negative Overtravel Switch (two-stage approach + fixed retract) *)
+     G_cfgHomeLimFastApproachVel : LREAL := 5.0       (* Coarse approach toward switch (mm/s) *)
+     G_cfgHomeLimSlowApproachVel : LREAL := 1.0       (* Slow re-approach for precise switch detect (mm/s) *)
+     G_cfgHomeLimBackoffVel      : LREAL := 5.0       (* Inter-approach backoff AND final retract velocity (mm/s) *)
+     G_cfgHomeLimRetractDist     : LREAL := 5.0       (* Retract distance from precise switch to position 0 (mm).
+                                                          Switch lands at -G_cfgHomeLimRetractDist in the homed frame. *)
+     G_cfgHomeLimSetPosition     : LREAL := 0.0       (* Position value at the retract endpoint (becomes coord-frame zero) *)
+     G_cfgHomeLimAccel           : LREAL := 5.0       (* Acceleration for all homing moves (mm/s²) *)
+     G_cfgHomeLimDecel           : LREAL := 5.0       (* Deceleration for all homing moves (mm/s²) *)
 
      (* Mode 101 - Go Home *)
      G_cfgGoHomePosition       : LREAL := 0.0         (* Target position for Go Home *)
@@ -250,18 +252,22 @@
    - All positions in millimeters (mm)
 
    Key landmarks (positive = deeper into cylinder, all relative to the homed zero):
-   - G_cfgPosSoftLimitMin (~-5 mm) : Software floor; small negative band absorbs
-                                     homing noise until the fast/slow redesign
-                                     places position 0 at a fixed retract endpoint.
-   - 0 mm                          : Home / zero reference. Set by MC_SetPosition
-                                     at the end of the Mode 110 homing sequence,
-                                     just past the negative overtravel switch.
-   - G_cfgPosCylinderEntry         : Physical cylinder-entry point. Below this the
-                                     piston is leaving the cylinder bore; the exit
-                                     guard monitors torque/velocity here.
-   - G_cfgPosMapTransitionPos      : Analog-scaling stage boundary (200 mm).
-   - G_cfgPosSoftLimitMax (305 mm) : Software ceiling; end-of-stroke in compression
-                                     direction.
+   - -G_cfgHomeLimRetractDist     : Negative overtravel switch position. Established
+                                    by Mode 110: slow approach precisely re-detects
+                                    the switch, then MC_SetPosition declares this
+                                    point to be (SetPosition - RetractDist).
+   - G_cfgPosSoftLimitMin (~-2.5) : Software floor; lives between zero and the
+                                    switch, providing noise headroom while still
+                                    catching real over-travel toward the switch.
+   - 0 mm                         : Home / zero reference. Reached by MC_MoveAbsolute(
+                                    SetPosition) at the end of Mode 110 — exactly
+                                    G_cfgHomeLimRetractDist positive of the switch.
+   - G_cfgPosCylinderEntry        : Physical cylinder-entry point. Below this the
+                                    piston is leaving the cylinder bore; the exit
+                                    guard monitors torque/velocity here.
+   - G_cfgPosMapTransitionPos     : Analog-scaling stage boundary (200 mm).
+   - G_cfgPosSoftLimitMax (305 mm): Software ceiling; end-of-stroke in compression
+                                    direction.
 
    VAR_GLOBAL
      (* ========================================================================

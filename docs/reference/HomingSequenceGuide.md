@@ -27,96 +27,105 @@ The system requires two types of homing to establish accurate position reference
 ## 2. Mode 110: Home to Limit Switch
 
 ### Purpose
-Establish the coordinate system zero reference using the physical home limit switch (DI5). This is required when the absolute encoder cannot provide valid position data.
+Establish the coordinate-system zero reference using the negative overtravel switch (which doubles as the home reference). The new two-stage scheme places position 0 at a deterministic, geometrically-defined point — exactly `G_cfgHomeLimRetractDist` positive of the precise switch — so the frame is repeatable across power cycles and doesn't depend on backoff hysteresis.
 
 > **Note on Implementation**
 >
-> The sequence of steps described below is encapsulated within the `FB_HomeLimit` function block. `PRG_Main` runs a single `ST_HOME_LIMIT` state that enables the FB each scan; the deprecated sub-state enum members (`ST_HOME_LIM_APPROACH` / `DETECT` / `BACKOFF` / `SETREF`) still exist in `E_SystemState` but are not used by the live state machine. The step labels below (`HL_APPROACH`, etc.) are `FB_HomeLimit`'s internal `INT` constants.
+> The sequence is encapsulated in `FB_HomeLimit`. `PRG_Main` runs a single `ST_HOME_LIMIT` state that enables the FB each scan; the deprecated sub-state members (`ST_HOME_LIM_APPROACH` / `DETECT` / `BACKOFF` / `SETREF`) still exist in `E_SystemState` but are unused. The internal sub-states below (`FAST_APPROACH`, etc.) are members of the `E_HomeLimitState` enum.
 >
-> **Command/status routing.** `FB_HomeLimit` does not instantiate any built-in motion FBs. It emits `CmdMoveVelocity`, `CmdStop`, and `CmdSetPosition` `VAR_OUTPUT` structs which `PRG_Main` copies into `G_cmdMoveVelocity` / `G_cmdStop` / `G_cmdSetPosition`; the LD POU's `MC_MoveVelocity`, `MC_Stop`, and `MC_SetPosition` act on those and report back through `G_sta*` globals wired into the FB's `Sta*` `VAR_INPUT` structs.
+> **Command/status routing.** `FB_HomeLimit` does not instantiate any built-in motion FBs. It emits `CmdJog`, `CmdMoveAbsolute`, and `CmdSetPosition` `VAR_OUTPUT` structs which `PRG_Main` copies into `G_cmdJog` / `G_cmdMoveAbsolute` / `G_cmdSetPosition` while `G_sysCurrentState = ST_HOME_LIMIT`; the LD POU's `Jog` (PLCopen Toolbox), `MC_MoveAbsolute`, and `MC_SetPosition` instances act on those and report back through `G_sta*` globals wired into the FB's `Sta*` `VAR_INPUT` structs. Jog is used for the indefinite-duration approach/backoff phases (level-sensitive Forward/Reverse, internal auto-decel); MoveAbsolute is used only for the final fixed-distance retract.
 
 ### Sequence Steps
 
 ```
-Step 1: APPROACH
-+------------------------------------------+
-| Step: HL_APPROACH                        |
-| Action: CmdMoveVelocity.Execute := TRUE  |
-|         -> G_cmdMoveVelocity -> LD POU   |
-|         -> MC_MoveVelocity (toward sw)   |
-| Velocity: ApproachVelocity FB input      |
-|           (= G_cfgHomeLimApproachVel)    |
-|           (default: 50 mm/s)             |
-| Over-travel: if LimitRetractActive trips |
-|   FB reverses approach direction         |
-| Exit: LimitHomeActive = TRUE             |
-+------------------------------------------+
-        |
-        v
-Step 2: DETECT
-+------------------------------------------+
-| Step: HL_DETECT                          |
-| Action: CmdStop.Execute := TRUE          |
-|         -> G_cmdStop -> MC_Stop          |
-| Verify: LimitHomeActive still TRUE       |
-| Exit: StaStop.Done                       |
-+------------------------------------------+
-        |
-        v
-Step 3: BACKOFF
-+------------------------------------------+
-| Step: HL_BACKOFF                         |
-| Action: CmdMoveVelocity.Execute := TRUE  |
-|         (opposite direction at slow vel) |
-| Velocity: BackoffVelocity FB input       |
-|           (= G_cfgVelHomingSlow)         |
-|           (default: 5 mm/s)              |
-| Exit: LimitHomeActive = FALSE            |
-+------------------------------------------+
-        |
-        v
-Step 4: SET REFERENCE
-+------------------------------------------+
-| Step: HL_SETREF                          |
-| Action: CmdSetPosition.Execute := TRUE   |
-|         CmdSetPosition.Position :=       |
-|           G_cfgHomeLimSetPosition (0.0)  |
-|         CmdSetPosition.Mode := FALSE     |
-|         -> G_cmdSetPosition -> LD POU    |
-|         -> MC_SetPosition                |
-|         writes the encoder reference     |
-| Exit: StaSetPosition.Done                |
-| PRG_Main clears G_flagAbsHomeRequired    |
-| after FB reports Done                    |
-+------------------------------------------+
-        |
-        v
-Step 5: COMPLETE
-+------------------------------------------+
-| State: ST_HOME_COMPLETE                  |
-| Action: Hold position                    |
-| Output: G_doHomingComplete = TRUE        |
-| Exit: New mode commanded                 |
-+------------------------------------------+
+Step 1: FAST APPROACH                Step 2: FAST AWAIT
++----------------------------------+  +---------------------------------+
+| State: FAST_APPROACH             |  | State: FAST_AWAIT               |
+| Action: CmdJog.Reverse := TRUE   |  | Action: CmdJog.Reverse := FALSE |
+| Velocity: FastApproachVelocity   |  |  (Jog auto-decels using         |
+|   (= G_cfgHomeLimFastApproachVel)|  |   Deceleration input)           |
+|   default 5.0 mm/s               |  | Exit: StaJog.Done               |
+| Exit: OvertravelNegActive = TRUE |  +---------------------------------+
++----------------------------------+               |
+        |                                          v
+        +------------------------------------------+
+                                                   |
+Step 3: INTER BACKOFF              Step 4: INTER AWAIT
++----------------------------------+  +---------------------------------+
+| State: INTER_BACKOFF             |  | State: INTER_AWAIT              |
+| Action: CmdJog.Forward := TRUE   |  | Action: CmdJog.Forward := FALSE |
+| Velocity: BackoffVelocity        |  | Exit: StaJog.Done               |
+|   (= G_cfgHomeLimBackoffVel)     |  +---------------------------------+
+|   default 5.0 mm/s               |              |
+| Exit: OvertravelNegActive = FALSE|              |
++----------------------------------+              v
+        |                          +---------------------------------+
+        +------------------------->|
+                                   |
+Step 5: SLOW APPROACH              Step 6: SLOW AWAIT
++----------------------------------+  +---------------------------------+
+| State: SLOW_APPROACH             |  | State: SLOW_AWAIT               |
+| Action: CmdJog.Reverse := TRUE   |  | Action: CmdJog.Reverse := FALSE |
+| Velocity: SlowApproachVelocity   |  | Exit: StaJog.Done — axis now    |
+|   (= G_cfgHomeLimSlowApproachVel)|  |   precisely at the switch       |
+|   default 1.0 mm/s               |  +---------------------------------+
+| Exit: OvertravelNegActive = TRUE |              |
++----------------------------------+              v
+        |                          +---------------------------------+
+        +------------------------->|
+                                   |
+Step 7: SETREF                     Step 8: RETRACT
++----------------------------------+  +---------------------------------+
+| State: SETREF                    |  | State: RETRACT                  |
+| Action: CmdSetPosition.Execute   |  | Action: CmdMoveAbsolute.Execute |
+|   Position :=                    |  |   Position := SetPosition       |
+|     SetPosition - RetractDist    |  |     (= G_cfgHomeLimSetPosition, |
+|     (default 0 - 5 = -5 mm)      |  |      default 0.0)               |
+|   Mode := FALSE (absolute)       |  |   Velocity := BackoffVelocity   |
+| Effect: switch is now declared   |  |   Direction := Positive         |
+|   to be at -RetractDist          |  | Effect: traverses exactly       |
+| Exit: StaSetPosition.Done        |  |   RetractDist positive of switch|
++----------------------------------+  +---------------------------------+
+                                                   |
+                                                   v
+Step 9: RETRACT AWAIT              Step 10: COMPLETE
++----------------------------------+  +---------------------------------+
+| State: RETRACT_AWAIT             |  | State: ST_HOME_COMPLETE         |
+| Action: CmdMoveAbsolute.Execute  |  |   (PRG_Main, not FB)            |
+|   := FALSE (one-scan latch)      |  | G_sysActualPosition ≈ 0.0       |
+| Exit: StaMoveAbsolute.Done       |  | G_doHomingComplete = TRUE       |
+| FB sets Done = TRUE              |  | G_flagHomingRequired = FALSE    |
+| PRG_Main clears                  |  | Exit: New mode commanded        |
+|   G_flagHomingRequired           |  +---------------------------------+
++----------------------------------+
 ```
+
+### Coordinate Frame After Homing
+
+| Position (mm)                | Meaning                                                       |
+|------------------------------|---------------------------------------------------------------|
+| `0`                          | Retract endpoint — where the axis lives at end of homing.     |
+| `G_cfgPosSoftLimitMin` (-2.5)| Software floor; lives between zero and the switch.            |
+| `-G_cfgHomeLimRetractDist`   | Negative overtravel switch position (-5.0 mm with defaults).  |
 
 ### Timing Expectations
 
 | Phase | Typical Duration | Maximum |
 |-------|------------------|---------|
-| Approach | 5-15 seconds | 30 seconds |
-| Detect | 100 ms | 500 ms |
-| Backoff | 1-2 seconds | 5 seconds |
-| Set Reference | 50 ms | 200 ms |
-| **Total** | **7-18 seconds** | **36 seconds** |
+| Fast approach | 2-10 seconds | 20 seconds |
+| Inter-approach backoff | <1 second | 5 seconds |
+| Slow approach | 1-5 seconds | 20 seconds |
+| SetReference | 50 ms | 200 ms |
+| Retract (MC_MoveAbsolute) | ~1 second | 5 seconds |
+| **Total** | **5-18 seconds** | **51 seconds** |
 
 ### Abort Handling
 
 If `G_diMotionEnable` goes LOW during homing:
-1. MC_Stop executed immediately
-2. Homing sequence aborted
-3. Transition to ST_HOLD_POSITION
-4. Homing must be restarted from beginning
+1. `FB_HomeLimit` clears all `Cmd*.Execute` lines and transitions to `ABORTING`.
+2. The currently-busy FB (Jog or MoveAbsolute) decelerates per its configured deceleration.
+3. Once both `StaJog.Done`/`!Busy` and `StaMoveAbsolute.!Busy` are observed, the FB returns to `IDLE`.
+4. `PRG_Main` transitions to `ST_HOLD_POSITION`. Homing must be restarted from the beginning — partial frame is not retained.
 
 ### Master Coordination
 
@@ -356,11 +365,14 @@ MASTER:
 
 | Parameter | Default | Units | Description |
 |-----------|---------|-------|-------------|
-| `G_cfgHomeLimApproachVel` | 50.0 | mm/s | Approach velocity magnitude (FB picks direction) |
-| `G_cfgHomeLimBackoffDist` | 5.0 | mm | Distance to move off the switch after detection |
-| `G_cfgVelHomingSlow` | 5.0 | mm/s | Backoff velocity (also reused as Mode 111 slow velocity input by FBs) |
-| `G_cfgHomeLimSetPosition` | 0.0 | mm | Position reference written via `MC_SetPosition` |
-| `G_cfgHomingTimeout` | T#30S | — | Overall FB timeout for either homing mode |
+| `G_cfgHomeLimFastApproachVel` | 5.0 | mm/s | Coarse approach velocity toward switch |
+| `G_cfgHomeLimSlowApproachVel` | 1.0 | mm/s | Slow re-approach velocity for precise switch detect |
+| `G_cfgHomeLimBackoffVel` | 5.0 | mm/s | Inter-approach backoff AND retract velocity |
+| `G_cfgHomeLimRetractDist` | 5.0 | mm | Distance retracted from precise switch to position 0 |
+| `G_cfgHomeLimSetPosition` | 0.0 | mm | Position value at the retract endpoint (becomes coord-frame zero) |
+| `G_cfgHomeLimAccel` | 5.0 | mm/s² | Acceleration for all homing moves |
+| `G_cfgHomeLimDecel` | 5.0 | mm/s² | Deceleration for all homing moves |
+| `G_cfgHomingTimeout` | T#30S | — | Overall FB timeout for the entire homing sequence |
 
 ### Mode 111 Parameters
 
