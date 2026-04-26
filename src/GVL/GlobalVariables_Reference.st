@@ -196,7 +196,8 @@
         TIMING PARAMETERS
         ======================================================================== *)
 
-     G_cfgHandshakeTimeout     : TIME := T#5MS        (* Handshake timeout duration *)
+     G_cfgHandshakeTimeout     : TIME := T#5MS        (* Internal handshake timeout (master must raise motion enable within this window after handshake start) *)
+     G_cfgHoldPositionTimeout  : TIME := T#2M         (* Hold-position inactivity watchdog: if no handshake completes within this window after motion halts, gracefully shut down to idle (no fault) *)
      G_cfgBrakeEngageDelay     : TIME := T#500MS      (* Wait after brake engage command *)
      G_cfgBrakeDisengageDelay  : TIME := T#500MS      (* Wait after brake disengage command *)
      G_cfgHomingTimeout        : TIME := T#30S        (* Overall homing sequence timeout *)

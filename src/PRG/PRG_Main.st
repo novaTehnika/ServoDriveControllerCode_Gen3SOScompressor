@@ -56,13 +56,13 @@
        tStateTimer         : TON
        tBrakeTimer         : TON
        tDriveReadyTimer    : TON
-       tHandshakeTimer     : TON
+       tHoldPositionTimer  : TON
        (* Timer IN/PT latches (single-call-per-scan pattern)
        bStateTimerIN       : BOOL
        bBrakeTimerIN       : BOOL
        tBrakeTimerPT       : TIME
        bDriveReadyTimerIN  : BOOL
-       bHandshakeTimerIN   : BOOL
+       bHoldPositionTimerIN : BOOL
        (* Edge triggers
        rTrigMotionEnable   : R_TRIG
        fTrigMotionEnable   : F_TRIG
@@ -424,7 +424,11 @@ ELSIF G_sysCurrentState = E_SystemState#ST_HOLD_POSITION THEN
 
         G_doInMotion := NOT G_sysHalted;
 
-        IF fbHandshake.HandshakeComplete THEN
+        IF G_sysHalted AND (G_sysRequestedMode = E_OperatingMode#MODE_IDLE) THEN
+            (* Master wants IDLE - no handshake required, shut down cleanly *)
+            G_sysCurrentState := E_SystemState#ST_BRAKE_ENGAGE;
+
+        ELSIF fbHandshake.HandshakeComplete THEN
             eTargetMode := G_sysRequestedMode;
             fbIsOperational(Mode := eTargetMode);
 
@@ -444,14 +448,13 @@ ELSIF G_sysCurrentState = E_SystemState#ST_HOLD_POSITION THEN
                     G_sysCurrentState := E_SystemState#ST_GO_HOME;
                 ELSIF eTargetMode = E_OperatingMode#MODE_HOME_LIMIT THEN
                     G_sysCurrentState := E_SystemState#ST_HOME_LIMIT;
-                ELSIF eTargetMode = E_OperatingMode#MODE_IDLE THEN
-                    G_sysCurrentState := E_SystemState#ST_BRAKE_ENGAGE;
                 END_IF;
+                (* MODE_IDLE handled by direct path above *)
             END_IF;
 
-        ELSIF tHandshakeTimer.Q THEN
-            G_sysActiveFault := E_FaultCode#FAULT_HANDSHAKE;
-            G_sysCurrentState := E_SystemState#ST_FAULT;
+        ELSIF tHoldPositionTimer.Q THEN
+            (* Master inactivity watchdog - graceful shutdown to idle, no fault *)
+            G_sysCurrentState := E_SystemState#ST_BRAKE_ENGAGE;
         END_IF;
 
 
@@ -562,13 +565,13 @@ ELSE
     tBrakeTimerPT := T#0MS;
 END_IF;
 
-bHandshakeTimerIN := (G_sysCurrentState = E_SystemState#ST_HOLD_POSITION) AND NOT bEnterState;
+bHoldPositionTimerIN := (G_sysCurrentState = E_SystemState#ST_HOLD_POSITION) AND G_sysHalted;
 
 bStateTimerIN := (G_sysCurrentState = E_SystemState#ST_FAULT) AND NOT bEnterState;
 
 tDriveReadyTimer(IN := bDriveReadyTimerIN, PT := G_cfgDriveReadyTimeout);
 tBrakeTimer(IN := bBrakeTimerIN, PT := tBrakeTimerPT);
-tHandshakeTimer(IN := bHandshakeTimerIN, PT := G_cfgHandshakeTimeout);
+tHoldPositionTimer(IN := bHoldPositionTimerIN, PT := G_cfgHoldPositionTimeout);
 tStateTimer(IN := bStateTimerIN, PT := G_cfgFaultIdleTimeout);
 
 
