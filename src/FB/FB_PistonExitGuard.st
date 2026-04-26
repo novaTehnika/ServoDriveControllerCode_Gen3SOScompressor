@@ -101,14 +101,3 @@ IF InDangerZone THEN
         FaultTriggered := TRUE;
     END_IF;
 END_IF;
-
-(* --------------------------------------------------------------------------
-   HARD LIMIT VIOLATION
-
-   If position has gone below absolute minimum, always fault regardless of
-   torque/velocity. This is a backup check.
-   -------------------------------------------------------------------------- *)
-
-IF ActualPosition < CylinderEntry THEN
-    FaultTriggered := TRUE;
-END_IF;
