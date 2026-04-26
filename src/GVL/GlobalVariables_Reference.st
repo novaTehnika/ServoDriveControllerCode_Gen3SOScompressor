@@ -141,6 +141,17 @@
 
 
      (* ========================================================================
+        DIRECT CONTROL ACCEL/DECEL (mm/s^2)
+        Slew limits applied by Y_DirectControl in Position/Velocity/Torque
+        operating modes. Required nonzero for the FB to ramp to commanded
+        Velocity/Position; zero values leave the servo unable to move.
+        ======================================================================== *)
+
+     G_cfgDirectCtrlAccel      : LREAL := 5.0         (* Accel for Y_DirectControl operating modes (mm/s^2) *)
+     G_cfgDirectCtrlDecel      : LREAL := 5.0         (* Decel for Y_DirectControl operating modes (mm/s^2) *)
+
+
+     (* ========================================================================
         TORQUE LIMITS (% of rated torque)
         100 = 100% rated, up to 800% peak
         ======================================================================== *)

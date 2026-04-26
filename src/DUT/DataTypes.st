@@ -263,6 +263,8 @@ TYPE
       Position        : LREAL;
       Velocity        : LREAL;
       Torque          : LREAL;
+      Acceleration    : LREAL;
+      Deceleration    : LREAL;
    END_STRUCT;
 
    ST_CmdSetPosition :
