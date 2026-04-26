@@ -806,6 +806,7 @@ fbSafetyMonitor(
     ActualPosition := G_sysActualPosition,
     SoftLimitMin := G_cfgPosSoftLimitMin,
     SoftLimitMax := G_cfgPosSoftLimitMax,
+    HomingRequired := G_flagHomingRequired,
     DriveFault := G_sysDriveFault,
     CurrentState := G_sysCurrentState,
     ExitGuardTriggered := fbPistonExitGuard.FaultTriggered

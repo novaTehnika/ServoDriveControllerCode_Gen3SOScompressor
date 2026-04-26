@@ -33,6 +33,7 @@
        ActualPosition      : LREAL            (* Current axis position (mm)
        SoftLimitMin        : LREAL            (* Minimum allowed position (mm)
        SoftLimitMax        : LREAL            (* Maximum allowed position (mm)
+       HomingRequired      : BOOL             (* TRUE while coordinate frame is not yet established
        DriveFault          : BOOL             (* Drive has reported a fault
        CurrentState        : E_SystemState    (* Current state machine state
        ExitGuardTriggered  : BOOL             (* Piston exit guard triggered fault
@@ -137,13 +138,20 @@ END_IF;
    POSITION LIMIT MONITORING
    Position beyond software limits.
 
-   Suppressed during ST_HOME_LIMIT: the soft limits are defined in the
-   post-homing coordinate frame, and the homing sequence legitimately drives
-   the axis below SoftLimitMin to find the negative overtravel switch (which
-   physically sits at -G_cfgHomeLimRetractDist after homing completes).
+   Suppressed while HomingRequired is TRUE: the soft limits are defined in
+   the post-homing coordinate frame and have no meaning before that frame
+   is established. This covers:
+   - Boot with a stale absolute-encoder reading (axis parked outside the
+     post-homing soft-limit range — e.g., on the negative overtravel
+     switch — would otherwise trip FAULT_POSITION in ST_IDLE before the
+     master can ever command Mode 110).
+   - The activation transition states (DRIVE_RESET / DRIVE_ENABLE /
+     BRAKE_RELEASE) leading into ST_HOME_LIMIT.
+   - ST_HOME_LIMIT itself, where the homing sequence legitimately drives
+     the axis below SoftLimitMin to find the switch.
    -------------------------------------------------------------------------- *)
 
-IF (CurrentState <> E_SystemState#ST_HOME_LIMIT) AND
+IF (NOT HomingRequired) AND
    ((ActualPosition < SoftLimitMin) OR (ActualPosition > SoftLimitMax)) THEN
     FaultPosition := TRUE;
 ELSE
