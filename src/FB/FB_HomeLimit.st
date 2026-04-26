@@ -15,7 +15,7 @@
    internally when Forward/Reverse go FALSE; the explicit DETECT state
    (MC_Stop wait) is replaced by waiting on Jog.Done.
 
-   Sequence:
+   Sequence (states qualify with E_HomeLimitState#<name>):
    1. APPROACH:     Jog Reverse=TRUE at ApproachVelocity toward switch.
    2. AWAIT_STOP_1: Jog Reverse cleared on OvertravelNegActive; wait for Jog.Done.
    3. BACKOFF:      Jog Forward=TRUE at BackoffVelocity until switch clears.
@@ -56,20 +56,10 @@
        CmdJog              : ST_CmdJog              (* Command output for Jog FB
        CmdSetPosition      : ST_CmdSetPosition      (* Command output for MC_SetPosition
      VAR:
-       eState              : INT := 0         (* State machine
+       eState              : E_HomeLimitState  (* State machine - default IDLE
        rTrigExecute        : R_TRIG
-       tTimeout            : TON              (* Single call site - see end of body
-       bTimeoutIN          : BOOL             (* Latched IN for tTimeout
-     VAR CONSTANT:
-       HL_IDLE             : INT := 0
-       HL_APPROACH         : INT := 1
-       HL_AWAIT_STOP_1     : INT := 2
-       HL_BACKOFF          : INT := 3
-       HL_AWAIT_STOP_2     : INT := 4
-       HL_SETREF           : INT := 5
-       HL_DONE             : INT := 6
-       HL_ABORTING         : INT := 7
-       HL_ERROR            : INT := 8
+       tTimeout            : TON               (* Single call site - see end of body
+       bTimeoutIN          : BOOL              (* Latched IN for tTimeout
    ============================================================================ *)
 
 (* ============================================================================
@@ -81,7 +71,7 @@ IF NOT Enable THEN
     Done := FALSE;
     InMotion := FALSE;
     Error := FALSE;
-    eState := HL_IDLE;
+    eState := E_HomeLimitState#IDLE;
     CmdJog.Forward := FALSE;
     CmdJog.Reverse := FALSE;
     CmdJog.Velocity := LREAL#0.0;
@@ -93,25 +83,26 @@ ELSE
     rTrigExecute(CLK := Execute);
 
     (* Handle abort in most states *)
-    IF Abort AND (eState <> HL_IDLE) AND (eState <> HL_ERROR) AND (eState <> HL_DONE) THEN
+    IF Abort AND (eState <> E_HomeLimitState#IDLE) AND (eState <> E_HomeLimitState#ERROR) AND (eState <> E_HomeLimitState#DONE) THEN
         CmdJog.Forward := FALSE;
         CmdJog.Reverse := FALSE;
         CmdSetPosition.Execute := FALSE;
-        eState := HL_ABORTING;
+        eState := E_HomeLimitState#ABORTING;
     END_IF;
 
     (* Positive overtravel must never trigger during homing. *)
-    IF OvertravelPosActive AND (eState <> HL_IDLE) AND (eState <> HL_ERROR) AND
-       (eState <> HL_DONE) AND (eState <> HL_ABORTING) THEN
+    IF OvertravelPosActive AND (eState <> E_HomeLimitState#IDLE) AND (eState <> E_HomeLimitState#ERROR) AND
+       (eState <> E_HomeLimitState#DONE) AND (eState <> E_HomeLimitState#ABORTING) THEN
         CmdJog.Forward := FALSE;
         CmdJog.Reverse := FALSE;
         CmdSetPosition.Execute := FALSE;
         Error := TRUE;
-        eState := HL_ERROR;
+        eState := E_HomeLimitState#ERROR;
     END_IF;
 
     (* Default timer IN; overall timeout check uses last-scan Q *)
-    bTimeoutIN := (eState <> HL_IDLE) AND (eState <> HL_DONE) AND (eState <> HL_ERROR) AND (eState <> HL_ABORTING);
+    bTimeoutIN := (eState <> E_HomeLimitState#IDLE) AND (eState <> E_HomeLimitState#DONE) AND
+                  (eState <> E_HomeLimitState#ERROR) AND (eState <> E_HomeLimitState#ABORTING);
 
     IF tTimeout.Q THEN
         CmdJog.Forward := FALSE;
@@ -119,16 +110,16 @@ ELSE
         CmdSetPosition.Execute := FALSE;
         Error := TRUE;
         bTimeoutIN := FALSE;
-        eState := HL_ERROR;
+        eState := E_HomeLimitState#ERROR;
     END_IF;
 
 (* --------------------------------------------------------------------------
    State Machine
    -------------------------------------------------------------------------- *)
 
-IF eState = HL_IDLE THEN
+IF eState = E_HomeLimitState#IDLE THEN
 
-    (* HL_IDLE - Waiting for execute command *)
+    (* IDLE - Waiting for execute command *)
         Active := FALSE;
         Done := FALSE;
         InMotion := FALSE;
@@ -140,13 +131,13 @@ IF eState = HL_IDLE THEN
 
         IF rTrigExecute.Q OR Execute THEN
             Active := TRUE;
-            eState := HL_APPROACH;
+            eState := E_HomeLimitState#APPROACH;
         END_IF;
 
 
-ELSIF eState = HL_APPROACH THEN
+ELSIF eState = E_HomeLimitState#APPROACH THEN
 
-    (* HL_APPROACH - Jog negative toward overtravel / home switch *)
+    (* APPROACH - Jog negative toward overtravel / home switch *)
         CmdJog.Reverse := TRUE;
         CmdJog.Forward := FALSE;
         CmdJog.Velocity := ApproachVelocity;
@@ -157,34 +148,34 @@ ELSIF eState = HL_APPROACH THEN
 
         IF OvertravelNegActive THEN
             CmdJog.Reverse := FALSE;       (* Jog auto-decels *)
-            eState := HL_AWAIT_STOP_1;
+            eState := E_HomeLimitState#AWAIT_STOP_1;
 
         ELSIF StaJog.Error THEN
             CmdJog.Reverse := FALSE;
             Error := TRUE;
-            eState := HL_ERROR;
+            eState := E_HomeLimitState#ERROR;
         END_IF;
 
 
-ELSIF eState = HL_AWAIT_STOP_1 THEN
+ELSIF eState = E_HomeLimitState#AWAIT_STOP_1 THEN
 
-    (* HL_AWAIT_STOP_1 - Wait for Jog to finish decelerating after switch detection *)
+    (* AWAIT_STOP_1 - Wait for Jog to finish decelerating after switch detection *)
         CmdJog.Forward := FALSE;
         CmdJog.Reverse := FALSE;
         InMotion := StaJog.Busy;
 
         IF StaJog.Done THEN
-            eState := HL_BACKOFF;
+            eState := E_HomeLimitState#BACKOFF;
 
         ELSIF StaJog.Error THEN
             Error := TRUE;
-            eState := HL_ERROR;
+            eState := E_HomeLimitState#ERROR;
         END_IF;
 
 
-ELSIF eState = HL_BACKOFF THEN
+ELSIF eState = E_HomeLimitState#BACKOFF THEN
 
-    (* HL_BACKOFF - Jog positive until switch clears *)
+    (* BACKOFF - Jog positive until switch clears *)
         CmdJog.Forward := TRUE;
         CmdJog.Reverse := FALSE;
         CmdJog.Velocity := BackoffVelocity;
@@ -195,34 +186,34 @@ ELSIF eState = HL_BACKOFF THEN
 
         IF NOT OvertravelNegActive THEN
             CmdJog.Forward := FALSE;       (* Jog auto-decels *)
-            eState := HL_AWAIT_STOP_2;
+            eState := E_HomeLimitState#AWAIT_STOP_2;
 
         ELSIF StaJog.Error THEN
             CmdJog.Forward := FALSE;
             Error := TRUE;
-            eState := HL_ERROR;
+            eState := E_HomeLimitState#ERROR;
         END_IF;
 
 
-ELSIF eState = HL_AWAIT_STOP_2 THEN
+ELSIF eState = E_HomeLimitState#AWAIT_STOP_2 THEN
 
-    (* HL_AWAIT_STOP_2 - Wait for Jog to finish decelerating after switch clears *)
+    (* AWAIT_STOP_2 - Wait for Jog to finish decelerating after switch clears *)
         CmdJog.Forward := FALSE;
         CmdJog.Reverse := FALSE;
         InMotion := StaJog.Busy;
 
         IF StaJog.Done THEN
-            eState := HL_SETREF;
+            eState := E_HomeLimitState#SETREF;
 
         ELSIF StaJog.Error THEN
             Error := TRUE;
-            eState := HL_ERROR;
+            eState := E_HomeLimitState#ERROR;
         END_IF;
 
 
-ELSIF eState = HL_SETREF THEN
+ELSIF eState = E_HomeLimitState#SETREF THEN
 
-    (* HL_SETREF - Set position reference to establish coordinate frame *)
+    (* SETREF - Set position reference to establish coordinate frame *)
         CmdJog.Forward := FALSE;
         CmdJog.Reverse := FALSE;
         InMotion := FALSE;
@@ -234,31 +225,31 @@ ELSIF eState = HL_SETREF THEN
         IF StaSetPosition.Done THEN
             CmdSetPosition.Execute := FALSE;
             Done := TRUE;
-            eState := HL_DONE;
+            eState := E_HomeLimitState#DONE;
 
         ELSIF StaSetPosition.Error THEN
             CmdSetPosition.Execute := FALSE;
             Error := TRUE;
-            eState := HL_ERROR;
+            eState := E_HomeLimitState#ERROR;
         END_IF;
 
 
-ELSIF eState = HL_DONE THEN
+ELSIF eState = E_HomeLimitState#DONE THEN
 
-    (* HL_DONE - Homing sequence complete *)
+    (* DONE - Homing sequence complete *)
         Done := TRUE;
         Active := TRUE;
         InMotion := FALSE;
 
         IF NOT Execute THEN
             Done := FALSE;
-            eState := HL_IDLE;
+            eState := E_HomeLimitState#IDLE;
         END_IF;
 
 
-ELSIF eState = HL_ABORTING THEN
+ELSIF eState = E_HomeLimitState#ABORTING THEN
 
-    (* HL_ABORTING - Jog inputs already cleared; wait for decel to finish *)
+    (* ABORTING - Jog inputs already cleared; wait for decel to finish *)
         CmdJog.Forward := FALSE;
         CmdJog.Reverse := FALSE;
         InMotion := StaJog.Busy;
@@ -266,23 +257,23 @@ ELSIF eState = HL_ABORTING THEN
         IF StaJog.Done OR NOT StaJog.Busy THEN
             Active := FALSE;
             InMotion := FALSE;
-            eState := HL_IDLE;
+            eState := E_HomeLimitState#IDLE;
 
         ELSIF StaJog.Error THEN
-            eState := HL_ERROR;
+            eState := E_HomeLimitState#ERROR;
         END_IF;
 
 
-ELSIF eState = HL_ERROR THEN
+ELSIF eState = E_HomeLimitState#ERROR THEN
 
-    (* HL_ERROR *)
+    (* ERROR *)
         Active := FALSE;
         InMotion := FALSE;
         Done := FALSE;
 
         IF NOT Execute THEN
             Error := FALSE;
-            eState := HL_IDLE;
+            eState := E_HomeLimitState#IDLE;
         END_IF;
 
     END_IF;  (* state machine *)

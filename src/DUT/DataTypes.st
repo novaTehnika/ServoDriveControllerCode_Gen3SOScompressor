@@ -125,6 +125,28 @@ TYPE
 
 
    (* ============================================================================
+      E_HomeLimitState - FB_HomeLimit Internal State Enumeration
+
+      Sub-state machine inside FB_HomeLimit (Mode 110 homing sequence).
+      ============================================================================ *)
+
+   (* NOTE: Implicit integer values do not matter for this enum.
+      All code references states by name, never by numeric value. *)
+   E_HomeLimitState :
+   (
+      IDLE,                    (* Waiting for execute command *)
+      APPROACH,                (* Jog reverse toward overtravel / home switch *)
+      AWAIT_STOP_1,            (* Wait for Jog to finish decelerating after switch detection *)
+      BACKOFF,                 (* Jog forward until switch clears *)
+      AWAIT_STOP_2,            (* Wait for Jog to finish decelerating after switch clears *)
+      SETREF,                  (* MC_SetPosition to establish coordinate frame *)
+      DONE,                    (* Homing sequence complete *)
+      ABORTING,                (* Abort requested; wait for decel *)
+      ERROR                    (* Error latched; await Execute clear *)
+   );
+
+
+   (* ============================================================================
       ST_AxisLimits - Axis Limits Structure
 
       Structure containing position, velocity, and torque limits.
