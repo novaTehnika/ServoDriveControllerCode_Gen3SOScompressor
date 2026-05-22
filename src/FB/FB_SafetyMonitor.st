@@ -89,18 +89,6 @@ bInFaultState := (CurrentState = E_SystemState#ST_FAULT) OR
                  (CurrentState = E_SystemState#ST_FAULT_IDLE);
 
 (* --------------------------------------------------------------------------
-   Reset fault latch when appropriate
-   -------------------------------------------------------------------------- *)
-
-(* Clear fault latch when entering fault idle or returning to idle *)
-IF (CurrentState = E_SystemState#ST_FAULT_IDLE) OR (CurrentState = E_SystemState#ST_IDLE) THEN
-    IF NOT FaultDetected THEN
-        bLatchedFault := FALSE;
-        eLatchedFaultCode := E_FaultCode#FAULT_NONE;
-    END_IF;
-END_IF;
-
-(* --------------------------------------------------------------------------
    DRIVE FAULT MONITORING
    Most critical - servo amplifier has detected an issue
    -------------------------------------------------------------------------- *)
@@ -166,7 +154,9 @@ FaultPistonExit := ExitGuardTriggered;
 
 (* --------------------------------------------------------------------------
    FAULT PRIORITY AND OUTPUT
-   Determine highest priority fault and set outputs
+   Determine highest priority RAW fault for this scan.
+   Must run BEFORE latch clearing so the clear check sees the current scan's
+   value, not a stale value from the previous scan's latch override below.
    -------------------------------------------------------------------------- *)
 
 (* Priority order: Drive > LimitSwitch > Position > PistonExit *)
@@ -193,8 +183,17 @@ END_IF;
 
 (* --------------------------------------------------------------------------
    FAULT LATCHING
-   Latch fault for persistence across scans until explicitly cleared
+   Latch fault for persistence across scans until the physical condition
+   clears AND the system has left fault states. The latch clear gate uses
+   the freshly computed FaultDetected above — checking the OUTPUT variable
+   would see a stale latch-asserted TRUE and never clear.
    -------------------------------------------------------------------------- *)
+
+(* Clear latch once we're out of fault states with no raw fault present. *)
+IF NOT bInFaultState AND NOT FaultDetected THEN
+    bLatchedFault := FALSE;
+    eLatchedFaultCode := E_FaultCode#FAULT_NONE;
+END_IF;
 
 IF FaultDetected AND NOT bLatchedFault AND NOT bInFaultState THEN
     bLatchedFault := TRUE;
