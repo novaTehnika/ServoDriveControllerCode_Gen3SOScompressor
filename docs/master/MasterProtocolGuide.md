@@ -188,10 +188,10 @@ When `G_doFaultActive == HIGH`, read DO0-DO2 as fault code:
 | 000 | None | No fault / cleared | N/A |
 | 001 | Handshake | Timeout or mismatch | Retry handshake |
 | 010 | Drive | Servo amplifier fault | Check drive, reset |
-| 011 | Position | Software limit exceeded | Command safe position |
+| 011 | Position | Software limit exceeded | Command safe position; if still out, jog in via ST_RECOVERY |
 | 100 | Homing Required | Homing not completed | Command Mode 110 or 111 |
 | 101 | Piston Exit | Safety guard triggered | Reduce force, check pressure |
-| 110 | Limit Switch | Unexpected limit activation | Check mechanics |
+| 110 | Limit Switch | Unexpected limit activation | Check mechanics; if still on switch, jog off via ST_RECOVERY |
 | 111 | Encoder | Position data invalid | Homing required |
 
 ### Fault Reset Handshake
@@ -446,6 +446,29 @@ END_IF
 9. Slave: Sets G_doFaultActive = LOW
 10. Master: Returns to IDLE state
 ```
+
+### Scenario 4: Limit Recovery (switch/soft-limit still active at reset)
+
+For `FAULT_LIMIT_SWITCH` (110) or `FAULT_POSITION` (011), if the limit is still
+active when the reset clears, the slave enters the `ST_RECOVERY` hub instead of
+returning to idle/brake-hold. Jog off the limit, then resume normally:
+
+```
+1. [Limit fault active] Slave: G_doFaultActive = HIGH, fault_code = 110 (or 011)
+2. Master: G_diMotionEnable = FALSE; mirror code to mode_bits; pulse G_diFaultReset
+3. Slave: clears fault; limit still active -> enters ST_RECOVERY (drive stays on)
+          (if it had timed out to ST_FAULT_IDLE, the drive re-enables first)
+4. Master: set mode_bits = 010 (Position) or 011 (Velocity); raise G_diMotionEnable
+5. Master: drive analog reference AWAY from the limit
+          - toward-limit commands are clamped to zero (no re-fault); reverse to proceed
+6. [Switch clears AND position inside soft limits]
+7. Master: drop G_diMotionEnable -> slave goes to ST_HOLD_POSITION (normal branch)
+8. Master: select any mode and continue (re-home if position is uncertain)
+```
+
+To abandon recovery without retracting, select Mode 001 (Brake Hold, drive stays on)
+or Mode 000 (Idle, shut down) from the hub — both are honored even with the limit
+still active. See the [Fault Code Reference](FaultCodeReference.md#limit-recovery-state-st_recovery).
 
 ---
 

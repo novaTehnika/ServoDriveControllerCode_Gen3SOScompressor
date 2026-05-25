@@ -120,7 +120,13 @@ TYPE
 
       (* Fault States *)
       ST_FAULT,                (* Fault active, no brake, MC_Stop, await handshake/timeout *)
-      ST_FAULT_IDLE            (* Drive disabled, brake engaged, await fault reset handshake *)
+      ST_FAULT_IDLE,           (* Drive disabled, brake engaged, await fault reset handshake *)
+
+      (* Recovery States - jog off a still-active limit switch / soft-limit overshoot.
+         Entered from ST_FAULT (drive stays energized, brake released). *)
+      ST_RECOVERY,             (* Armed recovery hub: holds position via MC_Stop; select MODE_POSITION/MODE_VELOCITY to retract *)
+      ST_RECOVERY_POSITION,    (* Position-control retract; target clamped away from the active limit *)
+      ST_RECOVERY_VELOCITY     (* Velocity-control retract; command zeroed if it drives into the active limit *)
    );
 
 

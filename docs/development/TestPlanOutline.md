@@ -115,6 +115,13 @@ This plan does **not** cover the testing of the Simulink master controller softw
         -   `FAULT_LIMIT_SWITCH`: Manually trigger a limit switch during a normal move.
         -   `FAULT_ENCODER`: Reserved / not emitted by firmware — encoder alarms surface as `FAULT_DRIVE` via the servopack. Trigger by disconnecting the encoder battery or simulating an A.810 alarm; expect `FAULT_DRIVE`.
     -   **Acceptance Criteria:** In every case, the `G_doFaultActive` signal must go HIGH, and the correct fault code must be present on `G_doModeConfBit0-2`. The system must perform a controlled stop.
+-   **Limit Recovery (`ST_RECOVERY`):** For `FAULT_LIMIT_SWITCH` and `FAULT_POSITION` with the limit **still active** at reset:
+    -   Reset from `ST_FAULT` (fast path) → verify the slave enters `ST_RECOVERY` (drive stays on), not `ST_BRAKE_HOLD`.
+    -   Reset from `ST_FAULT_IDLE` (after `G_cfgFaultIdleTimeout`) → verify the drive re-enables and the slave lands in `ST_RECOVERY`.
+    -   In `ST_RECOVERY`, select Mode 010/011 + `G_diMotionEnable`; command **away** from the limit → axis retracts; command **toward** the limit → motion is clamped to zero and **no** new fault is raised.
+    -   Jog clear of the switch and back inside soft limits, drop `G_diMotionEnable` → verify transition to `ST_HOLD_POSITION` and that normal modes resume without faulting.
+    -   Regression: reset with the limit **already cleared** → verify the slave goes straight to `ST_BRAKE_HOLD`/`ST_IDLE` (no recovery detour). Force a drive fault mid re-enable → verify it faults and a later normal activation is not diverted to recovery.
+    -   **Acceptance Criteria:** Recovery is reachable from both fault paths, only the safe travel direction is permitted, and a successful retract rejoins normal operation. Drive and piston-exit faults still trigger while in recovery.
 
 ### 3.6 Performance and Stability Testing
 -   **Objective:** Verify the system is stable and performant under load and over time.

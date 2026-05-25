@@ -26,6 +26,8 @@
    - Transition (Inter-Mode): ST_HOLD_POSITION
    - Transition (Deactivation): ST_BRAKE_ENGAGE, ST_DRIVE_DISABLE
    - Fault: ST_FAULT, ST_FAULT_IDLE
+   - Recovery: ST_RECOVERY (hub), ST_RECOVERY_POSITION, ST_RECOVERY_VELOCITY
+               (jog off a still-active limit; entered from ST_FAULT, drive stays on)
 
    Variables (define in MWiec GUI):
      VAR:
@@ -83,6 +85,11 @@
        rAnalogFilterAlpha  : LREAL := 0.0
        bFaultResetInFaultState : BOOL
        eFaultResetActiveCode   : E_FaultCode
+       (* Limit-recovery context (computed once per scan before the state machine)
+       bBlockNeg           : BOOL             (* Negative travel blocked by neg switch or below SoftLimitMin
+       bBlockPos           : BOOL             (* Positive travel blocked by pos switch or above SoftLimitMax
+       bLimitConditionActive : BOOL           (* Either direction blocked - a limit is currently active
+       bRecoveryPending    : BOOL             (* Latched at ST_FAULT_IDLE reset; routes activation to ST_RECOVERY at brake release
    ============================================================================ *)
 
 (* ============================================================================
@@ -104,6 +111,8 @@ IF bFirstScan THEN
     G_doPerformanceStatus := FALSE;
     G_doHomingComplete := FALSE;
     G_doInMotion := FALSE;
+
+    bRecoveryPending := FALSE;
 
     IF G_cfgAnalogFilterTimeConst > T#0MS THEN
         rAnalogFilterAlpha := LREAL#0.001 / ((DINT_TO_LREAL(TIME_TO_DINT(G_cfgAnalogFilterTimeConst)) / LREAL#1000.0) + LREAL#0.001);
@@ -136,6 +145,18 @@ fTrigMotionEnable(CLK := bFilteredMotionEnable);
 
 G_sysOvertravelNegActive := NOT bFilteredOvertravelNeg;
 G_sysOvertravelPosActive := NOT bFilteredOvertravelPos;
+
+
+(* --------------------------------------------------------------------------
+   Limit Recovery Context
+   Which travel directions are blocked by an active limit (hard overtravel
+   switch or soft-limit overshoot). Used by the ST_FAULT recovery entry and
+   the ST_RECOVERY_* sub-states. Positive = into cylinder, Negative = toward exit.
+   -------------------------------------------------------------------------- *)
+
+bBlockNeg := G_sysOvertravelNegActive OR (G_sysActualPosition < G_cfgPosSoftLimitMin);
+bBlockPos := G_sysOvertravelPosActive OR (G_sysActualPosition > G_cfgPosSoftLimitMax);
+bLimitConditionActive := bBlockNeg OR bBlockPos;
 
 
 (* --------------------------------------------------------------------------
@@ -224,7 +245,13 @@ ELSIF G_sysCurrentState = E_SystemState#ST_BRAKE_RELEASE THEN
         IF tBrakeTimer.Q THEN
             G_sysBrakeEngaged := FALSE;
 
-            IF eTargetMode = E_OperatingMode#MODE_BRAKE_HOLD THEN
+            IF bRecoveryPending THEN
+                (* Re-powered out of ST_FAULT_IDLE to jog off a still-active
+                   limit. eTargetMode is stale on this path (the DI bits carried
+                   the fault-ack code), so route by the flag, not the mode. *)
+                bRecoveryPending := FALSE;
+                G_sysCurrentState := E_SystemState#ST_RECOVERY;
+            ELSIF eTargetMode = E_OperatingMode#MODE_BRAKE_HOLD THEN
                 G_sysCurrentState := E_SystemState#ST_BRAKE_HOLD;
             ELSIF eTargetMode = E_OperatingMode#MODE_POSITION THEN
                 G_sysCurrentState := E_SystemState#ST_POSITION_CTRL;
@@ -501,11 +528,23 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT THEN
 
             G_sysLastFaultCode := G_sysActiveFault;
             G_sysFaultCount := G_sysFaultCount + UDINT#1;
+
+            (* Drop any pending recovery intent if a re-enable aborted to fault *)
+            bRecoveryPending := FALSE;
         END_IF;
 
         IF fbFaultReset.FaultResetValid THEN
             G_sysActiveFault := E_FaultCode#FAULT_NONE;
-            G_sysCurrentState := E_SystemState#ST_BRAKE_HOLD;
+
+            IF ((G_sysLastFaultCode = E_FaultCode#FAULT_LIMIT_SWITCH) OR
+                (G_sysLastFaultCode = E_FaultCode#FAULT_POSITION)) AND
+               bLimitConditionActive THEN
+                (* Limit still active - enter recovery to jog off it.
+                   Drive stays energized and the brake stays released. *)
+                G_sysCurrentState := E_SystemState#ST_RECOVERY;
+            ELSE
+                G_sysCurrentState := E_SystemState#ST_BRAKE_HOLD;
+            END_IF;
 
         ELSIF tStateTimer.Q THEN
             G_sysCurrentState := E_SystemState#ST_FAULT_IDLE;
@@ -537,7 +576,127 @@ ELSIF G_sysCurrentState = E_SystemState#ST_FAULT_IDLE THEN
 
         IF fbFaultReset.FaultResetValid THEN
             G_sysActiveFault := E_FaultCode#FAULT_NONE;
-            G_sysCurrentState := E_SystemState#ST_IDLE;
+
+            IF ((G_sysLastFaultCode = E_FaultCode#FAULT_LIMIT_SWITCH) OR
+                (G_sysLastFaultCode = E_FaultCode#FAULT_POSITION)) AND
+               bLimitConditionActive THEN
+                (* Limit still active - re-power through the activation sequence
+                   and divert to recovery at brake release (bRecoveryPending). *)
+                bRecoveryPending := TRUE;
+                G_sysCurrentState := E_SystemState#ST_DRIVE_RESET;
+            ELSE
+                G_sysCurrentState := E_SystemState#ST_IDLE;
+            END_IF;
+        END_IF;
+
+
+    (* ======================================================================
+       RECOVERY STATES
+       Jog off a still-active limit (overtravel switch or soft-limit
+       overshoot) after a FAULT_LIMIT_SWITCH / FAULT_POSITION reset.
+       Drive stays energized and the brake stays released throughout.
+       ====================================================================== *)
+
+ELSIF G_sysCurrentState = E_SystemState#ST_RECOVERY THEN
+        (* ----------------------------------------------------------------
+           RECOVERY HUB - armed, position held via MC_Stop.
+           Mirrors ST_BRAKE_HOLD's handshake, but the brake stays released
+           so a motion sub-mode can take over without a re-enable sequence.
+           ---------------------------------------------------------------- *)
+        IF bEnterState THEN
+            G_doBrakeDisengage := TRUE;
+            G_sysConfirmedMode := E_OperatingMode#MODE_BRAKE_HOLD;
+        END_IF;
+
+        G_doInMotion := FALSE;
+
+        IF fbHandshake.HandshakeComplete THEN
+            eTargetMode := G_sysRequestedMode;
+
+            IF eTargetMode = E_OperatingMode#MODE_POSITION THEN
+                G_sysCurrentState := E_SystemState#ST_RECOVERY_POSITION;
+            ELSIF eTargetMode = E_OperatingMode#MODE_VELOCITY THEN
+                G_sysCurrentState := E_SystemState#ST_RECOVERY_VELOCITY;
+            ELSIF eTargetMode = E_OperatingMode#MODE_IDLE THEN
+                G_sysCurrentState := E_SystemState#ST_BRAKE_ENGAGE;
+            ELSIF eTargetMode = E_OperatingMode#MODE_BRAKE_HOLD THEN
+                G_sysCurrentState := E_SystemState#ST_BRAKE_HOLD;
+            END_IF;
+        END_IF;
+
+
+ELSIF G_sysCurrentState = E_SystemState#ST_RECOVERY_POSITION THEN
+        (* ----------------------------------------------------------------
+           POSITION RETRACT - like ST_POSITION_CTRL, but the target is also
+           blocked from moving further toward the active limit. The normal
+           soft-limit clamp already pulls the target back inside the valid
+           box; the explicit block covers the (defensive) case of a switch
+           tripping inside the soft-limit range.
+           ---------------------------------------------------------------- *)
+        IF bEnterState THEN
+            G_sysConfirmedMode := E_OperatingMode#MODE_POSITION;
+            stCurrentLimits.PosMax := G_cfgPosSoftLimitMax;
+            stCurrentLimits.PosMin := G_cfgPosSoftLimitMin;
+            stCurrentLimits.VelMax := G_cfgVelLimitNormal;
+            stCurrentLimits.TorqueMax := G_cfgTorqueLimitNormal;
+        END_IF;
+
+        G_sysCommandedPosition := fbAnalogProc.ScaledPosition;
+        G_sysCommandedPosition := LIMIT(stCurrentLimits.PosMin,
+                                      G_sysCommandedPosition,
+                                      stCurrentLimits.PosMax);
+
+        (* Block any target that would drive further toward the active limit *)
+        IF bBlockNeg AND (G_sysCommandedPosition < G_sysActualPosition) THEN
+            G_sysCommandedPosition := G_sysActualPosition;
+        END_IF;
+        IF bBlockPos AND (G_sysCommandedPosition > G_sysActualPosition) THEN
+            G_sysCommandedPosition := G_sysActualPosition;
+        END_IF;
+
+        G_doInMotion := ABS(G_sysActualVelocity) > G_cfgInMotionVelThreshold;
+
+        IF fTrigMotionEnable.Q THEN
+            IF bLimitConditionActive THEN
+                G_sysCurrentState := E_SystemState#ST_RECOVERY;
+            ELSE
+                G_sysCurrentState := E_SystemState#ST_HOLD_POSITION;
+            END_IF;
+        END_IF;
+
+
+ELSIF G_sysCurrentState = E_SystemState#ST_RECOVERY_VELOCITY THEN
+        (* ----------------------------------------------------------------
+           VELOCITY RETRACT - like ST_VELOCITY_CTRL, but a command that
+           would drive further toward the active limit is zeroed (no fault).
+           ---------------------------------------------------------------- *)
+        IF bEnterState THEN
+            G_sysConfirmedMode := E_OperatingMode#MODE_VELOCITY;
+            stCurrentLimits.VelMax := G_cfgVelLimitMax;
+            stCurrentLimits.TorqueMax := G_cfgTorqueLimitNormal;
+        END_IF;
+
+        G_sysCommandedVelocity := fbAnalogProc.ScaledVelocity;
+        G_sysCommandedVelocity := LIMIT(-stCurrentLimits.VelMax,
+                                      G_sysCommandedVelocity,
+                                      stCurrentLimits.VelMax);
+
+        (* Block velocity that would drive further toward the active limit *)
+        IF bBlockNeg AND (G_sysCommandedVelocity < LREAL#0.0) THEN
+            G_sysCommandedVelocity := LREAL#0.0;
+        END_IF;
+        IF bBlockPos AND (G_sysCommandedVelocity > LREAL#0.0) THEN
+            G_sysCommandedVelocity := LREAL#0.0;
+        END_IF;
+
+        G_doInMotion := ABS(G_sysActualVelocity) > G_cfgInMotionVelThreshold;
+
+        IF fTrigMotionEnable.Q THEN
+            IF bLimitConditionActive THEN
+                G_sysCurrentState := E_SystemState#ST_RECOVERY;
+            ELSE
+                G_sysCurrentState := E_SystemState#ST_HOLD_POSITION;
+            END_IF;
         END_IF;
 
 END_IF;
@@ -626,6 +785,9 @@ IF (G_sysCurrentState = E_SystemState#ST_DRIVE_ENABLE) OR
    (G_sysCurrentState = E_SystemState#ST_HOME_COMPLETE) OR
    (G_sysCurrentState = E_SystemState#ST_HOLD_POSITION) OR
    (G_sysCurrentState = E_SystemState#ST_BRAKE_ENGAGE) OR
+   (G_sysCurrentState = E_SystemState#ST_RECOVERY) OR
+   (G_sysCurrentState = E_SystemState#ST_RECOVERY_POSITION) OR
+   (G_sysCurrentState = E_SystemState#ST_RECOVERY_VELOCITY) OR
    (G_sysCurrentState = E_SystemState#ST_FAULT) THEN
     G_cmdPower.Enable := TRUE;
     G_cmdPower.EnablePositive := TRUE;
@@ -658,13 +820,27 @@ ELSIF G_sysCurrentState = E_SystemState#ST_TORQUE_CTRL THEN
     G_cmdDirectControl.Velocity := stCurrentLimits.VelMax;
     G_cmdDirectControl.Torque := G_sysCommandedTorque;
 
+ELSIF G_sysCurrentState = E_SystemState#ST_RECOVERY_POSITION THEN
+    G_cmdDirectControl.Enable := TRUE;
+    G_cmdDirectControl.ControlMode := Y_ControlMode#PositionMode;
+    G_cmdDirectControl.Position := G_sysCommandedPosition;
+    G_cmdDirectControl.Velocity := stCurrentLimits.VelMax;
+    G_cmdDirectControl.Torque := stCurrentLimits.TorqueMax;
+
+ELSIF G_sysCurrentState = E_SystemState#ST_RECOVERY_VELOCITY THEN
+    G_cmdDirectControl.Enable := TRUE;
+    G_cmdDirectControl.ControlMode := Y_ControlMode#VelocityTLMode;
+    G_cmdDirectControl.Velocity := G_sysCommandedVelocity;
+    G_cmdDirectControl.Torque := stCurrentLimits.TorqueMax;
+
 ELSIF G_sysCurrentState = E_SystemState#ST_HOLD_POSITION THEN
     G_cmdStop.Execute := NOT G_sysHalted;
 
 ELSIF G_sysCurrentState = E_SystemState#ST_DRIVE_RESET THEN
     G_cmdReset.Execute := TRUE;
 
-ELSIF G_sysCurrentState = E_SystemState#ST_FAULT THEN
+ELSIF (G_sysCurrentState = E_SystemState#ST_FAULT) OR
+      (G_sysCurrentState = E_SystemState#ST_RECOVERY) THEN
     G_cmdStop.Execute := NOT G_staStop.Done;
 
 END_IF;
@@ -721,7 +897,8 @@ fbAnalogProc(
 fbHandshake(
     Enable := (G_sysCurrentState = E_SystemState#ST_IDLE) OR
               (G_sysCurrentState = E_SystemState#ST_BRAKE_HOLD) OR
-              (G_sysCurrentState = E_SystemState#ST_HOLD_POSITION),
+              (G_sysCurrentState = E_SystemState#ST_HOLD_POSITION) OR
+              (G_sysCurrentState = E_SystemState#ST_RECOVERY),
     RequestedMode := G_sysRequestedMode,
     ModeStable := fbModeDecoder.ModeStable,
     MotionEnable := bFilteredMotionEnable,

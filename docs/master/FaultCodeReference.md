@@ -26,7 +26,7 @@ When `G_doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 co
 | 011 | 3 | FAULT_POSITION | Medium | Yes |
 | 100 | 4 | FAULT_HOMING_REQ | Low | Yes (with homing) |
 | 101 | 5 | FAULT_PISTON_EXIT | High | Conditional |
-| 110 | 6 | FAULT_LIMIT_SWITCH | High | No (investigation) |
+| 110 | 6 | FAULT_LIMIT_SWITCH | High | Manual jog-off via ST_RECOVERY (investigate cause) |
 | 111 | 7 | FAULT_ENCODER | High | **Reserved (not emitted by current firmware — encoder alarms surface as FAULT_DRIVE)** |
 
 ---
@@ -126,10 +126,13 @@ When `G_doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 co
 3. Set G_diMotionEnable = FALSE
 4. Mirror code: DI0=1, DI1=1, DI2=0
 5. Pulse G_diFaultReset
-6. After clear: command position away from limit
+6. After clear:
+   - If position is back inside the soft limits -> ST_BRAKE_HOLD (normal)
+   - If still beyond a soft limit -> slave enters ST_RECOVERY; jog back
+     inside via MODE_POSITION/MODE_VELOCITY (see "Limit Recovery State")
 ```
 
-**Important**: After clearing, immediately command a safe position. The fault will retrigger if position remains out of limits.
+**Important**: If the position is still outside the soft limits at reset, the slave no longer bounces straight back into fault — it routes to **`ST_RECOVERY`** so you can drive back inside. See [Limit Recovery State (ST_RECOVERY)](#limit-recovery-state-st_recovery).
 
 ---
 
@@ -230,9 +233,47 @@ When `G_doFaultActive` (DO5) is HIGH, the slave is in fault state and DO0-DO2 co
 - Check for position drift or encoder error
 
 **Manual Recovery**:
-1. Clear fault with mirrored code
-2. Carefully command mode to move away from limit
-3. Consider re-homing if position uncertain
+1. Clear fault with mirrored code (DI0=0, DI1=1, DI2=1) while `G_diMotionEnable` is LOW
+2. If the switch is still active, the slave enters **`ST_RECOVERY`** — jog off the
+   switch via `MODE_POSITION`/`MODE_VELOCITY` (see below). Motion *into* the switch
+   is blocked; motion *away* is allowed.
+3. Once clear, consider re-homing if position is uncertain.
+
+---
+
+### Limit Recovery State (ST_RECOVERY)
+
+`FAULT_LIMIT_SWITCH` and `FAULT_POSITION` can leave the axis resting **on** a hard
+overtravel switch or **beyond** a soft limit. Any normal motion mode would
+immediately re-trip the fault there, so the firmware provides a dedicated recovery
+sub-machine that lets the operator jog **away** from the limit while refusing motion
+*into* it.
+
+**Entry is automatic at fault reset.** When a `FAULT_LIMIT_SWITCH` or `FAULT_POSITION`
+reset succeeds:
+- If the limit condition has cleared (switch released **and** position inside the
+  soft limits) → normal recovery (`ST_BRAKE_HOLD`), as before.
+- If the limit is still active → the slave enters **`ST_RECOVERY`** (drive stays
+  energized, brake released). From `ST_FAULT` this is immediate; from `ST_FAULT_IDLE`
+  (slow path) the drive is re-enabled first and then lands in `ST_RECOVERY`.
+
+**Operating procedure (two-step — during the reset the DI bits carry the fault-ack
+code, so the recovery mode is selected afterward):**
+1. After the reset lands in `ST_RECOVERY`, set the mode bits to `MODE_POSITION` (010)
+   or `MODE_VELOCITY` (011) and raise `G_diMotionEnable` (the normal mode handshake).
+2. Drive the analog reference to retract. Motion **away** from the active limit runs
+   at the normal velocity limit. A command **toward** the active limit is clamped to
+   zero — it does **not** re-fault; just reverse the reference.
+3. When the switch clears and position is back inside the soft limits, drop
+   `G_diMotionEnable`: the slave rejoins the normal branch (`ST_HOLD_POSITION`) and you
+   may select any mode. If a limit is still active when motion-enable drops, it
+   returns to the recovery hub so you can keep jogging.
+
+**Exit without recovering:** from the recovery hub request `MODE_BRAKE_HOLD` (drive
+stays on) or `MODE_IDLE` (shut down) — honored even with a limit still active.
+
+While in recovery the position-limit and limit-switch faults are suppressed; **drive
+and piston-exit faults remain active**.
 
 ---
 
@@ -348,10 +389,10 @@ After reset, determine appropriate next action:
 
 001 (Handshake) -> Retry previous mode command
 010 (Drive)     -> May need power cycle, then re-home
-011 (Position)  -> Command safe position immediately
+011 (Position)  -> If still out of limits, jog back in via ST_RECOVERY
 100 (Homing)    -> Command Mode 110 and/or 111
 101 (Piston)    -> Check pressure, move away from exit
-110 (Limit)     -> Manual investigation required
+110 (Limit)     -> Investigate; if still on switch, jog off via ST_RECOVERY
 111 (Encoder)   -> Must complete Mode 110 homing
 ```
 
@@ -405,10 +446,10 @@ After reset, determine appropriate next action:
 | 0 | 000 | None | - |
 | 1 | 001 | Handshake | Retry mode |
 | 2 | 010 | Drive | Check drive |
-| 3 | 011 | Position | Move to safe |
+| 3 | 011 | Position | Jog back in (ST_RECOVERY) |
 | 4 | 100 | Homing Req | Home axis |
 | 5 | 101 | Piston Exit | Check pressure |
-| 6 | 110 | Limit Switch | Investigate |
+| 6 | 110 | Limit Switch | Investigate; jog off (ST_RECOVERY) |
 | 7 | 111 | Encoder | Home axis |
 
 ### Reset Checklist

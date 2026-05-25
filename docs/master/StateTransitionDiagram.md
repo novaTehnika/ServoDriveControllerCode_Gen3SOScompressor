@@ -259,6 +259,37 @@
                                 +---------------+
 ```
 
+### Limit Recovery on Reset
+
+When the cleared fault was `FAULT_LIMIT_SWITCH` or `FAULT_POSITION` **and** a limit
+is still active at reset (switch held or position beyond a soft limit), the reset
+routes into the recovery sub-machine instead of the normal targets above:
+
+```
+   ST_FAULT --reset, limit still active--------------------> ST_RECOVERY
+   ST_FAULT_IDLE --reset, limit still active--> (DRIVE_RESET
+                              -> DRIVE_ENABLE -> BRAKE_RELEASE) -> ST_RECOVERY
+            (re-enable sequence; carried by bRecoveryPending)
+
+   ST_RECOVERY  (drive ON, brake released, position held via MC_Stop)
+        |  select MODE_POSITION (010) / MODE_VELOCITY (011) + G_diMotionEnable
+        v
+   ST_RECOVERY_POSITION / ST_RECOVERY_VELOCITY
+        |  jog AWAY from the limit (toward-limit commands are clamped to zero)
+        |
+        +-- G_diMotionEnable toggle, limit still active --> ST_RECOVERY (keep jogging)
+        +-- G_diMotionEnable toggle, limit cleared -------> ST_HOLD_POSITION (normal)
+
+   ST_RECOVERY --select MODE_BRAKE_HOLD--> ST_BRAKE_HOLD   (manual exit, drive on)
+   ST_RECOVERY --select MODE_IDLE-------> ST_BRAKE_ENGAGE  (shutdown)
+```
+
+If the limit has already cleared at reset, the normal `ST_BRAKE_HOLD` / `ST_IDLE`
+targets apply (no recovery detour). Limit-switch and position faults are suppressed
+while in recovery; drive and piston-exit faults stay active. See the
+[Fault Code Reference](FaultCodeReference.md#limit-recovery-state-st_recovery) for
+the master-side procedure.
+
 ---
 
 ## 5. Valid Mode Transitions
@@ -316,6 +347,9 @@ ST_BRAKE_ENGAGE            Engaging brake
 ST_DRIVE_DISABLE           Powering off drive
 ST_FAULT                   Fault active
 ST_FAULT_IDLE              Safe powered-down fault state
+ST_RECOVERY                Limit-recovery hub: drive ON, brake released, held via MC_Stop
+ST_RECOVERY_POSITION       Position-control retract (direction clamped away from limit)
+ST_RECOVERY_VELOCITY       Velocity-control retract (direction clamped away from limit)
 ```
 
 ---
@@ -431,3 +465,11 @@ Mode Confirm    000__|________/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾�
 ### At ST_FAULT
 - Check: Valid reset handshake?
 - Check: Fault condition persists after reset?
+- Check: Was it a limit/position fault with the limit still active? → route to `ST_RECOVERY`
+  (from `ST_FAULT_IDLE`, re-enable the drive first) instead of `ST_BRAKE_HOLD`/`ST_IDLE`.
+
+### At ST_RECOVERY (and sub-states)
+- Check: Mode select `MODE_POSITION`/`MODE_VELOCITY` → enter retract sub-state.
+- Check: Commanded direction toward the active limit → clamp command to zero (no fault).
+- Check: `G_diMotionEnable` toggle → limit cleared? `ST_HOLD_POSITION` (normal) : `ST_RECOVERY` (keep jogging).
+- Check: Mode select `MODE_BRAKE_HOLD`/`MODE_IDLE` → leave recovery.

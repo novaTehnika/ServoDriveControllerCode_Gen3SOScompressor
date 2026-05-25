@@ -50,6 +50,7 @@
        bInMotionState      : BOOL
        bInHomingState      : BOOL
        bInFaultState       : BOOL
+       bInRecoveryState    : BOOL             (* TRUE in ST_RECOVERY / ST_RECOVERY_POSITION / ST_RECOVERY_VELOCITY
    ============================================================================ *)
 
 (* ============================================================================
@@ -88,6 +89,14 @@ bInHomingState := (CurrentState = E_SystemState#ST_HOME_LIMIT) OR
 bInFaultState := (CurrentState = E_SystemState#ST_FAULT) OR
                  (CurrentState = E_SystemState#ST_FAULT_IDLE);
 
+(* Check if in a limit-recovery state. While recovering, the operator is
+   deliberately jogging off an active limit; the active overtravel switch and
+   out-of-soft-limit position are expected and must not fault. Travel direction
+   is enforced by command clamping in PRG_Main, not here. *)
+bInRecoveryState := (CurrentState = E_SystemState#ST_RECOVERY) OR
+                    (CurrentState = E_SystemState#ST_RECOVERY_POSITION) OR
+                    (CurrentState = E_SystemState#ST_RECOVERY_VELOCITY);
+
 (* --------------------------------------------------------------------------
    DRIVE FAULT MONITORING
    Most critical - servo amplifier has detected an issue
@@ -106,6 +115,15 @@ IF bInHomingState THEN
     (* During homing, negative overtravel is the expected target.
        Positive overtravel is never expected - always faults. *)
     IF OvertravelPosActive THEN
+        FaultLimitSwitch := TRUE;
+    ELSE
+        FaultLimitSwitch := FALSE;
+    END_IF;
+ELSIF bInRecoveryState THEN
+    (* During recovery, the active switch is expected (we are jogging off it).
+       Only a simultaneous both-switches reading is impossible mechanically and
+       indicates a wiring/sensor fault. *)
+    IF OvertravelNegActive AND OvertravelPosActive THEN
         FaultLimitSwitch := TRUE;
     ELSE
         FaultLimitSwitch := FALSE;
@@ -135,10 +153,14 @@ END_IF;
      if voluntarily re-commanded after a successful homing). The sequence
      legitimately drives the axis below SoftLimitMin to find the switch,
      and the coordinate frame is being re-established mid-flight.
+   - In a recovery state (bInRecoveryState): the axis starts outside the
+     soft-limit box and is being jogged back inside; faulting on the very
+     position we are recovering from would defeat the recovery.
    -------------------------------------------------------------------------- *)
 
 IF (NOT HomingRequired) AND
    (CurrentState <> E_SystemState#ST_HOME_LIMIT) AND
+   (NOT bInRecoveryState) AND
    ((ActualPosition < SoftLimitMin) OR (ActualPosition > SoftLimitMax)) THEN
     FaultPosition := TRUE;
 ELSE
